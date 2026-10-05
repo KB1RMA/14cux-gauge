@@ -1,0 +1,54 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+
+/* Coniston Green with saddle tan: the default palette, so it sets the
+   colours on :root itself and the other palettes override it. */
+:root {
+  --bg: #eceee7;
+  --surface: #fafbf7;
+  --surface-raised: #e3e7dc;
+  --border: #cdd3c4;
+  --control-border: #737e69;
+  --focus: #8a5634;
+  --text: #1b2216;
+  --text-muted: #55604b;
+  --accent: #475a3a;
+  --accent-contrast: #ffffff;
+  --good: #2a6e2f;
+  --warn: #9a4f00;
+  --danger: #b3262d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #151b12;
+    --surface: #1e2719;
+    --surface-raised: #283322;
+    --border: #34402d;
+    --control-border: #77866b;
+    --focus: #d9a273;
+    --text: #eaefe4;
+    --text-muted: #a5b19a;
+    --accent: #d9a273;
+    --accent-contrast: #1b2216;
+    --good: #7fd18b;
+    --warn: #ffaa55;
+    --danger: #ff7b73;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #151b12;
+  --surface: #1e2719;
+  --surface-raised: #283322;
+  --border: #34402d;
+  --control-border: #77866b;
+  --focus: #d9a273;
+  --text: #eaefe4;
+  --text-muted: #a5b19a;
+  --accent: #d9a273;
+  --accent-contrast: #1b2216;
+  --good: #7fd18b;
+  --warn: #ffaa55;
+  --danger: #ff7b73;
+}

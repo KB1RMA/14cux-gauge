@@ -1,0 +1,53 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+
+/* British Racing Green with saddle tan. */
+:root[data-palette='racing-green'] {
+  --bg: #eaede8;
+  --surface: #f9faf8;
+  --surface-raised: #e0e5de;
+  --border: #c9d0c6;
+  --control-border: #6e7a6a;
+  --focus: #8a5634;
+  --text: #161d16;
+  --text-muted: #525d50;
+  --accent: #2f3d2f;
+  --accent-contrast: #ffffff;
+  --good: #2a6e2f;
+  --warn: #9a4f00;
+  --danger: #b3262d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='racing-green']:not([data-theme='light']) {
+    --bg: #101511;
+    --surface: #182019;
+    --surface-raised: #212a22;
+    --border: #2c372d;
+    --control-border: #71806f;
+    --focus: #d9a273;
+    --text: #e7ede6;
+    --text-muted: #a0ad9e;
+    --accent: #d9a273;
+    --accent-contrast: #161d16;
+    --good: #7fd18b;
+    --warn: #ffaa55;
+    --danger: #ff7b73;
+  }
+}
+
+:root[data-palette='racing-green'][data-theme='dark'] {
+  --bg: #101511;
+  --surface: #182019;
+  --surface-raised: #212a22;
+  --border: #2c372d;
+  --control-border: #71806f;
+  --focus: #d9a273;
+  --text: #e7ede6;
+  --text-muted: #a0ad9e;
+  --accent: #d9a273;
+  --accent-contrast: #161d16;
+  --good: #7fd18b;
+  --warn: #ffaa55;
+  --danger: #ff7b73;
+}

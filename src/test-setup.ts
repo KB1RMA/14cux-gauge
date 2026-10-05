@@ -7,6 +7,7 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   delete document.documentElement.dataset['theme'];
+  delete document.documentElement.dataset['palette'];
 });
 
 // jsdom does no layout, so it leaves out APIs that Radix's positioned

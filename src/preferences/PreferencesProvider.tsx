@@ -6,11 +6,19 @@ import { useStoredState } from '../storage/useStoredState';
 import type { SpeedUnit, TemperatureUnit } from '../units';
 import {
   PreferencesContext,
+  type PalettePreference,
   type Preferences,
   type ThemePreference,
 } from './context';
 
 const STORAGE_KEY = 'preferences';
+
+const PALETTES = [
+  'coniston',
+  'arles',
+  'alpine-beluga',
+  'racing-green',
+] as const satisfies readonly PalettePreference[];
 
 function parsePreferences(stored: unknown): Preferences {
   const p = asRecord(stored);
@@ -19,6 +27,7 @@ function parsePreferences(stored: unknown): Preferences {
     temperatureUnit: oneOf(p['temperatureUnit'], ['F', 'C'], 'F'),
     speedUnit: oneOf(p['speedUnit'], ['mph', 'kmh'], 'mph'),
     theme: oneOf(p['theme'], ['system', 'light', 'dark'], 'system'),
+    palette: oneOf(p['palette'], PALETTES, 'coniston'),
   };
 }
 
@@ -33,6 +42,17 @@ function applyTheme(theme: ThemePreference): void {
   }
 }
 
+/** `theme.css` reads `data-palette` on the root element; no attribute is Coniston. */
+function applyPalette(palette: PalettePreference): void {
+  const root = document.documentElement;
+
+  if (palette === 'coniston') {
+    delete root.dataset['palette'];
+  } else {
+    root.dataset['palette'] = palette;
+  }
+}
+
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferences] = useStoredState(
     STORAGE_KEY,
@@ -43,6 +63,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     applyTheme(preferences.theme);
   }, [preferences.theme]);
+
+  useLayoutEffect(() => {
+    applyPalette(preferences.palette);
+  }, [preferences.palette]);
 
   const value = useMemo(
     () => ({
@@ -55,6 +79,9 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       },
       setTheme: (theme: ThemePreference) => {
         setPreferences((p) => ({ ...p, theme }));
+      },
+      setPalette: (palette: PalettePreference) => {
+        setPreferences((p) => ({ ...p, palette }));
       },
     }),
     [preferences, setPreferences],

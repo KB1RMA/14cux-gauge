@@ -20,7 +20,7 @@ This project is not affiliated with or endorsed by the author of libcomm14cux or
 - **Live graphs:** a Graphs tab plots every reading over the last 30 seconds to 10 minutes, with its current, lowest and highest values as text. Choose which graphs to show; the choice, the time window and the last tab used are remembered.
 - **Fault codes:** read on demand, and clear after a confirmation.
 - **ECU info:** tune number, ident and checksum fixer.
-- **Preferences:** units and a light, dark or system theme, in a menu in the top-right corner so the dashboard stays focused on the readings.
+- **Preferences:** units, a light, dark or system theme, and a choice of colour palettes named after NAS Defender factory paints (Coniston Green, Arles Blue, Alpine White and Beluga Black, British Racing Green), in a menu in the top-right corner so the dashboard stays focused on the readings.
 
 ## Accessibility
 
@@ -82,7 +82,7 @@ Tests drive a real `Ecu` against the library's `SimulatedTransport` (or a fake `
 
 ### Acceptance suite
 
-`e2e/` holds a [Playwright](https://playwright.dev) suite that runs the **production build** in Chromium, Firefox and WebKit, served from `/14cux-gauge/` as GitHub Pages serves it. It covers demo mode, preferences, keyboard-only use, axe-core WCAG 2.2 AA checks with colour contrast in both themes, the shipped source maps and footer links, and the serial path. For the serial tests, `navigator.serial` is replaced with a port whose far end is comm14cux-ts's byte-level `SimulatedTransport`, so the app's real `WebSerialTransport` code runs.
+`e2e/` holds a [Playwright](https://playwright.dev) suite that runs the **production build** in Chromium, Firefox and WebKit, served from `/14cux-gauge/` as GitHub Pages serves it. It covers demo mode, preferences, keyboard-only use, axe-core WCAG 2.2 AA checks with colour contrast in every palette, light and dark, the shipped source maps and footer links, and the serial path. For the serial tests, `navigator.serial` is replaced with a port whose far end is comm14cux-ts's byte-level `SimulatedTransport`, so the app's real `WebSerialTransport` code runs.
 
 ```sh
 npx playwright install   # once, to download the browsers
