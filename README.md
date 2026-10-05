@@ -73,16 +73,30 @@ npm test               # Vitest watch mode
 npm run test:coverage  # single run, enforces the coverage thresholds
 npm run build          # production build in dist/, with source maps
 npm run preview        # serve the production build
+npm run test:e2e       # acceptance suite against dist/ (build first)
 ```
 
 Tests drive a real `Ecu` against the library's `SimulatedTransport` (or a fake `SerialPort`); see [AGENTS.md](AGENTS.md) for the rules.
 
-CI checks out comm14cux-ts beside the app and builds it before installing.
+### Acceptance suite
+
+`e2e/` holds a [Playwright](https://playwright.dev) suite that runs the **production build** in Chromium, Firefox and WebKit, served from `/14cux-gauge/` as GitHub Pages serves it. It covers demo mode, preferences, keyboard-only use, axe-core WCAG 2.2 AA checks with colour contrast in both themes, the shipped source maps and footer links, and the serial path. For the serial tests, `navigator.serial` is replaced with a port whose far end is comm14cux-ts's byte-level `SimulatedTransport`, so the app's real `WebSerialTransport` code runs.
+
+```sh
+npx playwright install   # once, to download the browsers
+npm run build && npm run test:e2e
+npx playwright show-report test-reports/e2e/html
+```
+
+### CI and releases
+
+CI checks out comm14cux-ts beside the app and builds it before installing. On every pull request and push to `main`, `validate.yml` lints, type-checks, runs the unit tests, builds, and runs the acceptance suite against that build.
+
+Publishing a GitHub release runs `release.yml`: it builds once, runs the acceptance suite against that build in all three browsers, and deploys the same `dist/` to GitHub Pages only if every test passes. A flaky test (one that passes only on retry) fails the run. The repository's Pages source must be set to **GitHub Actions** (Settings → Pages).
 
 ## Roadmap
 
 - Publish comm14cux-ts to npm (or give it a `prepare` script) and depend on a version range instead of `file:`.
-- Deploy to GitHub Pages (HTTPS satisfies Web Serial's secure-context requirement).
 - Fuel map viewer, ROM dump download, raw memory read/write, fuel pump and idle-motor tests.
 - CSV logging, charts and sparklines.
 - Electron packaging. The renderer is plain web code; the main process will need `session.on('select-serial-port')` plus `setPermissionCheckHandler` / `setDevicePermissionHandler` to let the user choose a port.

@@ -133,3 +133,17 @@ jobs:
         run: npm ci && npm run build
       - run: npm ci
       - run: npm run build
+      - name: Upload the production build
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: ${{ env.APP_DIR }}/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  acceptance:
+    name: Acceptance
+    needs: build
+    uses: ./.github/workflows/acceptance.yml
+    with:
+      dist-artifact: dist

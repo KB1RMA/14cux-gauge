@@ -1,0 +1,93 @@
+name: Release
+run-name: Release ${{ github.event.release.tag_name || github.ref_name }}
+
+# Publishing a GitHub release builds the app once, runs the acceptance suite
+# against that build in Chromium, Firefox and WebKit, and only then deploys
+# the same build to GitHub Pages.
+
+on:
+  release:
+    types: [published]
+  # Re-deploy by hand, for example after changing the Pages settings. Pick a
+  # release tag as the ref.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time; never cancel one that has started.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+# comm14cux-ts is not published to npm yet; see validate.yml.
+env:
+  APP_DIR: 14cux-gauge
+  LIB_DIR: comm14cux-ts
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ${{ env.APP_DIR }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: ${{ env.APP_DIR }}
+      - uses: actions/checkout@v7
+        with:
+          repository: KB1RMA/comm14cux-ts
+          path: ${{ env.LIB_DIR }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ env.APP_DIR }}/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: |
+            ${{ env.APP_DIR }}/package-lock.json
+            ${{ env.LIB_DIR }}/package-lock.json
+      - name: Build comm14cux-ts
+        working-directory: ${{ env.LIB_DIR }}
+        run: npm ci && npm run build
+      - run: npm ci
+      - run: npm run build
+      - name: Upload the production build
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: ${{ env.APP_DIR }}/dist
+          if-no-files-found: error
+          retention-days: 30
+
+  acceptance:
+    name: Acceptance
+    needs: build
+    uses: ./.github/workflows/acceptance.yml
+    with:
+      dist-artifact: dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download the tested build
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v5
