@@ -74,4 +74,23 @@ test.describe('Release build', () => {
     await expect(footer).toContainText('Provided with absolutely no warranty.');
     await expect(footer).toContainText('Not affiliated with or endorsed by');
   });
+
+  test('shows the version and commit it was built from', async ({ page }) => {
+    await page.goto('./');
+
+    const footer = page.getByRole('contentinfo');
+
+    // A release build names its tag; the PR and main builds do not.
+    await expect(footer).toContainText(
+      /(Release v|Development build of )\d+\.\d+\.\d+/,
+    );
+    await expect(
+      footer.getByRole('link', {
+        name: /^[0-9a-f]{7}\b/,
+      }),
+    ).toHaveAttribute(
+      'href',
+      /^https:\/\/github\.com\/KB1RMA\/14cux-gauge\/commit\/[0-9a-f]{40}$/,
+    );
+  });
 });

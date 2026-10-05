@@ -91,7 +91,11 @@ jobs:
           --reporter=default --reporter=github-actions --reporter=json
           --outputFile.json=test-reports/results.json
 
+      # Stamps the release into the footer; the build fails if the tag does
+      # not match package.json's version.
       - name: Build
+        env:
+          RELEASE_TAG: ${{ env.TAG }}
         run: npm run build
 
       - name: Package
