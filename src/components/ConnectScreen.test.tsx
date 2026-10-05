@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { EcuProvider } from '../ecu/EcuProvider';
 import { expectNoAxeViolations } from '../test-support/a11y';
 import { ConnectScreen } from './ConnectScreen';
@@ -62,5 +63,28 @@ describe('ConnectScreen', () => {
     expect(
       screen.getByRole('checkbox', { name: /Double-speed firmware/ }),
     ).not.toBeChecked();
+  });
+
+  it('remembers the double-speed choice for the next visit', async () => {
+    const user = userEvent.setup();
+
+    Object.defineProperty(navigator, 'serial', {
+      value: {},
+      configurable: true,
+    });
+
+    const first = renderScreen();
+
+    await user.click(
+      screen.getByRole('checkbox', { name: /Double-speed firmware/ }),
+    );
+    expect(localStorage.getItem('cuxGauge.doubleSpeed')).toBe('true');
+
+    first.unmount();
+    renderScreen();
+
+    expect(
+      screen.getByRole('checkbox', { name: /Double-speed firmware/ }),
+    ).toBeChecked();
   });
 });

@@ -1,5 +1,49 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Copyright (C) 2026 14cux-gauge contributors */
+.views {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--control-border);
+}
+
+.tab {
+  margin-bottom: -1px;
+  padding: 0.5rem 1rem;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: var(--radius) var(--radius) 0 0;
+  font-weight: 600;
+}
+
+.tab:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-raised);
+}
+
+/* The selected tab is marked by its underline and bold text, not colour alone. */
+.tab[data-state='active'] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.tab:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Radix makes each panel focusable so keyboard users can reach its content. */
+.views > [role='tabpanel']:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+  border-radius: var(--radius);
+}
+
 .dashboard {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

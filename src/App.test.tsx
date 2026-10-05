@@ -62,4 +62,63 @@ describe('App in demo mode', () => {
     expect(screen.getByRole('status')).not.toHaveTextContent(/samples/);
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
   });
+
+  it('switches between the overview and live graphs, and remembers the view', async () => {
+    const user = userEvent.setup();
+    const { container, unmount } = render(
+      <App pollIntervalMs={{ demo: 10 }} />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+
+    const tabs = await screen.findByRole('tablist', {
+      name: 'Dashboard views',
+    });
+
+    expect(within(tabs).getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    await user.click(within(tabs).getByRole('tab', { name: 'Graphs' }));
+
+    expect(
+      screen.getByRole('tabpanel', { name: 'Graphs' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Live data' }),
+    ).not.toBeInTheDocument();
+
+    const rpm = screen.getByRole('figure', { name: 'Engine speed (rpm)' });
+
+    // The demo's samples reach the graph's text summary.
+    await vi.waitFor(() => {
+      expect(
+        within(rpm)
+          .getAllByRole('definition')
+          .map((dd) => dd.textContent),
+      ).toContainEqual(expect.stringMatching(/^\d+ rpm$/));
+    });
+    await expectNoAxeViolations(container);
+
+    // Arrow keys move between tabs, as in any tab list.
+    within(tabs).getByRole('tab', { name: 'Graphs' }).focus();
+    await user.keyboard('{ArrowLeft}');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Live data' }),
+    ).toBeInTheDocument();
+
+    await user.keyboard('{ArrowRight}');
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+    unmount();
+
+    render(<App pollIntervalMs={{ demo: 10 }} />);
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Live graphs' }),
+    ).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  });
 });

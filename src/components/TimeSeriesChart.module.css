@@ -1,0 +1,59 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+.chart {
+  margin: 0;
+  min-width: 0;
+  padding: 0.75rem 1rem 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.caption {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.unit {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0.25rem 0 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats div {
+  display: flex;
+  gap: 0.35rem;
+  align-items: baseline;
+}
+
+.stats dt {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.stats dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+/* The first stat (Now) is the headline value. */
+.stats div:first-child dd {
+  font-size: 1.25rem;
+}
+
+.plot {
+  /* Reserve the height before uPlot draws, so the page does not jump. */
+  min-height: 140px;
+}

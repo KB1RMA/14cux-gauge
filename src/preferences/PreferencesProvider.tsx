@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useLayoutEffect, useMemo, type ReactNode } from 'react';
+import { asRecord, oneOf } from '../storage/settings';
+import { useStoredState } from '../storage/useStoredState';
 import type { SpeedUnit, TemperatureUnit } from '../units';
 import {
   PreferencesContext,
@@ -15,60 +11,24 @@ import {
   type ThemePreference,
 } from './context';
 
-const STORAGE_KEY = 'cuxGauge.preferences';
-const DEFAULTS: Preferences = {
-  temperatureUnit: 'F',
-  speedUnit: 'mph',
-  theme: 'system',
-  palette: 'coniston',
-};
+const STORAGE_KEY = 'preferences';
 
-const PALETTES: readonly PalettePreference[] = [
+const PALETTES = [
   'coniston',
   'arles',
   'alpine-beluga',
   'racing-green',
-];
+] as const satisfies readonly PalettePreference[];
 
-function parseTheme(value: unknown): ThemePreference {
-  return value === 'light' || value === 'dark' ? value : 'system';
-}
+function parsePreferences(stored: unknown): Preferences {
+  const p = asRecord(stored);
 
-function parsePalette(value: unknown): PalettePreference {
-  return PALETTES.find((palette) => palette === value) ?? 'coniston';
-}
-
-// Storage can be missing or throw (private windows, blocked site data), so
-// every access is guarded and the defaults always work.
-function load(): Preferences {
-  try {
-    const parsed: unknown = JSON.parse(
-      localStorage.getItem(STORAGE_KEY) ?? '{}',
-    );
-
-    if (typeof parsed !== 'object' || parsed === null) {
-      return DEFAULTS;
-    }
-
-    const stored = parsed as Partial<Record<keyof Preferences, unknown>>;
-
-    return {
-      temperatureUnit: stored.temperatureUnit === 'C' ? 'C' : 'F',
-      speedUnit: stored.speedUnit === 'kmh' ? 'kmh' : 'mph',
-      theme: parseTheme(stored.theme),
-      palette: parsePalette(stored.palette),
-    };
-  } catch {
-    return DEFAULTS;
-  }
-}
-
-function save(preferences: Preferences): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
-  } catch {
-    // Not remembered; the setting still applies for this visit.
-  }
+  return {
+    temperatureUnit: oneOf(p['temperatureUnit'], ['F', 'C'], 'F'),
+    speedUnit: oneOf(p['speedUnit'], ['mph', 'kmh'], 'mph'),
+    theme: oneOf(p['theme'], ['system', 'light', 'dark'], 'system'),
+    palette: oneOf(p['palette'], PALETTES, 'coniston'),
+  };
 }
 
 /** `theme.css` reads `data-theme` on the root element; no attribute follows the system. */
@@ -94,11 +54,10 @@ function applyPalette(palette: PalettePreference): void {
 }
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
-  const [preferences, setPreferences] = useState(load);
-
-  useEffect(() => {
-    save(preferences);
-  }, [preferences]);
+  const [preferences, setPreferences] = useStoredState(
+    STORAGE_KEY,
+    parsePreferences,
+  );
 
   // Before paint, so a stored theme does not flash the system one first.
   useLayoutEffect(() => {
@@ -125,7 +84,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         setPreferences((p) => ({ ...p, palette }));
       },
     }),
-    [preferences],
+    [preferences, setPreferences],
   );
 
   return <PreferencesContext value={value}>{children}</PreferencesContext>;

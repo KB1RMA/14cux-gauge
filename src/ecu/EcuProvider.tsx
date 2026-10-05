@@ -10,20 +10,42 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { SampleHistory } from '../history/sampleHistory';
+import { METRIC_KEYS, sampleOf, type MetricKey } from '../metrics';
 import {
   createEcuConnection,
   type EcuConnection,
   type EcuSource,
 } from './connect';
 import { connectionReducer } from './connectionState';
-import { EcuContext, LiveDataContext, type LiveData } from './contexts';
+import {
+  EcuContext,
+  HistoryContext,
+  LiveDataContext,
+  type LiveData,
+} from './contexts';
 import { describeError } from './errors';
-import { startPoller, type Poller } from './poller';
+import { startPoller, type LiveSnapshot, type Poller } from './poller';
 
 const NO_LIVE_DATA: LiveData = {
   snapshot: undefined,
   stats: { sampleRateHz: 0 },
 };
+
+/** Enough for the longest graph window (10 minutes) at 25 samples a second. */
+export const HISTORY_CAPACITY = 15_000;
+
+function recordSnapshot(
+  history: SampleHistory<MetricKey>,
+  snapshot: LiveSnapshot,
+): void {
+  history.push(
+    snapshot.timestamp,
+    Object.fromEntries(
+      METRIC_KEYS.map((key) => [key, sampleOf(snapshot, key)]),
+    ),
+  );
+}
 
 export interface EcuProviderProps {
   children: ReactNode;
@@ -41,6 +63,9 @@ export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
   const [state, dispatch] = useReducer(connectionReducer, { status: 'idle' });
   const [ecu, setEcu] = useState<Ecu | undefined>(undefined);
   const [liveData, setLiveData] = useState<LiveData>(NO_LIVE_DATA);
+  const [history] = useState(
+    () => new SampleHistory(METRIC_KEYS, HISTORY_CAPACITY),
+  );
   const sessionRef = useRef<Session | undefined>(undefined);
   // Bumped by every connect/disconnect, so a slow async step can tell that it
   // has been superseded.
@@ -80,6 +105,7 @@ export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
       const myGeneration = ++generationRef.current;
 
       await teardown();
+      history.clear();
       dispatch({ type: 'connect', source });
 
       const connection = createEcuConnection(source);
@@ -107,6 +133,7 @@ export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
       sessionRef.current.poller = startPoller(connection.ecu, {
         intervalMs: source.kind === 'demo' ? demoInterval : serialInterval,
         onSnapshot: (snapshot, stats) => {
+          recordSnapshot(history, snapshot);
           setLiveData({ snapshot, stats });
         },
         onError: (error) => {
@@ -116,7 +143,7 @@ export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
       setEcu(connection.ecu);
       dispatch({ type: 'connected' });
     },
-    [teardown, fail, demoInterval, serialInterval],
+    [teardown, fail, history, demoInterval, serialInterval],
   );
 
   const disconnect = useCallback(async () => {
@@ -146,7 +173,9 @@ export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
 
   return (
     <EcuContext value={value}>
-      <LiveDataContext value={liveData}>{children}</LiveDataContext>
+      <LiveDataContext value={liveData}>
+        <HistoryContext value={history}>{children}</HistoryContext>
+      </LiveDataContext>
     </EcuContext>
   );
 }

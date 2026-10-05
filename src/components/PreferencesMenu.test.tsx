@@ -158,6 +158,48 @@ describe('PreferencesMenu', () => {
     expect(root).not.toHaveAttribute('data-theme');
   });
 
+  it('saves the units, theme and paint, and restores them on the next visit', async () => {
+    const user = userEvent.setup();
+    const first = renderWithTiles();
+
+    expect(localStorage.getItem('cuxGauge.preferences')).toBeNull();
+
+    await user.click(trigger());
+    await user.click(screen.getByRole('menuitemradio', { name: /Celsius/ }));
+    await user.click(
+      screen.getByRole('menuitemradio', { name: /Kilometres per hour/ }),
+    );
+    await user.click(screen.getByRole('menuitemradio', { name: 'Dark' }));
+    await user.click(screen.getByRole('menuitemradio', { name: 'Arles Blue' }));
+
+    expect(
+      JSON.parse(localStorage.getItem('cuxGauge.preferences') ?? 'null'),
+    ).toEqual({
+      temperatureUnit: 'C',
+      speedUnit: 'kmh',
+      theme: 'dark',
+      palette: 'arles',
+    });
+
+    first.unmount();
+    delete document.documentElement.dataset['theme'];
+    delete document.documentElement.dataset['palette'];
+    renderWithTiles();
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    expect(document.documentElement).toHaveAttribute('data-palette', 'arles');
+    await user.click(trigger());
+    expect(
+      screen.getByRole('menuitemradio', { name: /Celsius/ }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole('menuitemradio', { name: /Kilometres per hour/ }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole('menuitemradio', { name: 'Arles Blue' }),
+    ).toBeChecked();
+  });
+
   it('applies a stored theme on load', () => {
     localStorage.setItem(
       'cuxGauge.preferences',
