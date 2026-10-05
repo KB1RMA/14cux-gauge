@@ -7,6 +7,7 @@ import { SampleHistory } from '../history/sampleHistory';
 import { METRIC_KEYS, METRICS, type MetricKey } from '../metrics';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { expectNoAxeViolations } from '../test-support/a11y';
+import { loadPlot } from '../charts/plotOptions';
 import { installCanvasStandIns } from '../test-support/canvas';
 import { TimeSeriesChart } from './TimeSeriesChart';
 
@@ -131,6 +132,16 @@ describe('TimeSeriesChart', () => {
 
 describe('TimeSeriesChart drawing', () => {
   let restore: () => void;
+
+  // The chart library is imported on first use. Import it once here, so no
+  // test's wait for a chart includes that (slow, on a CI runner) first load.
+  // It reads matchMedia as it loads, so the stand-ins must be in place.
+  beforeAll(async () => {
+    const restoreForImport = installCanvasStandIns();
+
+    await loadPlot();
+    restoreForImport();
+  });
 
   beforeEach(() => {
     restore = installCanvasStandIns();
