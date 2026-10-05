@@ -8,6 +8,9 @@ import type { LiveSnapshot } from './ecu/poller';
 import { openSessionStore } from './storage/openSessionStore';
 import { MemorySessionStore } from './storage/sessionStore';
 import { expectNoAxeViolations, readingFor } from './test-support/a11y';
+import { snapshotAt } from './test-support/snapshots';
+
+const START = Date.UTC(2026, 9, 5, 14, 0);
 
 /** Lets the demo ECU, polled every 10 ms, take a few samples. */
 async function collectSamples() {
@@ -110,7 +113,41 @@ describe('Recording and browsing sessions', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Demo ECU · Polling');
     await expectNoAxeViolations(container);
 
-    await user.click(item.getByRole('button', { name: 'Idle wobble' }));
+    await user.click(sessionsNav().getByRole('button', { name: 'Live' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Live data' }),
+    ).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  });
+
+  it('opens a session to replay, annotate and delete it', async () => {
+    const user = userEvent.setup();
+    const store = new MemorySessionStore();
+    const { id } = await store.create({
+      name: 'Idle wobble',
+      source: 'demo',
+      startedAt: START,
+    });
+
+    await store.append(id, [
+      snapshotAt(START, { engineRpm: 820 }),
+      snapshotAt(START + 1000, { engineRpm: 900 }),
+      snapshotAt(START + 2000, { engineRpm: 760 }),
+    ]);
+    await store.finish(id, START + 2000);
+    await store.update(id, { notes: 'Hunts between 600 and 900 rpm.' });
+
+    const { container } = render(
+      <App
+        openSessionStore={() => Promise.resolve({ store, persistent: true })}
+      />,
+    );
+
+    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Idle wobble' }),
+    );
 
     expect(
       await screen.findByRole('heading', { level: 2, name: 'Idle wobble' }),
@@ -118,11 +155,9 @@ describe('Recording and browsing sessions', () => {
     expect(await screen.findByRole('button', { name: 'Play' })).toBeVisible();
     expect(
       screen.getByRole('slider', { name: 'Playback position' }),
-    ).toHaveAttribute(
-      'aria-valuetext',
-      expect.stringMatching(/^0 seconds of /) as string,
-    );
-    expect(readingFor('Engine speed')).toHaveTextContent(/^\d+ rpm$/);
+    ).toHaveAttribute('aria-valuetext', '0 seconds of 2 seconds');
+    expect(readingFor('Engine speed')).toHaveTextContent('820 rpm');
+    expect(readingFor('Length')).toHaveTextContent('0:02');
     await expectNoAxeViolations(container);
 
     await user.click(screen.getByRole('button', { name: 'Play' }));
@@ -132,6 +167,11 @@ describe('Recording and browsing sessions', () => {
     await user.click(screen.getByRole('radio', { name: '10×' }));
 
     expect(screen.getByRole('radio', { name: '10×' })).toBeChecked();
+    // At ten times speed the two seconds play out, and playback stops.
+    expect(
+      await screen.findByRole('button', { name: 'Play' }),
+    ).toBeInTheDocument();
+    expect(readingFor('Engine speed')).toHaveTextContent('760 rpm');
 
     await user.click(screen.getByRole('tab', { name: 'Graphs' }));
 
@@ -168,7 +208,7 @@ describe('Recording and browsing sessions', () => {
     });
 
     expect(confirm).toHaveTextContent(
-      /“Idle wobble” and its [\d,]+ samples will be deleted/,
+      '“Idle wobble” and its 3 samples will be deleted from this browser. This cannot be undone.',
     );
     await expectNoAxeViolations(confirm);
     await user.click(
@@ -179,13 +219,7 @@ describe('Recording and browsing sessions', () => {
     expect(
       screen.getByRole('heading', { name: 'Recorded sessions' }),
     ).toHaveFocus();
-
-    await user.click(sessionsNav().getByRole('button', { name: 'Live' }));
-
-    expect(
-      await screen.findByRole('heading', { name: 'Live data' }),
-    ).toHaveFocus();
-    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+    expect(await store.list()).toEqual([]);
   });
 
   it('replays a recording with the keyboard', async () => {
