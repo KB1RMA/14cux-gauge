@@ -1,6 +1,6 @@
 {
   "name": "14cux-gauge",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Browser dashboard for the Lucas 14CUX engine ECU, built on comm14cux-ts",
   "license": "GPL-3.0-only",
