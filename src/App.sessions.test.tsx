@@ -30,6 +30,17 @@ async function recordAndStop(user: UserEvent) {
   return screen.findByRole('dialog', { name: 'Save recording' });
 }
 
+/**
+ * Waits for the save dialog to close. It closes once the store has written
+ * the name and notes, which IndexedDB does on a later tick; until then it
+ * hides the rest of the page from queries by role.
+ */
+async function savedAndClosed(dialog: HTMLElement) {
+  await vi.waitFor(() => {
+    expect(dialog).not.toBeInTheDocument();
+  });
+}
+
 function sessionsNav() {
   return within(screen.getByRole('navigation', { name: 'Views' }));
 }
@@ -80,8 +91,8 @@ describe('Recording and browsing sessions', () => {
       'Hunts between 600 and 900 rpm.',
     );
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await savedAndClosed(dialog);
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     // The same button, now offering to record again.
     expect(screen.getByRole('button', { name: 'Record' })).toHaveFocus();
     expect(screen.getByRole('status')).toHaveTextContent(/Polling$/);
@@ -363,6 +374,7 @@ describe('Recording and browsing sessions', () => {
       'Cold start',
     );
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await savedAndClosed(dialog);
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
     unmount();
 
