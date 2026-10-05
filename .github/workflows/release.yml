@@ -21,10 +21,16 @@ on:
   release:
     types:
       - published
-  # Re-deploy to Pages by hand, for example after changing the Pages settings.
-  # The ref must be a release's tag; the run fails on a branch. Release assets
-  # are only attached for a published release.
+  # release-please.yml starts this on each release it publishes, with
+  # attach-assets set, because its releases do not trigger the event above.
+  # Also used to re-deploy to Pages by hand, for example after changing the
+  # Pages settings. The ref must be a release's tag; the run fails on a branch.
   workflow_dispatch:
+    inputs:
+      attach-assets:
+        description: Attach the attested build to the release, not just deploy it
+        type: boolean
+        default: false
 
 concurrency:
   group: release-${{ github.event.release.tag_name || github.ref_name }}
@@ -166,7 +172,7 @@ jobs:
   publish:
     name: Attest and upload to the release
     needs: [build, acceptance]
-    if: ${{ github.event_name == 'release' }}
+    if: ${{ github.event_name == 'release' || inputs.attach-assets }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -243,7 +249,7 @@ jobs:
     name: Deploy to GitHub Pages
     needs: [build, acceptance, publish]
     # Only once the release's attested assets are uploaded (publish is skipped
-    # on a manual run), and never for a prerelease.
+    # on a manual re-deploy), and never for a prerelease.
     if: >-
       ${{ !cancelled()
       && needs.acceptance.result == 'success'
