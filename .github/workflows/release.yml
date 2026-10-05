@@ -1,0 +1,149 @@
+name: Release
+run-name: Release ${{ github.event.release.tag_name }}
+
+# Publishing a GitHub release tests and builds the tagged commit, then attaches
+# the built app to the release with three signed attestations about it:
+#   - SLSA build provenance (which workflow, commit and runner built it)
+#   - a CycloneDX SBOM of the runtime dependencies bundled into it
+#   - an in-toto test result listing the tests that passed against it
+# Each attestation is stored by GitHub and also attached to the release as a
+# Sigstore bundle, so it can be verified offline. See "Verifying a release" in
+# README.md.
+
+permissions:
+  contents: read
+
+on:
+  release:
+    types:
+      - published
+
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+# comm14cux-ts is not published to npm yet; see validate.yml.
+env:
+  APP_DIR: 14cux-gauge
+  LIB_DIR: comm14cux-ts
+  TAG: ${{ github.event.release.tag_name }}
+
+jobs:
+  release:
+    name: Build, attest and upload
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # upload release assets
+      id-token: write # sign attestations with Sigstore
+      attestations: write # store attestations on the repository
+    defaults:
+      run:
+        working-directory: ${{ env.APP_DIR }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: ${{ env.APP_DIR }}
+      - uses: actions/checkout@v7
+        with:
+          repository: KB1RMA/comm14cux-ts
+          path: ${{ env.LIB_DIR }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ env.APP_DIR }}/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: |
+            ${{ env.APP_DIR }}/package-lock.json
+            ${{ env.LIB_DIR }}/package-lock.json
+      - name: Build comm14cux-ts
+        working-directory: ${{ env.LIB_DIR }}
+        run: npm ci && npm run build
+      - run: npm ci
+
+      - name: Test
+        run: >
+          npx vitest --run --coverage
+          --reporter=default --reporter=github-actions --reporter=json
+          --outputFile.json=test-reports/results.json
+
+      - name: Build
+        run: npm run build
+
+      - name: Package
+        id: package
+        run: |
+          mkdir -p release
+          name="14cux-gauge-${TAG}"
+          (cd dist && zip -r -X "../release/${name}.zip" .)
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+          echo "zip=${APP_DIR}/release/${name}.zip" >> "$GITHUB_OUTPUT"
+
+      # Runtime dependencies only: dev tools are not bundled into the app.
+      - name: Generate SBOM
+        run: >
+          npm sbom --sbom-format cyclonedx --omit dev
+          > "release/${{ steps.package.outputs.name }}.cdx.json"
+
+      # https://github.com/in-toto/attestation/blob/main/spec/predicates/test-result.md
+      # The configuration records the test setup, the lockfile and the exact
+      # comm14cux-ts commit the tests ran against.
+      - name: Build test result predicate
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+        run: |
+          configuration=$(
+            sha256sum vite.config.ts package-lock.json |
+              jq -R -s 'split("\n") | map(select(length > 0) | split("  ") | {name: .[1], digest: {sha256: .[0]}})' |
+              jq --arg commit "$(git -C "../${LIB_DIR}" rev-parse HEAD)" \
+                '. + [{name: "comm14cux-ts", uri: "git+https://github.com/KB1RMA/comm14cux-ts", digest: {gitCommit: $commit}}]'
+          )
+          jq --arg url "$RUN_URL" --arg root "$PWD/" --argjson configuration "$configuration" '
+            def tests($status): [
+              .testResults[]
+              | (.name | ltrimstr($root)) as $file
+              | .assertionResults[]
+              | select(.status == $status)
+              | "\($file) > \(.fullName)"
+            ];
+            {
+              result: (if .success then "PASSED" else "FAILED" end),
+              configuration: $configuration,
+              url: $url,
+              passedTests: tests("passed"),
+              warnedTests: [],
+              failedTests: tests("failed")
+            }' test-reports/results.json > test-reports/test-result.json
+
+      - name: Attest build provenance
+        id: provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ steps.package.outputs.zip }}
+
+      - name: Attest SBOM
+        id: sbom
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ steps.package.outputs.zip }}
+          sbom-path: ${{ env.APP_DIR }}/release/${{ steps.package.outputs.name }}.cdx.json
+
+      - name: Attest test results
+        id: test-result
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ steps.package.outputs.zip }}
+          predicate-type: https://in-toto.io/attestation/test-result/v0.1
+          predicate-path: ${{ env.APP_DIR }}/test-reports/test-result.json
+
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: ${{ steps.package.outputs.name }}
+          PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+          SBOM_BUNDLE: ${{ steps.sbom.outputs.bundle-path }}
+          TEST_RESULT_BUNDLE: ${{ steps.test-result.outputs.bundle-path }}
+        run: |
+          cp "$PROVENANCE_BUNDLE" "release/${NAME}.provenance.sigstore.json"
+          cp "$SBOM_BUNDLE" "release/${NAME}.sbom.sigstore.json"
+          cp "$TEST_RESULT_BUNDLE" "release/${NAME}.test-result.sigstore.json"
+          gh release upload "$TAG" release/* --clobber

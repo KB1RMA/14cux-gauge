@@ -79,6 +79,26 @@ Tests drive a real `Ecu` against the library's `SimulatedTransport` (or a fake `
 
 CI checks out comm14cux-ts beside the app and builds it before installing.
 
+### Verifying a release
+
+Publishing a GitHub release runs `.github/workflows/release.yml`, which tests and builds the tagged commit and attaches `14cux-gauge-<tag>.zip` (the built app) to the release with three signed attestations:
+
+| Attestation      | Predicate type                                    | Release asset                        |
+| ---------------- | ------------------------------------------------- | ------------------------------------ |
+| Build provenance | `https://slsa.dev/provenance/v1`                  | `*.provenance.sigstore.json`         |
+| SBOM (CycloneDX) | `https://cyclonedx.org/bom`                       | `*.sbom.sigstore.json`, `*.cdx.json` |
+| Test results     | `https://in-toto.io/attestation/test-result/v0.1` | `*.test-result.sigstore.json`        |
+
+Verify a download with the [GitHub CLI](https://cli.github.com/):
+
+```sh
+gh attestation verify 14cux-gauge-<tag>.zip --repo KB1RMA/14cux-gauge
+gh attestation verify 14cux-gauge-<tag>.zip --repo KB1RMA/14cux-gauge --predicate-type https://cyclonedx.org/bom
+gh attestation verify 14cux-gauge-<tag>.zip --repo KB1RMA/14cux-gauge --predicate-type https://in-toto.io/attestation/test-result/v0.1
+```
+
+Add `--bundle <file>.sigstore.json` to verify against the attached bundle instead of fetching the attestation from GitHub.
+
 ## Roadmap
 
 - Publish comm14cux-ts to npm (or give it a `prepare` script) and depend on a version range instead of `file:`.
