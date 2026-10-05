@@ -4,12 +4,16 @@ run-name: Release Please
 # On every push to main, release-please keeps a release pull request open
 # with the next version and changelog, worked out from Conventional Commit
 # messages. Merging that pull request tags the commit and publishes a GitHub
-# release, and this workflow then starts release.yml on the new tag to test,
-# attest and deploy it to GitHub Pages.
+# release, which starts release.yml to test, attest and deploy it to GitHub
+# Pages.
 #
-# A release published with the default GITHUB_TOKEN does not trigger the
-# `release` event that release.yml also listens for, so it is started with
-# `workflow_dispatch` here instead, which GITHUB_TOKEN is allowed to trigger.
+# release-please acts as a GitHub App rather than with the default
+# GITHUB_TOKEN. Events made with GITHUB_TOKEN start no workflows, so the
+# release pull request would never get the status checks the default branch's
+# ruleset requires, and the published release would not start release.yml.
+# The app needs read and write access to contents, issues and pull requests.
+# Its client ID is the RELEASE_APP_CLIENT_ID variable and its private key the
+# RELEASE_APP_PRIVATE_KEY secret.
 
 permissions:
   contents: read
@@ -28,35 +32,18 @@ jobs:
     name: Release Please
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: write # tag and publish releases, push the release branch
-      issues: write # create the autorelease labels
-      pull-requests: write # open and update the release pull request
+    permissions: {} # everything is done with the app's token
     steps:
-      - id: release
-        uses: googleapis/release-please-action@v5
+      - id: app-token
+        uses: actions/create-github-app-token@v3
         with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write # tag and publish releases, push the release branch
+          permission-issues: write # create the autorelease labels
+          permission-pull-requests: write # open and update the release pull request
+      - uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-    outputs:
-      release-created: ${{ steps.release.outputs.release_created }}
-      tag: ${{ steps.release.outputs.tag_name }}
-
-  release:
-    name: Start the release workflow
-    needs: release-please
-    if: ${{ needs.release-please.outputs.release-created == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      actions: write # dispatch release.yml
-    steps:
-      - name: Dispatch release.yml on ${{ needs.release-please.outputs.tag }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.release-please.outputs.tag }}
-        run: >
-          gh workflow run release.yml
-          --repo "$GITHUB_REPOSITORY"
-          --ref "$TAG"
-          --field attach-assets=true
