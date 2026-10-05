@@ -172,6 +172,34 @@ describe('ReplayGraphs', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('hides and shows graphs from Choose graphs, as the live view does', async () => {
+    const user = userEvent.setup();
+
+    renderReplay();
+    await user.click(screen.getByRole('button', { name: /Choose graphs/ }));
+    await user.click(screen.getByRole('checkbox', { name: 'Engine speed' }));
+    await user.keyboard('{Escape}');
+
+    expect(screen.getAllByRole('figure')).toHaveLength(14);
+    expect(
+      JSON.parse(localStorage.getItem('cuxGauge.graphs') ?? '{}'),
+    ).toMatchObject({
+      hidden: ['engineRpm'],
+    });
+  });
+
+  it('describes the window in whole seconds for a long recording', () => {
+    // Five minutes, a sample every ten seconds: the slider steps 2 s.
+    renderReplay(
+      Array.from({ length: 31 }, (_, i) => snapshotAt(START + i * 10_000)),
+    );
+
+    expect(screen.getByRole('slider', { name: 'Graphs to' })).toHaveAttribute(
+      'aria-valuetext',
+      '5 minutes',
+    );
+  });
+
   it('works for a recording of one sample', () => {
     renderReplay([snapshotAt(START)]);
 
