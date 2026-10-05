@@ -2,11 +2,12 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import type { LiveSnapshot } from '../ecu/poller';
 import {
+  applyChanges,
+  emptySummary,
   newestFirst,
-  newSessionId,
-  SESSION_FORMAT_VERSION,
   UnknownSessionError,
   type NewSession,
+  type SessionChanges,
   type SessionStore,
   type SessionSummary,
 } from './sessionStore';
@@ -22,7 +23,7 @@ import {
  */
 
 const DB_NAME = 'cuxGauge';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const SESSIONS = 'sessions';
 const CHUNKS = 'chunks';
 const BY_SESSION = 'sessionId';
@@ -74,7 +75,11 @@ function completed(tx: IDBTransaction): Promise<void> {
   return done;
 }
 
-function upgrade(db: IDBDatabase, oldVersion: number): void {
+function upgrade(
+  db: IDBDatabase,
+  tx: IDBTransaction,
+  oldVersion: number,
+): void {
   // Each step takes the schema from one version to the next.
   if (oldVersion < 1) {
     db.createObjectStore(SESSIONS, { keyPath: 'id' });
@@ -82,6 +87,24 @@ function upgrade(db: IDBDatabase, oldVersion: number): void {
       BY_SESSION,
       BY_SESSION,
     );
+  }
+
+  if (oldVersion < 2) {
+    // Session format 2 adds notes.
+    const cursor = tx.objectStore(SESSIONS).openCursor();
+
+    cursor.onsuccess = () => {
+      const current = cursor.result;
+
+      if (current) {
+        current.update({
+          ...(current.value as Omit<SessionSummary, 'notes' | 'formatVersion'>),
+          notes: '',
+          formatVersion: 2,
+        });
+        current.continue();
+      }
+    };
   }
 }
 
@@ -103,7 +126,10 @@ export class IndexedDbSessionStore implements SessionStore {
     const req = factory.open(name, DB_VERSION);
 
     req.onupgradeneeded = (event) => {
-      upgrade(req.result, event.oldVersion);
+      // Set while an upgrade is running; the steps share its transaction.
+      if (req.transaction) {
+        upgrade(req.result, req.transaction, event.oldVersion);
+      }
     };
 
     const db = await request(req);
@@ -117,13 +143,7 @@ export class IndexedDbSessionStore implements SessionStore {
   }
 
   async create(session: NewSession): Promise<SessionSummary> {
-    const summary: SessionSummary = {
-      ...session,
-      id: newSessionId(),
-      endedAt: null,
-      sampleCount: 0,
-      formatVersion: SESSION_FORMAT_VERSION,
-    };
+    const summary = emptySummary(session);
     const tx = this.db.transaction(SESSIONS, 'readwrite');
 
     tx.objectStore(SESSIONS).add(summary);
@@ -162,6 +182,21 @@ export class IndexedDbSessionStore implements SessionStore {
     await done;
 
     return finished;
+  }
+
+  async update(id: string, changes: SessionChanges): Promise<SessionSummary> {
+    const tx = this.db.transaction(SESSIONS, 'readwrite');
+    const done = completed(tx);
+    const sessions = tx.objectStore(SESSIONS);
+    const updated = applyChanges(
+      await this.summaryIn(sessions, id, tx),
+      changes,
+    );
+
+    sessions.put(updated);
+    await done;
+
+    return updated;
   }
 
   async list(): Promise<SessionSummary[]> {

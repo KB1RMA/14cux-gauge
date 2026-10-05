@@ -1,0 +1,105 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.play {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 6rem;
+  justify-content: center;
+}
+
+.slider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 12rem;
+  height: 1.5rem;
+  touch-action: none;
+  user-select: none;
+}
+
+.slider[data-disabled] {
+  opacity: 0.55;
+}
+
+.track {
+  position: relative;
+  flex-grow: 1;
+  height: 0.35rem;
+  background: var(--surface-raised);
+  /* The track is the control's boundary, so it needs 3:1 contrast. */
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+}
+
+.range {
+  position: absolute;
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+}
+
+.thumb {
+  display: block;
+  width: 1.1rem;
+  height: 1.1rem;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  cursor: grab;
+}
+
+.thumb:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.time {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* A segmented control, like the graphs' time window. */
+.speeds {
+  display: inline-flex;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.speed {
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+  font-variant-numeric: tabular-nums;
+}
+
+.speed + .speed {
+  border-left: 1px solid var(--control-border);
+}
+
+.speed[data-state='on'] {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.speed:focus-visible {
+  outline-offset: -4px;
+  outline-color: var(--text);
+}
+
+.speed[data-state='on']:focus-visible {
+  outline-color: var(--accent-contrast);
+}

@@ -16,8 +16,12 @@ import type { LiveSnapshot } from '../ecu/poller';
  * so a recording does not depend on the display units chosen at the time.
  */
 
-/** Bumped when the stored shape changes; readers must check it. */
-export const SESSION_FORMAT_VERSION = 1;
+/**
+ * Bumped when the stored shape changes; readers must check it.
+ *
+ * 1: the first format. 2: adds `notes`.
+ */
+export const SESSION_FORMAT_VERSION = 2;
 
 export interface SessionSummary {
   id: string;
@@ -28,6 +32,8 @@ export interface SessionSummary {
   /** `Date.now()` when recording stopped; `null` while recording, or if the app closed first. */
   endedAt: number | null;
   sampleCount: number;
+  /** Free text the user keeps with the session; empty if none. */
+  notes: string;
   formatVersion: typeof SESSION_FORMAT_VERSION;
 }
 
@@ -37,12 +43,17 @@ export interface NewSession {
   startedAt: number;
 }
 
+/** The parts of a session the user can edit. */
+export type SessionChanges = Partial<Pick<SessionSummary, 'name' | 'notes'>>;
+
 export interface SessionStore {
   create(session: NewSession): Promise<SessionSummary>;
   /** Appends samples, in order, to a session. */
   append(id: string, samples: readonly LiveSnapshot[]): Promise<void>;
   /** Marks a session as finished at `endedAt`. */
   finish(id: string, endedAt: number): Promise<SessionSummary>;
+  /** Renames a session or changes its notes. */
+  update(id: string, changes: SessionChanges): Promise<SessionSummary>;
   /** Every session, newest first. */
   list(): Promise<SessionSummary[]>;
   get(id: string): Promise<SessionSummary | undefined>;
@@ -64,6 +75,30 @@ export function newSessionId(): string {
   return crypto.randomUUID();
 }
 
+/** A new summary for `session`, with nothing recorded yet. */
+export function emptySummary(session: NewSession): SessionSummary {
+  return {
+    ...session,
+    id: newSessionId(),
+    endedAt: null,
+    sampleCount: 0,
+    notes: '',
+    formatVersion: SESSION_FORMAT_VERSION,
+  };
+}
+
+/** `summary` with `changes` applied; fields left out stay as they are. */
+export function applyChanges(
+  summary: SessionSummary,
+  { name, notes }: SessionChanges,
+): SessionSummary {
+  return {
+    ...summary,
+    ...(name === undefined ? {} : { name }),
+    ...(notes === undefined ? {} : { notes }),
+  };
+}
+
 export function newestFirst(a: SessionSummary, b: SessionSummary): number {
   return b.startedAt - a.startedAt;
 }
@@ -79,13 +114,7 @@ export class MemorySessionStore implements SessionStore {
   >();
 
   async create(session: NewSession): Promise<SessionSummary> {
-    const summary: SessionSummary = {
-      ...session,
-      id: newSessionId(),
-      endedAt: null,
-      sampleCount: 0,
-      formatVersion: SESSION_FORMAT_VERSION,
-    };
+    const summary = emptySummary(session);
 
     this.sessions.set(summary.id, { summary, samples: [] });
 
@@ -106,6 +135,14 @@ export class MemorySessionStore implements SessionStore {
     const entry = this.entry(id);
 
     entry.summary = { ...entry.summary, endedAt };
+
+    return { ...entry.summary };
+  }
+
+  async update(id: string, changes: SessionChanges): Promise<SessionSummary> {
+    const entry = this.entry(id);
+
+    entry.summary = applyChanges(entry.summary, changes);
 
     return { ...entry.summary };
   }

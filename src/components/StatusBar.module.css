@@ -66,3 +66,21 @@
     animation: none;
   }
 }
+
+.actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.elapsed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Paired with the word "Record"/"recorded"; the colour is only a cue. */
+.recDot {
+  color: var(--danger);
+}

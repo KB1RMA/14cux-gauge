@@ -15,7 +15,8 @@ export interface ConfirmDialogProps {
 }
 
 /**
- * Modal confirmation shown before any action that writes to the ECU.
+ * Modal confirmation shown before any action that writes to the ECU or
+ * deletes data the user cannot get back.
  *
  * Radix's AlertDialog traps focus, hides the rest of the page from assistive
  * tech, starts on Cancel (the safe choice) and treats Escape as Cancel. `open`

@@ -43,7 +43,8 @@ describe.each(backends)('%s', (_name, open) => {
       startedAt: 1000,
       endedAt: null,
       sampleCount: 0,
-      formatVersion: 1,
+      notes: '',
+      formatVersion: 2,
     });
     expect(await store.get(session.id)).toEqual(session);
     expect(await store.readSamples(session.id)).toEqual([]);
@@ -100,6 +101,31 @@ describe.each(backends)('%s', (_name, open) => {
     expect((await store.get(id))?.endedAt).toBe(5000);
   });
 
+  it('renames a session and keeps notes with it', async () => {
+    const { id } = await store.create({
+      name: 'Drive',
+      source: 'serial',
+      startedAt: 0,
+    });
+
+    await store.append(id, [snapshotAt(0)]);
+
+    const renamed = await store.update(id, { name: 'Hesitation at 2500' });
+
+    expect(renamed.name).toBe('Hesitation at 2500');
+    expect(renamed.notes).toBe('');
+
+    const noted = await store.update(id, { notes: 'Stumbles off idle.' });
+
+    expect(noted).toMatchObject({
+      name: 'Hesitation at 2500',
+      notes: 'Stumbles off idle.',
+      sampleCount: 1,
+    });
+    expect(await store.get(id)).toEqual(noted);
+    expect(await store.readSamples(id)).toEqual([snapshotAt(0)]);
+  });
+
   it('removes a session and its samples', async () => {
     const keep = await store.create({
       name: 'K',
@@ -124,6 +150,9 @@ describe.each(backends)('%s', (_name, open) => {
 
   it('rejects writes and reads for an unknown session', async () => {
     await expect(store.append('missing', [snapshotAt(0)])).rejects.toThrow(
+      UnknownSessionError,
+    );
+    await expect(store.update('missing', { name: 'A' })).rejects.toThrow(
       UnknownSessionError,
     );
     await expect(store.finish('missing', 1)).rejects.toThrow(
@@ -157,6 +186,71 @@ describe('IndexedDbSessionStore persistence', () => {
   });
 });
 
+describe('IndexedDbSessionStore upgrades', () => {
+  /** A database as the first release of the app left it. */
+  function openVersion1(factory: IDBFactory): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      const req = factory.open('cuxGauge', 1);
+
+      req.onupgradeneeded = () => {
+        req.result.createObjectStore('sessions', { keyPath: 'id' });
+        req.result
+          .createObjectStore('chunks', { autoIncrement: true })
+          .createIndex('sessionId', 'sessionId');
+      };
+
+      req.onsuccess = () => {
+        resolve(req.result);
+      };
+
+      req.onerror = () => {
+        reject(new Error('open failed'));
+      };
+    });
+  }
+
+  it('adds empty notes to sessions recorded in format 1', async () => {
+    const factory = new IDBFactory();
+    const old = await openVersion1(factory);
+    const tx = old.transaction(['sessions', 'chunks'], 'readwrite');
+
+    tx.objectStore('sessions').add({
+      id: 'v1-session',
+      name: 'Old drive',
+      source: 'serial',
+      startedAt: 10,
+      endedAt: 20,
+      sampleCount: 1,
+      formatVersion: 1,
+    });
+    tx.objectStore('chunks').add({
+      sessionId: 'v1-session',
+      samples: [snapshotAt(10)],
+    });
+    await new Promise((resolve) => {
+      tx.oncomplete = resolve;
+    });
+    old.close();
+
+    const store = await IndexedDbSessionStore.open({ factory });
+
+    expect(await store.list()).toEqual([
+      {
+        id: 'v1-session',
+        name: 'Old drive',
+        source: 'serial',
+        startedAt: 10,
+        endedAt: 20,
+        sampleCount: 1,
+        notes: '',
+        formatVersion: 2,
+      },
+    ]);
+    expect(await store.readSamples('v1-session')).toEqual([snapshotAt(10)]);
+    store.close();
+  });
+});
+
 describe('IndexedDbSessionStore failures', () => {
   function rawOpen(factory: IDBFactory, version: number): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
@@ -175,7 +269,7 @@ describe('IndexedDbSessionStore failures', () => {
   it('refuses to open a database from a newer version of the app', async () => {
     const factory = new IDBFactory();
 
-    (await rawOpen(factory, 2)).close();
+    (await rawOpen(factory, 3)).close();
 
     await expect(IndexedDbSessionStore.open({ factory })).rejects.toThrow(
       expect.objectContaining({ name: 'VersionError' }) as Error,
@@ -187,9 +281,9 @@ describe('IndexedDbSessionStore failures', () => {
     const store = await IndexedDbSessionStore.open({ factory });
 
     // Would block forever if the open store did not close itself.
-    const newer = await rawOpen(factory, 2);
+    const newer = await rawOpen(factory, 3);
 
-    expect(newer.version).toBe(2);
+    expect(newer.version).toBe(3);
     newer.close();
     store.close();
   });
