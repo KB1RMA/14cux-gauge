@@ -92,7 +92,27 @@ npx playwright show-report test-reports/e2e/html
 
 CI checks out comm14cux-ts beside the app and builds it before installing. On every pull request and push to `main`, `validate.yml` lints, type-checks, runs the unit tests, builds, and runs the acceptance suite against that build.
 
-Publishing a GitHub release runs `release.yml`: it builds once, runs the acceptance suite against that build in all three browsers, and deploys the same `dist/` to GitHub Pages only if every test passes. A flaky test (one that passes only on retry) fails the run. The repository's Pages source must be set to **GitHub Actions** (Settings → Pages).
+Publishing a GitHub release runs `release.yml`: it tests and builds once, runs the acceptance suite against that build in all three browsers, and only if every test passes attaches the attested build to the release (see below) and deploys the same `dist/` to GitHub Pages. A flaky test (one that passes only on retry) fails the run. The repository's Pages source must be set to **GitHub Actions** (Settings → Pages).
+
+### Verifying a release
+
+Publishing a GitHub release runs `.github/workflows/release.yml`, which tests and builds the tagged commit and, once the acceptance suite passes, attaches `14cux-gauge-<tag>.zip` (the built app) to the release with three signed attestations:
+
+| Attestation      | Predicate type                                    | Release asset                        |
+| ---------------- | ------------------------------------------------- | ------------------------------------ |
+| Build provenance | `https://slsa.dev/provenance/v1`                  | `*.provenance.sigstore.json`         |
+| SBOM (CycloneDX) | `https://cyclonedx.org/bom`                       | `*.sbom.sigstore.json`, `*.cdx.json` |
+| Test results     | `https://in-toto.io/attestation/test-result/v0.1` | `*.test-result.sigstore.json`        |
+
+Verify a download with the [GitHub CLI](https://cli.github.com/):
+
+```sh
+gh attestation verify 14cux-gauge-<tag>.zip --repo KB1RMA/14cux-gauge
+gh attestation verify 14cux-gauge-<tag>.zip --repo KB1RMA/14cux-gauge --predicate-type https://cyclonedx.org/bom
+gh attestation verify 14cux-gauge-<tag>.zip --repo KB1RMA/14cux-gauge --predicate-type https://in-toto.io/attestation/test-result/v0.1
+```
+
+Add `--bundle <file>.sigstore.json` to verify against the attached bundle instead of fetching the attestation from GitHub.
 
 ## Roadmap
 

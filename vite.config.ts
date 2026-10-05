@@ -20,11 +20,14 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}'],
     exclude: [...configDefaults.exclude],
     reporters: process.env['GITHUB_ACTIONS']
-      ? ['default', 'github-actions']
-      : ['default'],
+      ? ['default', 'github-actions', 'junit']
+      : ['default', 'junit'],
+    outputFile: {
+      junit: './test-reports/junit.xml',
+    },
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html', 'lcov'],
+      reporter: ['text', 'json', 'html', 'lcov'],
       reportsDirectory: './coverage',
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/**/*.test.{ts,tsx}', 'src/test-setup.ts', 'src/main.tsx'],

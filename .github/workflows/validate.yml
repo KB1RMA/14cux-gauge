@@ -105,6 +105,21 @@ jobs:
         run: npm ci && npm run build
       - run: npm ci
       - run: npm run test:coverage
+      # The app is checked out into a subdirectory, so the uploader runs there
+      # to find the reports and map their paths onto the repository.
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          working-directory: ${{ env.APP_DIR }}
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          working-directory: ${{ env.APP_DIR }}
+          report_type: test_results
+          files: ./test-reports/junit.xml
 
   build:
     name: Build
