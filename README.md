@@ -19,6 +19,7 @@ This project is not affiliated with or endorsed by the author of libcomm14cux or
 - **Live data:** engine speed, road speed, coolant and fuel temperature, throttle position, airflow, main voltage, short- and long-term lambda trims for both banks, idle bypass position, gear, MIL and fuel pump relay. Choose °F/°C and mph/km/h from the Preferences menu (top right); the choice is remembered.
 - **Live graphs:** a Graphs tab plots every reading over the last 30 seconds to 10 minutes, with its current, lowest and highest values as text. Choose which graphs to show; the choice, the time window and the last tab used are remembered.
 - **Recorded sessions:** press Record in the status bar to save every reading while connected, then name the recording and add notes when you stop. The Sessions view lists recordings, replays one through the same readings and graphs as the live dashboard (play, pause, scrub and 1×–10× speed, with or without a connection), and lets you rename it, edit its notes or delete it. Recordings are kept in the browser (IndexedDB); if the browser will not store data, they last until the page is closed.
+- **Works offline:** the app is a progressive web app. After one visit online it starts from a copy kept on the device, with no network, and can be installed from the browser's menu. It shows a notice when the device is offline, and another when a newer release has been published (by comparing the running build with `version.json`, which is never cached). An update is downloaded in the background and only applied when you choose "Reload to update", with a warning first if an ECU is connected, so it can never restart the page mid-diagnosis.
 - **Fault codes:** read on demand, and clear after a confirmation.
 - **ECU info:** tune number, ident and checksum fixer.
 - **Preferences:** units, a light, dark or system theme, and a choice of colour palettes named after NAS Defender factory paints (Coniston Green, Arles Blue, Alpine White and Beluga Black, British Racing Green), in a menu in the top-right corner so the dashboard stays focused on the readings.
@@ -75,7 +76,7 @@ npm run type:check     # tsc --noEmit, strict
 npm test               # Vitest watch mode
 npm run test:coverage  # single run, enforces the coverage thresholds
 npm run build          # production build in dist/, with source maps
-npm run preview        # serve the production build
+npm run preview        # serve the production build (the only mode with the offline copy)
 npm run test:e2e       # acceptance suite against dist/ (build first)
 ```
 

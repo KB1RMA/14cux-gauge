@@ -4,6 +4,9 @@ import { codecovVitePlugin } from '@codecov/vite-plugin';
 import react from '@vitejs/plugin-react';
 import { configDefaults, defineConfig } from 'vitest/config';
 import { readBuildInfo } from './build/buildInfo.ts';
+import { pwa } from './build/pwa.ts';
+
+const buildInfo = readBuildInfo();
 
 export default defineConfig({
   // Relative asset paths, so the build works from a sub-path (GitHub Pages)
@@ -21,9 +24,10 @@ export default defineConfig({
       }),
       telemetry: false,
     }),
+    pwa(buildInfo),
   ],
   define: {
-    __BUILD_INFO__: JSON.stringify(readBuildInfo()),
+    __BUILD_INFO__: JSON.stringify(buildInfo),
   },
   build: {
     // The GPL requires the corresponding source to be available; shipping

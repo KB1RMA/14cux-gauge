@@ -22,4 +22,10 @@ describe('index.html', () => {
 
     expect(viewport).toBe('width=device-width, initial-scale=1.0');
   });
+
+  it('links the web app manifest', () => {
+    expect(
+      page.querySelector('link[rel="manifest"]')?.getAttribute('href'),
+    ).toBe('./manifest.webmanifest');
+  });
 });
