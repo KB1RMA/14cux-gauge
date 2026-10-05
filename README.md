@@ -92,7 +92,7 @@ npx playwright show-report test-reports/e2e/html
 
 CI checks out comm14cux-ts beside the app and builds it before installing. On every pull request and push to `main`, `validate.yml` lints, type-checks, runs the unit tests, builds, and runs the acceptance suite against that build. Unit and acceptance test results both go to Codecov; acceptance runs are flagged `e2e-<browser>`.
 
-Publishing a GitHub release runs `release.yml`: it tests and builds once, runs the acceptance suite against that build in all three browsers, and only if every test passes attaches the attested build to the release (see below) and deploys the same `dist/` to GitHub Pages. A flaky test (one that passes only on retry) fails the run. The repository's Pages source must be set to **GitHub Actions** (Settings → Pages).
+Publishing a GitHub release runs `release.yml`: it tests and builds once, runs the acceptance suite against that build in all three browsers, and only if every test passes attaches the attested build to the release (see below) and deploys the same `dist/` to GitHub Pages. A flaky test (one that passes only on retry) fails the run. Prereleases are attested but not deployed, and a manual run must be on a release's tag. The repository's Pages source must be set to **GitHub Actions** (Settings → Pages), and the `github-pages` environment must allow release tags to deploy (Settings → Environments → github-pages → Deployment branches and tags, e.g. a `v*` tag rule).
 
 ### Verifying a release
 

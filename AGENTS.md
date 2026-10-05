@@ -119,4 +119,4 @@ The app must be usable with a keyboard alone and with a screen reader, and meet 
 - Playwright specs are `e2e/*.spec.ts`. They run against the production build in `dist/`, served from `/14cux-gauge/`; never point them at the Vite dev server.
 - Drive a serial ECU only through the `emulatedSerial` fixture: comm14cux-ts's `SimulatedTransport` behind a fake `navigator.serial`, with bytes planted in its memory. Do not stub app modules or intercept `Ecu` calls.
 - `eslint-plugin-playwright`'s recommended rules run as errors, with `no-raw-locators` on. Find elements by role and accessible name, as in the unit tests; a CSS or XPath locator needs a one-line disable saying why no role fits. Run `expectNoAxeViolations` for every new view or state; pass `within` while a Radix menu or dialog is open.
-- Do not add retries, skip a browser or loosen `failOnFlakyTests` to land a change. A release deploys only when the suite passes in Chromium, Firefox and WebKit.
+- Do not raise `retries` (CI retries once only to capture a trace), skip a browser or loosen `failOnFlakyTests` to land a change. A release deploys only when the suite passes in Chromium, Firefox and WebKit.

@@ -97,11 +97,15 @@ export { expect };
 
 /** The value shown for a name/value reading, found by its visible name. */
 export function reading(page: Page, name: string): Locator {
+  const exactName = new RegExp(
+    `^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+  );
+
   // A <dd> is tied to its <dt> by position only; no role expresses that.
   // eslint-disable-next-line playwright/no-raw-locators -- see above
   return page
     .getByRole('term')
-    .filter({ hasText: new RegExp(`^${name}$`) })
+    .filter({ hasText: exactName })
     .locator('xpath=following-sibling::dd[1]');
 }
 
@@ -146,9 +150,11 @@ export async function expectNoAxeViolations(
   { within }: { within?: string } = {},
 ): Promise<void> {
   // Contrast measured mid-fade is meaningless; let open/close transitions
-  // (but not endless ones, like the status pulse) finish first.
+  // (but not endless ones, like the status pulse) finish first. allSettled,
+  // because `finished` rejects when an animation is cancelled, as when Radix
+  // unmounts content mid-fade.
   await page.evaluate(() =>
-    Promise.all(
+    Promise.allSettled(
       document
         .getAnimations()
         .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
