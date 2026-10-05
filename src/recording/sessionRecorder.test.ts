@@ -89,4 +89,19 @@ describe('SessionRecorder', () => {
     expect(onError).toHaveBeenCalledExactlyOnceWith(failure);
     expect(recorder.recording).toBe(false);
   });
+
+  it('drops batches already queued behind a failed write', async () => {
+    const store = new MemorySessionStore();
+    const recorder = await SessionRecorder.start(store, NEW_SESSION);
+    const append = vi
+      .spyOn(store, 'append')
+      .mockRejectedValue(new Error('disk full'));
+
+    recorder.push(snapshotAt(0));
+    void recorder.flush();
+    recorder.push(snapshotAt(1));
+    await recorder.flush();
+
+    expect(append).toHaveBeenCalledTimes(1);
+  });
 });

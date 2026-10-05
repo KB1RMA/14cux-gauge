@@ -157,6 +157,61 @@ describe('IndexedDbSessionStore persistence', () => {
   });
 });
 
+describe('IndexedDbSessionStore failures', () => {
+  function rawOpen(factory: IDBFactory, version: number): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      const req = factory.open('cuxGauge', version);
+
+      req.onsuccess = () => {
+        resolve(req.result);
+      };
+
+      req.onerror = () => {
+        reject(new Error('open failed'));
+      };
+    });
+  }
+
+  it('refuses to open a database from a newer version of the app', async () => {
+    const factory = new IDBFactory();
+
+    (await rawOpen(factory, 2)).close();
+
+    await expect(IndexedDbSessionStore.open({ factory })).rejects.toThrow(
+      expect.objectContaining({ name: 'VersionError' }) as Error,
+    );
+  });
+
+  it('steps aside when another tab upgrades the database', async () => {
+    const factory = new IDBFactory();
+    const store = await IndexedDbSessionStore.open({ factory });
+
+    // Would block forever if the open store did not close itself.
+    const newer = await rawOpen(factory, 2);
+
+    expect(newer.version).toBe(2);
+    newer.close();
+    store.close();
+  });
+
+  it('rejects when a write fails', async () => {
+    const store = await IndexedDbSessionStore.open({
+      factory: new IDBFactory(),
+    });
+    const session = { name: 'A', source: 'demo', startedAt: 0 } as const;
+    const uuid = vi
+      .spyOn(crypto, 'randomUUID')
+      .mockReturnValue('00000000-0000-4000-8000-000000000000');
+
+    await store.create(session);
+    await expect(store.create(session)).rejects.toThrow(
+      expect.objectContaining({ name: 'ConstraintError' }) as Error,
+    );
+    uuid.mockRestore();
+    store.close();
+  });
+});
+
 describe('openSessionStore', () => {
   it('uses IndexedDB when it is available', async () => {
     const { store, persistent } = await openSessionStore(new IDBFactory());

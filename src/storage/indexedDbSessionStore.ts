@@ -54,8 +54,14 @@ function completed(tx: IDBTransaction): Promise<void> {
       resolve();
     };
 
-    tx.onerror = () => {
-      reject(tx.error ?? new Error('IndexedDB transaction failed'));
+    // The failing request carries the cause; `tx.error` is only set once
+    // the transaction has aborted.
+    tx.onerror = (event) => {
+      const request = event.target as IDBRequest | null;
+
+      reject(
+        request?.error ?? tx.error ?? new Error('IndexedDB transaction failed'),
+      );
     };
 
     tx.onabort = () => {

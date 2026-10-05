@@ -162,6 +162,33 @@ describe('TimeSeriesChart drawing', () => {
     expect(container.querySelector('canvas')).toBeNull();
   });
 
+  it('resizes the chart with its container', async () => {
+    const observers: (() => void)[] = [];
+
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          observers.push(callback);
+        }
+
+        observe(): void {}
+        disconnect(): void {}
+      },
+    );
+
+    const { container } = renderChart('engineRpm');
+
+    await vi.waitFor(() => {
+      expect(observers).toHaveLength(1);
+    });
+
+    expect(() => {
+      observers[0]?.();
+    }).not.toThrow();
+    expect(container.querySelector('.uplot')).not.toBeNull();
+  });
+
   it('draws on/off readings as steps', async () => {
     const history = new SampleHistory(METRIC_KEYS, 100);
 
