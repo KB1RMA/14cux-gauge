@@ -9,7 +9,7 @@ export interface TileProps {
   label: string;
   /** Formatted value; `null` is an invalid reading, `undefined` not read yet. */
   value: string | null | undefined;
-  unit?: string;
+  unit?: string | undefined;
   /** Colour emphasis only; the value text must carry the meaning by itself. */
   tone?: TileTone;
 }
