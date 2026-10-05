@@ -66,7 +66,7 @@ export default [
     },
   },
   {
-    files: ['src/**/*.{ts,tsx}', 'e2e/**/*.ts', '*.ts'],
+    files: ['src/**/*.{ts,tsx}', 'build/**/*.ts', 'e2e/**/*.ts', '*.ts'],
     plugins: {
       '@typescript-eslint': tseslint.plugin,
       prettier: prettierPlugin,
@@ -152,7 +152,7 @@ export default [
     rules: { 'react-refresh/only-export-components': 'off' },
   },
   {
-    files: ['src/**/*.test.{ts,tsx}'],
+    files: ['src/**/*.test.{ts,tsx}', 'build/**/*.test.ts'],
     plugins: { vitest: vitestPlugin },
     languageOptions: {
       globals: { ...vitestPlugin.environments.env.globals },

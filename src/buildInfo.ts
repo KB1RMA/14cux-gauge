@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 
-/** What the running bundle was built from; stamped in by `vite.config.ts`. */
+/**
+ * What the running bundle was built from; read by `build/buildInfo.ts` and
+ * stamped in by `vite.config.ts`.
+ */
 export interface BuildInfo {
   /** `version` from package.json. */
   version: string;

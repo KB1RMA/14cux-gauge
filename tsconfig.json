@@ -4,6 +4,7 @@
     "lib": ["es2023", "dom", "dom.iterable"],
     "module": "esnext",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "types": [
       "node",
@@ -35,6 +36,12 @@
     "incremental": true,
     "tsBuildInfoFile": "./node_modules/.cache/tsconfig.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "e2e/**/*.ts", "*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "build/**/*.ts",
+    "e2e/**/*.ts",
+    "*.ts"
+  ],
   "exclude": ["node_modules", "dist", "coverage"]
 }
