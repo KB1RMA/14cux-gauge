@@ -147,7 +147,12 @@ jobs:
         working-directory: ${{ env.LIB_DIR }}
         run: npm ci && npm run build
       - run: npm ci
+      # With CODECOV_TOKEN set, the build also uploads its bundle stats to
+      # Codecov, which comments the size change on the pull request. The
+      # secret is absent on fork PRs, where the upload is skipped.
       - run: npm run build
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       - name: Record the comm14cux-ts commit
         id: lib
         run: echo "commit=$(git -C "../${LIB_DIR}" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
