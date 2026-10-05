@@ -1,18 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
-import {
-  asRecord,
-  oneOf,
-  readSetting,
-  writeSetting,
-} from '../storage/settings';
+import { useLayoutEffect, useMemo, type ReactNode } from 'react';
+import { asRecord, oneOf } from '../storage/settings';
+import { useStoredState } from '../storage/useStoredState';
 import type { SpeedUnit, TemperatureUnit } from '../units';
 import {
   PreferencesContext,
@@ -44,13 +34,10 @@ function applyTheme(theme: ThemePreference): void {
 }
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
-  const [preferences, setPreferences] = useState(() =>
-    readSetting(STORAGE_KEY, parsePreferences),
+  const [preferences, setPreferences] = useStoredState(
+    STORAGE_KEY,
+    parsePreferences,
   );
-
-  useEffect(() => {
-    writeSetting(STORAGE_KEY, preferences);
-  }, [preferences]);
 
   // Before paint, so a stored theme does not flash the system one first.
   useLayoutEffect(() => {
@@ -70,7 +57,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         setPreferences((p) => ({ ...p, theme }));
       },
     }),
-    [preferences],
+    [preferences, setPreferences],
   );
 
   return <PreferencesContext value={value}>{children}</PreferencesContext>;

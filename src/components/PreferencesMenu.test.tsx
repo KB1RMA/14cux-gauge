@@ -155,6 +155,37 @@ describe('PreferencesMenu', () => {
     expect(root).not.toHaveAttribute('data-theme');
   });
 
+  it('saves the units and theme, and restores them on the next visit', async () => {
+    const user = userEvent.setup();
+    const first = renderWithTiles();
+
+    expect(localStorage.getItem('cuxGauge.preferences')).toBeNull();
+
+    await user.click(trigger());
+    await user.click(screen.getByRole('menuitemradio', { name: /Celsius/ }));
+    await user.click(
+      screen.getByRole('menuitemradio', { name: /Kilometres per hour/ }),
+    );
+    await user.click(screen.getByRole('menuitemradio', { name: 'Dark' }));
+
+    expect(
+      JSON.parse(localStorage.getItem('cuxGauge.preferences') ?? 'null'),
+    ).toEqual({ temperatureUnit: 'C', speedUnit: 'kmh', theme: 'dark' });
+
+    first.unmount();
+    delete document.documentElement.dataset['theme'];
+    renderWithTiles();
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    await user.click(trigger());
+    expect(
+      screen.getByRole('menuitemradio', { name: /Celsius/ }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole('menuitemradio', { name: /Kilometres per hour/ }),
+    ).toBeChecked();
+  });
+
   it('applies a stored theme on load', () => {
     localStorage.setItem(
       'cuxGauge.preferences',

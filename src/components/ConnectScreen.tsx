@@ -5,10 +5,18 @@ import { Checkbox, Label } from 'radix-ui';
 import { useEffect, useId, useRef, useState } from 'react';
 import { describeError, isPortPickerCancelled } from '../ecu/errors';
 import { useEcu } from '../ecu/useEcu';
+import { useStoredState } from '../storage/useStoredState';
 import { ExternalLink } from './ExternalLink';
 import styles from './ConnectScreen.module.css';
 
 const LIBRARY_HARDWARE_URL = 'https://github.com/KB1RMA/comm14cux-ts#hardware';
+
+/** Remembered, since it matches the user's ECU and rarely changes. */
+const DOUBLE_SPEED_KEY = 'doubleSpeed';
+
+function parseDoubleSpeed(stored: unknown): boolean {
+  return stored === true;
+}
 
 function isWebSerialSupported(): boolean {
   return 'serial' in navigator;
@@ -16,7 +24,10 @@ function isWebSerialSupported(): boolean {
 
 export function ConnectScreen() {
   const { state, connect } = useEcu();
-  const [doubleSpeed, setDoubleSpeed] = useState(false);
+  const [doubleSpeed, setDoubleSpeed] = useStoredState(
+    DOUBLE_SPEED_KEY,
+    parseDoubleSpeed,
+  );
   const [pickerError, setPickerError] = useState<string | undefined>(undefined);
   const supported = isWebSerialSupported();
   const busy = state.status === 'connecting';
