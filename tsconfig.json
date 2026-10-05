@@ -35,6 +35,6 @@
     "incremental": true,
     "tsBuildInfoFile": "./node_modules/.cache/tsconfig.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "e2e/**/*.ts", "*.ts"],
   "exclude": ["node_modules", "dist", "coverage"]
 }

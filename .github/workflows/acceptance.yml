@@ -1,0 +1,91 @@
+name: Acceptance
+run-name: Acceptance
+
+# Runs the Playwright acceptance suite against an already-built `dist/`,
+# uploaded by the calling workflow as the artifact named in `dist-artifact`.
+# It never rebuilds the app, so what passes here is byte-for-byte what ships.
+
+on:
+  workflow_call:
+    inputs:
+      dist-artifact:
+        description: Name of the artifact holding the production build (dist/)
+        type: string
+        required: true
+      comm14cux-ts-ref:
+        description: >
+          comm14cux-ts commit the build was made from, so the emulated ECU is
+          the same code that is bundled into dist/
+        type: string
+        required: true
+    secrets:
+      CODECOV_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+# comm14cux-ts is not published to npm yet; see validate.yml.
+env:
+  APP_DIR: 14cux-gauge
+  LIB_DIR: comm14cux-ts
+
+jobs:
+  e2e:
+    name: E2E (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    defaults:
+      run:
+        working-directory: ${{ env.APP_DIR }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: ${{ env.APP_DIR }}
+      - uses: actions/checkout@v7
+        with:
+          repository: KB1RMA/comm14cux-ts
+          ref: ${{ inputs.comm14cux-ts-ref }}
+          path: ${{ env.LIB_DIR }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ env.APP_DIR }}/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: |
+            ${{ env.APP_DIR }}/package-lock.json
+            ${{ env.LIB_DIR }}/package-lock.json
+      - name: Build comm14cux-ts
+        working-directory: ${{ env.LIB_DIR }}
+        run: npm ci && npm run build
+      - run: npm ci
+      - name: Download the production build
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.dist-artifact }}
+          path: ${{ env.APP_DIR }}/dist
+      - name: Install ${{ matrix.browser }}
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Run the acceptance suite
+        run: npm run test:e2e -- --project=${{ matrix.browser }}
+      - name: Upload the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report-${{ matrix.browser }}
+          path: ${{ env.APP_DIR }}/test-reports/e2e
+          retention-days: 14
+      # Alongside the unit test results validate.yml uploads, flagged by
+      # browser so Codecov can tell the runs apart.
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          working-directory: ${{ env.APP_DIR }}
+          report_type: test_results
+          files: ./test-reports/e2e/junit.xml
+          flags: e2e-${{ matrix.browser }}

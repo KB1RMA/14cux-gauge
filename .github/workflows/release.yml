@@ -1,14 +1,18 @@
 name: Release
-run-name: Release ${{ github.event.release.tag_name }}
+run-name: Release ${{ github.event.release.tag_name || github.ref_name }}
 
-# Publishing a GitHub release tests and builds the tagged commit, then attaches
-# the built app to the release with three signed attestations about it:
-#   - SLSA build provenance (which workflow, commit and runner built it)
-#   - a CycloneDX SBOM of the runtime dependencies bundled into it
-#   - an in-toto test result listing the tests that passed against it
-# Each attestation is stored by GitHub and also attached to the release as a
-# Sigstore bundle, so it can be verified offline. See "Verifying a release" in
-# README.md.
+# Publishing a GitHub release tests and builds the tagged commit once, runs the
+# acceptance suite against that build in Chromium, Firefox and WebKit, and only
+# if it passes:
+#   - attaches the built app to the release with three signed attestations:
+#       - SLSA build provenance (which workflow, commit and runner built it)
+#       - a CycloneDX SBOM of the runtime dependencies bundled into it
+#       - an in-toto test result listing the unit and acceptance tests that
+#         passed against it
+#     Each attestation is stored by GitHub and also attached to the release as
+#     a Sigstore bundle, so it can be verified offline. See "Verifying a
+#     release" in README.md.
+#   - deploys the same build to GitHub Pages, unless it is a prerelease.
 
 permissions:
   contents: read
@@ -17,30 +21,43 @@ on:
   release:
     types:
       - published
+  # Re-deploy to Pages by hand, for example after changing the Pages settings.
+  # The ref must be a release's tag; the run fails on a branch. Release assets
+  # are only attached for a published release.
+  workflow_dispatch:
 
 concurrency:
-  group: release-${{ github.event.release.tag_name }}
+  group: release-${{ github.event.release.tag_name || github.ref_name }}
   cancel-in-progress: false
 
 # comm14cux-ts is not published to npm yet; see validate.yml.
 env:
   APP_DIR: 14cux-gauge
   LIB_DIR: comm14cux-ts
-  TAG: ${{ github.event.release.tag_name }}
+  TAG: ${{ github.event.release.tag_name || github.ref_name }}
 
 jobs:
-  release:
-    name: Build, attest and upload
+  build:
+    name: Test, build and package
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions:
-      contents: write # upload release assets
-      id-token: write # sign attestations with Sigstore
-      attestations: write # store attestations on the repository
     defaults:
       run:
         working-directory: ${{ env.APP_DIR }}
     steps:
+      # Only a release's tag may reach Pages, including on a manual run.
+      - name: Check the ref is a release
+        id: release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+            echo "::error::Run this workflow on a release tag, not ${GITHUB_REF}."
+            exit 1
+          fi
+          prerelease=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq .isPrerelease)
+          echo "prerelease=${prerelease}" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
           path: ${{ env.APP_DIR }}
@@ -58,6 +75,9 @@ jobs:
       - name: Build comm14cux-ts
         working-directory: ${{ env.LIB_DIR }}
         run: npm ci && npm run build
+      - name: Record the comm14cux-ts commit
+        id: lib
+        run: echo "commit=$(git -C "../${LIB_DIR}" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - run: npm ci
 
       - name: Test
@@ -76,7 +96,6 @@ jobs:
           name="14cux-gauge-${TAG}"
           (cd dist && zip -r -X "../release/${name}.zip" .)
           echo "name=${name}" >> "$GITHUB_OUTPUT"
-          echo "zip=${APP_DIR}/release/${name}.zip" >> "$GITHUB_OUTPUT"
 
       # Runtime dependencies only: dev tools are not bundled into the app.
       - name: Generate SBOM
@@ -86,15 +105,17 @@ jobs:
 
       # https://github.com/in-toto/attestation/blob/main/spec/predicates/test-result.md
       # The configuration records the test setup, the lockfile and the exact
-      # comm14cux-ts commit the tests ran against.
-      - name: Build test result predicate
+      # comm14cux-ts commit the tests ran against. The publish job adds the
+      # acceptance results once the suite has run.
+      - name: Build unit test result predicate
         env:
+          LIB_COMMIT: ${{ steps.lib.outputs.commit }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
         run: |
           configuration=$(
-            sha256sum vite.config.ts package-lock.json |
+            sha256sum vite.config.ts playwright.config.ts package-lock.json |
               jq -R -s 'split("\n") | map(select(length > 0) | split("  ") | {name: .[1], digest: {sha256: .[0]}})' |
-              jq --arg commit "$(git -C "../${LIB_DIR}" rev-parse HEAD)" \
+              jq --arg commit "$LIB_COMMIT" \
                 '. + [{name: "comm14cux-ts", uri: "git+https://github.com/KB1RMA/comm14cux-ts", digest: {gitCommit: $commit}}]'
           )
           jq --arg url "$RUN_URL" --arg root "$PWD/" --argjson configuration "$configuration" '
@@ -112,33 +133,103 @@ jobs:
               passedTests: tests("passed"),
               warnedTests: [],
               failedTests: tests("failed")
-            }' test-reports/results.json > test-reports/test-result.json
+            }' test-reports/results.json > release/unit-test-result.json
+
+      - name: Upload the production build
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: ${{ env.APP_DIR }}/dist
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload the release package
+        uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: ${{ env.APP_DIR }}/release
+          if-no-files-found: error
+          retention-days: 30
+    outputs:
+      name: ${{ steps.package.outputs.name }}
+      lib-commit: ${{ steps.lib.outputs.commit }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+
+  acceptance:
+    name: Acceptance
+    needs: build
+    uses: ./.github/workflows/acceptance.yml
+    with:
+      dist-artifact: dist
+      comm14cux-ts-ref: ${{ needs.build.outputs.lib-commit }}
+    secrets: inherit
+
+  publish:
+    name: Attest and upload to the release
+    needs: [build, acceptance]
+    if: ${{ github.event_name == 'release' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # upload release assets
+      id-token: write # sign attestations with Sigstore
+      attestations: write # store attestations on the repository
+    env:
+      NAME: ${{ needs.build.outputs.name }}
+    steps:
+      - name: Download the tested package
+        uses: actions/download-artifact@v8
+        with:
+          name: release
+          path: release
+      - name: Download the acceptance results
+        uses: actions/download-artifact@v8
+        with:
+          pattern: e2e-report-*
+          path: e2e
+
+      # Adds each browser's Playwright results to the unit test predicate,
+      # named "<file> > <describe> > <test> [<browser>]".
+      - name: Build test result predicate
+        run: |
+          jq -s '
+            def walk($prefix):
+              (.specs[]? as $spec | $spec.tests[]
+                | {name: "e2e/\($spec.file) > \($prefix)\($spec.title) [\(.projectName)]", status}),
+              (.suites[]? as $suite | $suite | walk($prefix + $suite.title + " > "));
+            .[0] as $unit
+            | [.[1:][] | .suites[] | walk("")] as $e2e
+            | $unit
+            | .passedTests += [$e2e[] | select(.status == "expected") | .name]
+            | .warnedTests += [$e2e[] | select(.status == "flaky") | .name]
+            | .failedTests += [$e2e[] | select(.status == "unexpected") | .name]
+            | .result = (if $unit.result == "PASSED" and .failedTests == [] then "PASSED" else "FAILED" end)
+          ' release/unit-test-result.json e2e/*/results.json > test-result.json
+          rm release/unit-test-result.json
 
       - name: Attest build provenance
         id: provenance
         uses: actions/attest@v4
         with:
-          subject-path: ${{ steps.package.outputs.zip }}
+          subject-path: release/${{ env.NAME }}.zip
 
       - name: Attest SBOM
         id: sbom
         uses: actions/attest@v4
         with:
-          subject-path: ${{ steps.package.outputs.zip }}
-          sbom-path: ${{ env.APP_DIR }}/release/${{ steps.package.outputs.name }}.cdx.json
+          subject-path: release/${{ env.NAME }}.zip
+          sbom-path: release/${{ env.NAME }}.cdx.json
 
       - name: Attest test results
         id: test-result
         uses: actions/attest@v4
         with:
-          subject-path: ${{ steps.package.outputs.zip }}
+          subject-path: release/${{ env.NAME }}.zip
           predicate-type: https://in-toto.io/attestation/test-result/v0.1
-          predicate-path: ${{ env.APP_DIR }}/test-reports/test-result.json
+          predicate-path: test-result.json
 
       - name: Upload to the release
         env:
           GH_TOKEN: ${{ github.token }}
-          NAME: ${{ steps.package.outputs.name }}
           PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
           SBOM_BUNDLE: ${{ steps.sbom.outputs.bundle-path }}
           TEST_RESULT_BUNDLE: ${{ steps.test-result.outputs.bundle-path }}
@@ -146,4 +237,40 @@ jobs:
           cp "$PROVENANCE_BUNDLE" "release/${NAME}.provenance.sigstore.json"
           cp "$SBOM_BUNDLE" "release/${NAME}.sbom.sigstore.json"
           cp "$TEST_RESULT_BUNDLE" "release/${NAME}.test-result.sigstore.json"
-          gh release upload "$TAG" release/* --clobber
+          gh release upload "$TAG" release/* --clobber --repo "$GITHUB_REPOSITORY"
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: [build, acceptance, publish]
+    # Only once the release's attested assets are uploaded (publish is skipped
+    # on a manual run), and never for a prerelease.
+    if: >-
+      ${{ !cancelled()
+      && needs.acceptance.result == 'success'
+      && (needs.publish.result == 'success' || needs.publish.result == 'skipped')
+      && needs.build.outputs.prerelease == 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    # One Pages deployment at a time across releases; never cancel one that
+    # has started.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download the tested build
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v5

@@ -73,21 +73,38 @@ npm test               # Vitest watch mode
 npm run test:coverage  # single run, enforces the coverage thresholds
 npm run build          # production build in dist/, with source maps
 npm run preview        # serve the production build
+npm run test:e2e       # acceptance suite against dist/ (build first)
 ```
 
 Tests drive a real `Ecu` against the library's `SimulatedTransport` (or a fake `SerialPort`); see [AGENTS.md](AGENTS.md) for the rules.
 
-CI checks out comm14cux-ts beside the app and builds it before installing.
+### Acceptance suite
+
+`e2e/` holds a [Playwright](https://playwright.dev) suite that runs the **production build** in Chromium, Firefox and WebKit, served from `/14cux-gauge/` as GitHub Pages serves it. It covers demo mode, preferences, keyboard-only use, axe-core WCAG 2.2 AA checks with colour contrast in both themes, the shipped source maps and footer links, and the serial path. For the serial tests, `navigator.serial` is replaced with a port whose far end is comm14cux-ts's byte-level `SimulatedTransport`, so the app's real `WebSerialTransport` code runs.
+
+```sh
+npx playwright install   # once, to download the browsers
+npm run build && npm run test:e2e
+npx playwright show-report test-reports/e2e/html
+```
+
+### CI and releases
+
+CI checks out comm14cux-ts beside the app and builds it before installing. On every pull request and push to `main`, `validate.yml` lints, type-checks, runs the unit tests, builds, and runs the acceptance suite against that build. Unit and acceptance test results both go to Codecov; acceptance runs are flagged `e2e-<browser>`.
+
+Publishing a GitHub release runs `release.yml`: it tests and builds once, runs the acceptance suite against that build in all three browsers, and only if every test passes attaches the attested build to the release (see below) and deploys the same `dist/` to GitHub Pages. A flaky test (one that passes only on retry) fails the run. Prereleases are attested but not deployed, and a manual run must be on a release's tag. The repository's Pages source must be set to **GitHub Actions** (Settings → Pages), and the `github-pages` environment must allow release tags to deploy (Settings → Environments → github-pages → Deployment branches and tags, e.g. a `v*` tag rule).
 
 ### Verifying a release
 
-Publishing a GitHub release runs `.github/workflows/release.yml`, which tests and builds the tagged commit and attaches `14cux-gauge-<tag>.zip` (the built app) to the release with three signed attestations:
+Publishing a GitHub release runs `.github/workflows/release.yml`, which tests and builds the tagged commit and, once the acceptance suite passes, attaches `14cux-gauge-<tag>.zip` (the built app) to the release with three signed attestations:
 
 | Attestation      | Predicate type                                    | Release asset                        |
 | ---------------- | ------------------------------------------------- | ------------------------------------ |
 | Build provenance | `https://slsa.dev/provenance/v1`                  | `*.provenance.sigstore.json`         |
 | SBOM (CycloneDX) | `https://cyclonedx.org/bom`                       | `*.sbom.sigstore.json`, `*.cdx.json` |
 | Test results     | `https://in-toto.io/attestation/test-result/v0.1` | `*.test-result.sigstore.json`        |
+
+The test-result attestation lists every unit test and every acceptance test, the latter once per browser as `e2e/<file> > <describe> > <test> [<browser>]`.
 
 Verify a download with the [GitHub CLI](https://cli.github.com/):
 
@@ -102,7 +119,6 @@ Add `--bundle <file>.sigstore.json` to verify against the attached bundle instea
 ## Roadmap
 
 - Publish comm14cux-ts to npm (or give it a `prepare` script) and depend on a version range instead of `file:`.
-- Deploy to GitHub Pages (HTTPS satisfies Web Serial's secure-context requirement).
 - Fuel map viewer, ROM dump download, raw memory read/write, fuel pump and idle-motor tests.
 - CSV logging, charts and sparklines.
 - Electron packaging. The renderer is plain web code; the main process will need `session.on('select-serial-port')` plus `setPermissionCheckHandler` / `setDevicePermissionHandler` to let the user choose a port.

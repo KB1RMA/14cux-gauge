@@ -148,3 +148,24 @@ jobs:
         run: npm ci && npm run build
       - run: npm ci
       - run: npm run build
+      - name: Record the comm14cux-ts commit
+        id: lib
+        run: echo "commit=$(git -C "../${LIB_DIR}" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Upload the production build
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: ${{ env.APP_DIR }}/dist
+          if-no-files-found: error
+          retention-days: 7
+    outputs:
+      lib-commit: ${{ steps.lib.outputs.commit }}
+
+  acceptance:
+    name: Acceptance
+    needs: build
+    uses: ./.github/workflows/acceptance.yml
+    with:
+      dist-artifact: dist
+      comm14cux-ts-ref: ${{ needs.build.outputs.lib-commit }}
+    secrets: inherit
