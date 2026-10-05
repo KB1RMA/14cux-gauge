@@ -1,0 +1,68 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.bar[data-status='error'] {
+  border-color: var(--danger);
+}
+
+.indicator {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex: none;
+}
+
+.bar[data-status='connecting'] .indicator {
+  background: var(--accent);
+  animation: pulse 1s ease-in-out infinite alternate;
+}
+
+.bar[data-status='connected'] .indicator {
+  background: var(--good);
+}
+
+.bar[data-status='error'] .indicator {
+  background: var(--danger);
+}
+
+.text {
+  flex: 0 1 auto;
+}
+
+.rate {
+  flex: 1 1 8rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bar:not([data-status='connected']) .text {
+  flex: 1 1 16rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+@keyframes pulse {
+  to {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar[data-status='connecting'] .indicator {
+    animation: none;
+  }
+}

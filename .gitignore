@@ -1,0 +1,12 @@
+/node_modules
+/dist
+/coverage
+/test-reports
+*.tsbuildinfo
+*.local
+.DS_Store
+npm-debug.log*
+.env*
+!.env.example
+# Claude Code worktrees, and the comm14cux-ts symlink placed beside them
+/.claude/worktrees/
