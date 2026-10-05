@@ -1,0 +1,135 @@
+name: Validate Build, Tests and Style
+run-name: Validate Build, Tests and Style
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+# comm14cux-ts is not published to npm yet. package.json depends on it as
+# `file:../comm14cux-ts`, so every job checks the library out beside the app
+# and builds it before `npm ci`. Remove the library steps once it is published.
+env:
+  APP_DIR: 14cux-gauge
+  LIB_DIR: comm14cux-ts
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ${{ env.APP_DIR }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: ${{ env.APP_DIR }}
+      - uses: actions/checkout@v7
+        with:
+          repository: KB1RMA/comm14cux-ts
+          path: ${{ env.LIB_DIR }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ env.APP_DIR }}/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: |
+            ${{ env.APP_DIR }}/package-lock.json
+            ${{ env.LIB_DIR }}/package-lock.json
+      - name: Build comm14cux-ts
+        working-directory: ${{ env.LIB_DIR }}
+        run: npm ci && npm run build
+      - run: npm ci
+      - run: npm run lint
+
+  type-check:
+    name: Type check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ${{ env.APP_DIR }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: ${{ env.APP_DIR }}
+      - uses: actions/checkout@v7
+        with:
+          repository: KB1RMA/comm14cux-ts
+          path: ${{ env.LIB_DIR }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ env.APP_DIR }}/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: |
+            ${{ env.APP_DIR }}/package-lock.json
+            ${{ env.LIB_DIR }}/package-lock.json
+      - name: Build comm14cux-ts
+        working-directory: ${{ env.LIB_DIR }}
+        run: npm ci && npm run build
+      - run: npm ci
+      - run: npm run type:check
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ${{ env.APP_DIR }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: ${{ env.APP_DIR }}
+      - uses: actions/checkout@v7
+        with:
+          repository: KB1RMA/comm14cux-ts
+          path: ${{ env.LIB_DIR }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ env.APP_DIR }}/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: |
+            ${{ env.APP_DIR }}/package-lock.json
+            ${{ env.LIB_DIR }}/package-lock.json
+      - name: Build comm14cux-ts
+        working-directory: ${{ env.LIB_DIR }}
+        run: npm ci && npm run build
+      - run: npm ci
+      - run: npm run test:coverage
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ${{ env.APP_DIR }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: ${{ env.APP_DIR }}
+      - uses: actions/checkout@v7
+        with:
+          repository: KB1RMA/comm14cux-ts
+          path: ${{ env.LIB_DIR }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ env.APP_DIR }}/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: |
+            ${{ env.APP_DIR }}/package-lock.json
+            ${{ env.LIB_DIR }}/package-lock.json
+      - name: Build comm14cux-ts
+        working-directory: ${{ env.LIB_DIR }}
+        run: npm ci && npm run build
+      - run: npm ci
+      - run: npm run build

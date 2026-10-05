@@ -1,0 +1,39 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+.app {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.appBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+}
+
+.brand::before {
+  content: '';
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  margin-right: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+.main {
+  display: grid;
+  gap: 1rem;
+}

@@ -1,0 +1,46 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  animation: fade-in 150ms ease-out;
+  z-index: 20;
+}
+
+.dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(28rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-dialog);
+  animation: fade-in 150ms ease-out;
+  z-index: 21;
+}
+
+.title {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}

@@ -1,0 +1,97 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+.trigger {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border-color: transparent;
+}
+
+.trigger:hover,
+.trigger[data-state='open'] {
+  color: var(--text);
+  background: var(--surface-raised);
+  border-color: var(--control-border);
+}
+
+.content {
+  min-width: 14rem;
+  padding: 0.35rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-popover);
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+  animation: menu-in 120ms ease-out;
+  z-index: 10;
+}
+
+.label {
+  padding: 0.4rem 0.6rem 0.2rem 2rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.6rem 0.4rem 2rem;
+  border-radius: calc(var(--radius) - 3px);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+
+/* Radix moves focus between items and marks the focused one. */
+.item[data-highlighted] {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.item[data-highlighted] .hint {
+  color: inherit;
+}
+
+.indicator {
+  position: absolute;
+  left: 0.6rem;
+  display: inline-grid;
+  place-items: center;
+}
+
+.hint {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.separator {
+  height: 1px;
+  margin: 0.35rem 0.25rem;
+  background: var(--border);
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@media (forced-colors: active) {
+  .item[data-highlighted] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
