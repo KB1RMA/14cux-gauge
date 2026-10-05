@@ -8,9 +8,13 @@ run-name: PR Title
 # title would be skipped.
 #
 # Accepted form:  <type>[(<scope>)][!]: <description>
-#   feat: add a boost gauge             -> minor bump, "Features"
-#   fix(graphs): keep the axis visible  -> patch bump, "Bug Fixes"
-#   feat!: drop the legacy units        -> major bump, "BREAKING CHANGES"
+#   feat: add a boost gauge             -> "Features"
+#   fix(graphs): keep the axis visible  -> "Bug Fixes"
+#   feat!: drop the legacy units        -> "BREAKING CHANGES"
+#
+# How far each one bumps the version is set in release-please-config.json.
+# Before 1.0.0, bump-minor-pre-major and bump-patch-for-minor-pre-major make
+# a breaking change bump the minor version and a feat bump the patch.
 #
 # The title is checked with a plain shell regex rather than a third-party
 # action, so no outside code runs with access to the PR.
@@ -64,13 +68,13 @@ jobs:
             echo
             echo "Expected \`<type>[(<scope>)][!]: <description>\`, with no trailing full stop."
             echo
-            echo "| Type | Release |"
-            echo "| --- | --- |"
-            echo "| \`feat\` | minor, listed under Features |"
-            echo "| \`fix\` | patch, listed under Bug Fixes |"
-            echo "| \`perf\`, \`revert\`, \`deps\` | patch, listed in the changelog |"
-            echo "| \`docs\`, \`style\`, \`chore\`, \`refactor\`, \`test\`, \`build\`, \`ci\` | no release on their own |"
-            echo "| any type with \`!\`, e.g. \`feat!:\` | major, listed under Breaking Changes |"
+            echo "| Type | Before 1.0.0 | From 1.0.0 | Changelog |"
+            echo "| --- | --- | --- | --- |"
+            echo "| \`feat\` | patch | minor | Features |"
+            echo "| \`fix\` | patch | patch | Bug Fixes |"
+            echo "| \`perf\`, \`revert\`, \`deps\` | patch | patch | listed |"
+            echo "| \`docs\`, \`style\`, \`chore\`, \`refactor\`, \`test\`, \`build\`, \`ci\` | none on their own | none on their own | hidden |"
+            echo "| any type with \`!\`, e.g. \`feat!:\` | minor | major | Breaking Changes |"
             echo
             echo "Edit the PR title; this check re-runs automatically."
           } >> "$GITHUB_STEP_SUMMARY"
