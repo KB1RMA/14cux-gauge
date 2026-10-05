@@ -166,3 +166,9 @@
 .empty {
   color: var(--text-muted);
 }
+
+.hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}

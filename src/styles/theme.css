@@ -84,11 +84,14 @@ button {
   cursor: pointer;
 }
 
-button:hover:not(:disabled) {
+button:hover:not(:disabled, [aria-disabled='true']) {
   border-color: var(--text);
 }
 
-button:disabled {
+/* aria-disabled keeps a button focusable, for one that becomes unavailable
+   as it is pressed. */
+button:disabled,
+button[aria-disabled='true'] {
   opacity: 0.55;
   cursor: not-allowed;
 }
