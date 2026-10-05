@@ -4,6 +4,8 @@ import {
   expect,
   expectNoAxeViolations,
   reading,
+  tabKey,
+  tabTo,
   test,
 } from './support/fixtures';
 
@@ -86,24 +88,13 @@ test.describe('Demo mode', () => {
   });
 
   test('works with the keyboard alone', async ({ page, browserName }) => {
-    // Safari's Tab skips buttons unless the user turns on "Press Tab to
-    // highlight each item"; Option-Tab always reaches them.
-    const tab = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
+    const tab = tabKey(browserName);
 
     await page.goto('./');
 
     const demo = page.getByRole('button', { name: 'Demo mode' });
 
-    // Tab from the top of the page until the demo button has focus, as a
-    // keyboard user would.
-    for (let i = 0; i < 20; i++) {
-      await page.keyboard.press(tab);
-
-      if (await demo.evaluate((el) => el === document.activeElement)) {
-        break;
-      }
-    }
-
+    await tabTo(page, demo, tab);
     await expect(demo).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(

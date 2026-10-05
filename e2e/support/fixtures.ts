@@ -97,10 +97,40 @@ export { expect };
 
 /** The value shown for a name/value reading, found by its visible name. */
 export function reading(page: Page, name: string): Locator {
+  // A <dd> is tied to its <dt> by position only; no role expresses that.
+  // eslint-disable-next-line playwright/no-raw-locators -- see above
   return page
     .getByRole('term')
     .filter({ hasText: new RegExp(`^${name}$`) })
     .locator('xpath=following-sibling::dd[1]');
+}
+
+/**
+ * The key that moves focus to the next control. Safari's Tab skips buttons
+ * unless the user turns on "Press Tab to highlight each item"; Option-Tab
+ * always reaches them.
+ */
+export function tabKey(browserName: string): string {
+  return browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
+}
+
+/**
+ * Presses `key` from wherever focus is until `target` has focus, as a
+ * keyboard user would. Gives up after `limit` presses; assert focus after.
+ */
+export async function tabTo(
+  page: Page,
+  target: Locator,
+  key: string,
+  limit = 20,
+): Promise<void> {
+  for (let i = 0; i < limit; i++) {
+    await page.keyboard.press(key);
+
+    if (await target.evaluate((el) => el === document.activeElement)) {
+      return;
+    }
+  }
 }
 
 /**

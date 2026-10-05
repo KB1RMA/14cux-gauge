@@ -11,6 +11,10 @@ test.describe('Preferences', () => {
   test('changes units and theme, and remembers them after a reload', async ({
     page,
   }) => {
+    // The theme is an attribute on the root element, which has no role.
+    // eslint-disable-next-line playwright/no-raw-locators -- see above
+    const root = page.locator('html');
+
     await page.goto('./');
     await page.getByRole('button', { name: 'Demo mode' }).click();
     await expect(reading(page, 'Coolant')).toHaveText(/°F$/);
@@ -33,11 +37,11 @@ test.describe('Preferences', () => {
 
     await expect(reading(page, 'Coolant')).toHaveText(/°C$/);
     await expect(reading(page, 'Road speed')).toHaveText(/km\/h$/);
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expect(root).toHaveAttribute('data-theme', 'dark');
 
     await page.reload();
 
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expect(root).toHaveAttribute('data-theme', 'dark');
     await page.getByRole('button', { name: 'Demo mode' }).click();
     await expect(reading(page, 'Coolant')).toHaveText(/°C$/);
     await expect(reading(page, 'Road speed')).toHaveText(/km\/h$/);

@@ -27,6 +27,8 @@ test.describe('Release build', () => {
   test('ships source maps for the bundle', async ({ page, request }) => {
     await page.goto('./');
 
+    // Script elements have no role; this is a check on the bundle, not UI.
+    // eslint-disable-next-line playwright/no-raw-locators -- see above
     const scripts = await page
       .locator('script[type="module"][src]')
       .evaluateAll((elements) =>

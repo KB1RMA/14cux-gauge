@@ -8,6 +8,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import jsxA11y from 'eslint-plugin-jsx-a11y-x';
 import tseslint from 'typescript-eslint';
 import vitestPlugin from '@vitest/eslint-plugin';
+import playwright from 'eslint-plugin-playwright';
 
 const paddingLines = [
   'error',
@@ -39,6 +40,7 @@ const duplicatedHookRules = Object.fromEntries(
 );
 
 const reactStrict = eslintReact.configs['strict-type-checked'];
+const playwrightRecommended = playwright.configs['flat/recommended'];
 
 export default [
   {
@@ -165,6 +167,22 @@ export default [
       'vitest/no-focused-tests': 'error',
       'vitest/prefer-to-be': 'error',
       'vitest/prefer-to-have-length': 'error',
+    },
+  },
+  {
+    // Acceptance suite: Playwright's recommended preset as errors, plus
+    // role-based locators (see AGENTS.md). A CSS or XPath locator needs a
+    // one-line disable saying why no role fits.
+    files: ['e2e/**/*.ts'],
+    plugins: playwrightRecommended.plugins,
+    languageOptions: { globals: playwrightRecommended.languageOptions.globals },
+    rules: {
+      ...asErrors(playwrightRecommended.rules),
+      'playwright/expect-expect': [
+        'error',
+        { assertFunctionNames: ['expectNoAxeViolations'] },
+      ],
+      'playwright/no-raw-locators': 'error',
     },
   },
 ];
