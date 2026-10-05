@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
+import { codecovVitePlugin } from '@codecov/vite-plugin';
 import react from '@vitejs/plugin-react';
 import { configDefaults, defineConfig } from 'vitest/config';
 import { readBuildInfo } from './build/buildInfo.ts';
@@ -11,7 +12,20 @@ export default defineConfig({
   // Relative asset paths, so the build works from a sub-path (GitHub Pages)
   // or from a file:// URL (Electron).
   base: './',
-  plugins: [react(), pwa(buildInfo)],
+  plugins: [
+    react(),
+    // Uploads bundle stats to Codecov for size reporting on pull requests.
+    // Only runs where CODECOV_TOKEN is set (not locally or on fork PRs).
+    codecovVitePlugin({
+      enableBundleAnalysis: process.env['CODECOV_TOKEN'] !== undefined,
+      bundleName: '14cux-gauge',
+      ...(process.env['CODECOV_TOKEN'] && {
+        uploadToken: process.env['CODECOV_TOKEN'],
+      }),
+      telemetry: false,
+    }),
+    pwa(buildInfo),
+  ],
   define: {
     __BUILD_INFO__: JSON.stringify(buildInfo),
   },
