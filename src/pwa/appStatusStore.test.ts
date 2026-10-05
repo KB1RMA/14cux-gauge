@@ -18,9 +18,33 @@ class FakeWorker extends EventTarget {
   state = 'installing';
   postMessage = vi.fn();
 
+  constructor(private readonly registration?: FakeRegistration) {
+    super();
+  }
+
+  /** Finishes installing; like a browser, the registration now has it waiting. */
   install(): void {
-    this.state = 'installed';
+    this.settle('installed');
+
+    if (this.registration) {
+      this.registration.waiting = this;
+    }
+
     this.dispatchEvent(new Event('statechange'));
+  }
+
+  /** Fails to install, leaving any worker that was waiting in place. */
+  fail(): void {
+    this.settle('redundant');
+    this.dispatchEvent(new Event('statechange'));
+  }
+
+  private settle(state: string): void {
+    this.state = state;
+
+    if (this.registration?.installing === this) {
+      this.registration.installing = null;
+    }
   }
 }
 
@@ -30,10 +54,12 @@ class FakeRegistration extends EventTarget {
   update = vi.fn(() => Promise.resolve());
 
   foundWorker(): FakeWorker {
-    this.installing = new FakeWorker();
+    const worker = new FakeWorker(this);
+
+    this.installing = worker;
     this.dispatchEvent(new Event('updatefound'));
 
-    return this.installing;
+    return worker;
   }
 }
 
@@ -186,6 +212,70 @@ describe('AppStatusStore', () => {
       update: 'ready',
     });
     stop();
+  });
+
+  it('fetches a build newer than the waiting one, and waits for it', async () => {
+    const container = new FakeContainer();
+
+    container.registration.waiting = new FakeWorker();
+
+    const store = new AppStatusStore({
+      build: RUNNING,
+      versionUrl: 'v',
+      serviceWorker: container as unknown as ServiceWorkerContainer,
+      serviceWorkerUrl: 's',
+      fetchJson: () => Promise.resolve(NEWER),
+    });
+    const stop = store.start();
+
+    await settle();
+
+    expect(store.getSnapshot().update).toBe('ready');
+    expect(container.registration.update).toHaveBeenCalled();
+
+    const worker = container.registration.foundWorker();
+
+    expect(store.getSnapshot().update).toBe('downloading');
+
+    worker.install();
+
+    expect(store.getSnapshot().update).toBe('ready');
+    expect(container.registration.waiting).toBe(worker);
+    stop();
+  });
+
+  it('falls back to the waiting worker if a newer one fails to install', async () => {
+    const container = new FakeContainer();
+
+    container.registration.waiting = new FakeWorker();
+
+    const store = new AppStatusStore({
+      build: RUNNING,
+      versionUrl: 'v',
+      serviceWorker: container as unknown as ServiceWorkerContainer,
+      serviceWorkerUrl: 's',
+      fetchJson: () => Promise.resolve(NEWER),
+    });
+    const stop = store.start();
+
+    await settle();
+
+    const worker = container.registration.foundWorker();
+
+    expect(store.getSnapshot().update).toBe('downloading');
+
+    worker.fail();
+
+    expect(store.getSnapshot().update).toBe('ready');
+    stop();
+  });
+
+  it('reports online until started, so a store with checks off never says offline', () => {
+    setOnline(false);
+
+    const store = new AppStatusStore({ build: RUNNING, versionUrl: '' });
+
+    expect(store.getSnapshot().online).toBe(true);
   });
 
   it('does not call the first install an update', async () => {

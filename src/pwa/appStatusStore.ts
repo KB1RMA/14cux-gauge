@@ -67,9 +67,11 @@ export class AppStatusStore {
   private registered: Promise<void> = Promise.resolve();
 
   constructor(private readonly options: AppStatusStoreOptions) {
+    // Online until `start` reads the network: a store that is never started
+    // (checks switched off) must not report the app as offline for good.
     this.status = {
       running: options.build,
-      online: navigator.onLine,
+      online: true,
       latest: undefined,
       update: 'none',
     };
@@ -139,8 +141,9 @@ export class AppStatusStore {
         this.differs = !sameBuild(latest, this.options.build);
         this.publish({ latest });
 
-        // Fetch the new build now, while there is a network.
-        if (this.differs && !this.waiting) {
+        // Fetch the new build now, while there is a network. Also when a
+        // worker is already waiting: it may be an older build than this one.
+        if (this.differs) {
           void this.registration?.update().catch(() => undefined);
         }
       }
@@ -200,12 +203,23 @@ export class AppStatusStore {
   }
 
   private watch(worker: ServiceWorker | null): void {
-    worker?.addEventListener('statechange', () => {
-      if (
-        worker.state === 'installed' &&
-        this.options.serviceWorker?.controller
-      ) {
-        this.waiting = true;
+    const { serviceWorker } = this.options;
+
+    if (!worker || !serviceWorker?.controller) {
+      // Nothing installing, or the first install: just the offline copy.
+      return;
+    }
+
+    // A newer build is installing and will replace any worker that is
+    // waiting, so reloading now would start the older one.
+    this.waiting = false;
+    this.publish({});
+
+    worker.addEventListener('statechange', () => {
+      if (worker.state === 'installed' || worker.state === 'redundant') {
+        // Installed, it is the waiting worker; if it failed, the one that was
+        // waiting before (if any) still is.
+        this.waiting = Boolean(this.registration?.waiting);
         this.publish({});
       }
     });
