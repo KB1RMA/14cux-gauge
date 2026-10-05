@@ -2,6 +2,8 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import type { Ecu } from 'comm14cux-ts';
 import { createContext } from 'react';
+import type { SampleHistory } from '../history/sampleHistory';
+import type { MetricKey } from '../metrics';
 import type { EcuSource } from './connect';
 import type { ConnectionState } from './connectionState';
 import type { LiveSnapshot, PollerStats } from './poller';
@@ -23,3 +25,8 @@ export interface LiveData {
 
 export const EcuContext = createContext<EcuContextValue | undefined>(undefined);
 export const LiveDataContext = createContext<LiveData | undefined>(undefined);
+
+/** Recent samples of every metric, for the graphs; cleared on each connect. */
+export const HistoryContext = createContext<
+  SampleHistory<MetricKey> | undefined
+>(undefined);

@@ -17,6 +17,7 @@ This project is not affiliated with or endorsed by the author of libcomm14cux or
 - **Connect** over Web Serial at 7812 baud, or 15625 baud for double-speed firmware.
 - **Demo mode** runs a simulated ECU in the browser (warm-up, idle, a short drive and a rev sweep, with one stored fault code), so you can try the app without a car.
 - **Live data:** engine speed, road speed, coolant and fuel temperature, throttle position, airflow, main voltage, short- and long-term lambda trims for both banks, idle bypass position, gear, MIL and fuel pump relay. Choose °F/°C and mph/km/h from the Preferences menu (top right); the choice is remembered.
+- **Live graphs:** a Graphs tab plots every reading over the last 30 seconds to 10 minutes, with its current, lowest and highest values as text. Choose which graphs to show; the choice, the time window and the last tab used are remembered.
 - **Fault codes:** read on demand, and clear after a confirmation.
 - **ECU info:** tune number, ident and checksum fixer.
 - **Preferences:** units and a light, dark or system theme, in a menu in the top-right corner so the dashboard stays focused on the readings.
@@ -42,6 +43,7 @@ Clearing fault codes writes to the ECU's memory. Writing to a running ECU can af
 ## Credits and licence
 
 - ECU protocol and data decoding: [comm14cux-ts](https://github.com/KB1RMA/comm14cux-ts), derived from [libcomm14cux](https://github.com/colinbourassa/libcomm14cux) © Colin Bourassa, licensed under the GNU GPL v3.
+- Graphs: [uPlot](https://github.com/leeoniya/uPlot) © Leon Sorokin, licensed under the MIT licence.
 - UI components: [Radix Primitives](https://www.radix-ui.com/primitives) and [Radix Icons](https://www.radix-ui.com/icons) © WorkOS, licensed under the MIT licence.
 - The demo mode's memory layout and value encodings come from libcomm14cux via comm14cux-ts. Its ROM image is synthetic and contains no data from a real ROM.
 

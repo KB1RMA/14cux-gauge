@@ -7,6 +7,12 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import {
+  asRecord,
+  oneOf,
+  readSetting,
+  writeSetting,
+} from '../storage/settings';
 import type { SpeedUnit, TemperatureUnit } from '../units';
 import {
   PreferencesContext,
@@ -14,47 +20,16 @@ import {
   type ThemePreference,
 } from './context';
 
-const STORAGE_KEY = 'cuxGauge.preferences';
-const DEFAULTS: Preferences = {
-  temperatureUnit: 'F',
-  speedUnit: 'mph',
-  theme: 'system',
-};
+const STORAGE_KEY = 'preferences';
 
-function parseTheme(value: unknown): ThemePreference {
-  return value === 'light' || value === 'dark' ? value : 'system';
-}
+function parsePreferences(stored: unknown): Preferences {
+  const p = asRecord(stored);
 
-// Storage can be missing or throw (private windows, blocked site data), so
-// every access is guarded and the defaults always work.
-function load(): Preferences {
-  try {
-    const parsed: unknown = JSON.parse(
-      localStorage.getItem(STORAGE_KEY) ?? '{}',
-    );
-
-    if (typeof parsed !== 'object' || parsed === null) {
-      return DEFAULTS;
-    }
-
-    const stored = parsed as Partial<Record<keyof Preferences, unknown>>;
-
-    return {
-      temperatureUnit: stored.temperatureUnit === 'C' ? 'C' : 'F',
-      speedUnit: stored.speedUnit === 'kmh' ? 'kmh' : 'mph',
-      theme: parseTheme(stored.theme),
-    };
-  } catch {
-    return DEFAULTS;
-  }
-}
-
-function save(preferences: Preferences): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
-  } catch {
-    // Not remembered; the setting still applies for this visit.
-  }
+  return {
+    temperatureUnit: oneOf(p['temperatureUnit'], ['F', 'C'], 'F'),
+    speedUnit: oneOf(p['speedUnit'], ['mph', 'kmh'], 'mph'),
+    theme: oneOf(p['theme'], ['system', 'light', 'dark'], 'system'),
+  };
 }
 
 /** `theme.css` reads `data-theme` on the root element; no attribute follows the system. */
@@ -69,10 +44,12 @@ function applyTheme(theme: ThemePreference): void {
 }
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
-  const [preferences, setPreferences] = useState(load);
+  const [preferences, setPreferences] = useState(() =>
+    readSetting(STORAGE_KEY, parsePreferences),
+  );
 
   useEffect(() => {
-    save(preferences);
+    writeSetting(STORAGE_KEY, preferences);
   }, [preferences]);
 
   // Before paint, so a stored theme does not flash the system one first.
