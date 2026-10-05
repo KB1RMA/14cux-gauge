@@ -85,6 +85,12 @@ describe('App with a serial ECU', () => {
       'Serial ECU (7812 baud) · Polling',
     );
 
+    await user.click(screen.getByRole('button', { name: 'Record' }));
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Serial ECU (7812 baud) · Polling · Recording',
+    );
+
     act(() => {
       port.dispatchEvent(new Event('disconnect'));
     });
@@ -98,7 +104,16 @@ describe('App with a serial ECU', () => {
     expect(
       screen.getByRole('button', { name: 'Connect to ECU' }),
     ).toBeInTheDocument();
+    // The recording stopped with the link and keeps its default name; no
+    // dialog takes focus from Reconnect.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await expectNoAxeViolations(document.body);
+
+    await user.click(screen.getByRole('button', { name: 'Sessions' }));
+
+    expect(
+      await screen.findByRole('button', { name: /^Serial ECU, / }),
+    ).toBeInTheDocument();
   });
 
   it('stays put when the user dismisses the port picker', async () => {

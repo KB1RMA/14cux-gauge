@@ -16,6 +16,12 @@ export interface EcuContextValue {
   disconnect(): Promise<void>;
   /** Connects again to the last source (same serial port, or demo). */
   reconnect(): Promise<void>;
+  /**
+   * Calls `listener` with every snapshot the poller takes, from any
+   * connection, until the returned function is called. Unlike the live data
+   * context, no snapshot is skipped between renders.
+   */
+  onSnapshot(listener: (snapshot: LiveSnapshot) => void): () => void;
 }
 
 export interface LiveData {

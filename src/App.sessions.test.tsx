@@ -1,0 +1,426 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 14cux-gauge contributors
+import { act, render, screen, within } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
+import { IDBFactory } from 'fake-indexeddb';
+import { App } from './App';
+import type { LiveSnapshot } from './ecu/poller';
+import { openSessionStore } from './storage/openSessionStore';
+import { MemorySessionStore } from './storage/sessionStore';
+import { expectNoAxeViolations, readingFor } from './test-support/a11y';
+
+/** Lets the demo ECU, polled every 10 ms, take a few samples. */
+async function collectSamples() {
+  await act(() => new Promise((resolve) => setTimeout(resolve, 150)));
+}
+
+async function connectDemo(user: UserEvent) {
+  await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+  await screen.findByRole('heading', { name: 'Live data' });
+}
+
+async function recordAndStop(user: UserEvent) {
+  await user.click(screen.getByRole('button', { name: 'Record' }));
+  await collectSamples();
+  await user.click(screen.getByRole('button', { name: 'Stop recording' }));
+
+  return screen.findByRole('dialog', { name: 'Save recording' });
+}
+
+function sessionsNav() {
+  return within(screen.getByRole('navigation', { name: 'Views' }));
+}
+
+describe('Recording and browsing sessions', () => {
+  it('records a session, names it, and finds it in Sessions', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App pollIntervalMs={{ demo: 10 }} />);
+
+    await connectDemo(user);
+    await user.click(screen.getByRole('button', { name: 'Record' }));
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Demo ECU · Polling · Recording',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Stop recording' }),
+    ).toHaveFocus();
+    expect(screen.getByText(/^\d+:\d\d recorded$/)).toBeInTheDocument();
+    await expectNoAxeViolations(container);
+
+    await collectSamples();
+    await user.click(screen.getByRole('button', { name: 'Stop recording' }));
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Save recording',
+    });
+
+    expect(dialog).toHaveAccessibleDescription(
+      /^Recorded \d+ seconds? from the Demo ECU: [\d,]+ samples\./,
+    );
+    // The start time, in the user's locale.
+    expect(
+      (
+        within(dialog).getByRole('textbox', {
+          name: 'Name',
+        }) as HTMLInputElement
+      ).value,
+    ).toMatch(/^Demo ECU, .*2\d{3}/);
+    await expectNoAxeViolations(dialog);
+
+    const name = within(dialog).getByRole('textbox', { name: 'Name' });
+
+    await user.clear(name);
+    await user.type(name, '  Idle wobble  ');
+    await user.type(
+      within(dialog).getByRole('textbox', { name: 'Notes' }),
+      'Hunts between 600 and 900 rpm.',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // The same button, now offering to record again.
+    expect(screen.getByRole('button', { name: 'Record' })).toHaveFocus();
+    expect(screen.getByRole('status')).toHaveTextContent(/Polling$/);
+
+    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
+
+    expect(
+      sessionsNav().getByRole('button', { name: 'Sessions' }),
+    ).toHaveAttribute('aria-current', 'page');
+    expect(
+      await screen.findByRole('heading', { name: 'Recorded sessions' }),
+    ).toHaveFocus();
+    // jsdom has no IndexedDB, so the sessions live in memory.
+    expect(
+      screen.getByText(/recordings last only until the page is closed/),
+    ).toBeInTheDocument();
+
+    const item = within(screen.getByRole('listitem'));
+
+    expect(
+      item.getByRole('heading', { level: 3, name: 'Idle wobble' }),
+    ).toBeInTheDocument();
+    expect(
+      item.getByText('Hunts between 600 and 900 rpm.'),
+    ).toBeInTheDocument();
+    expect(readingFor('Source')).toHaveTextContent('Demo ECU');
+    expect(readingFor('Length')).toHaveTextContent(/^0:0\d$/);
+    // Live polling and the status bar carry on while browsing.
+    expect(screen.getByRole('status')).toHaveTextContent('Demo ECU · Polling');
+    await expectNoAxeViolations(container);
+
+    await user.click(item.getByRole('button', { name: 'Idle wobble' }));
+
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Idle wobble' }),
+    ).toHaveFocus();
+    expect(await screen.findByRole('button', { name: 'Play' })).toBeVisible();
+    expect(
+      screen.getByRole('slider', { name: 'Playback position' }),
+    ).toHaveAttribute(
+      'aria-valuetext',
+      expect.stringMatching(/^0 seconds of /) as string,
+    );
+    expect(readingFor('Engine speed')).toHaveTextContent(/^\d+ rpm$/);
+    await expectNoAxeViolations(container);
+
+    await user.click(screen.getByRole('button', { name: 'Play' }));
+
+    expect(screen.getByRole('button', { name: 'Pause' })).toHaveFocus();
+
+    await user.click(screen.getByRole('radio', { name: '10×' }));
+
+    expect(screen.getByRole('radio', { name: '10×' })).toBeChecked();
+
+    await user.click(screen.getByRole('tab', { name: 'Graphs' }));
+
+    expect(
+      screen.getByRole('figure', { name: 'Engine speed (rpm)' }),
+    ).toBeInTheDocument();
+    await expectNoAxeViolations(container);
+
+    const notes = screen.getByRole('textbox', { name: 'Notes' });
+
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+    await user.type(notes, ' Worse when warm.');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(await screen.findByText('Changes saved.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'All sessions' }));
+
+    // Back on the session the user came from.
+    expect(
+      await screen.findByRole('button', { name: 'Idle wobble' }),
+    ).toHaveFocus();
+    expect(
+      screen.getByText('Hunts between 600 and 900 rpm. Worse when warm.'),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Delete Idle wobble' }),
+    );
+
+    const confirm = screen.getByRole('alertdialog', {
+      name: 'Delete this session?',
+    });
+
+    expect(confirm).toHaveTextContent(
+      /“Idle wobble” and its [\d,]+ samples will be deleted/,
+    );
+    await expectNoAxeViolations(confirm);
+    await user.click(
+      within(confirm).getByRole('button', { name: 'Delete session' }),
+    );
+
+    expect(await screen.findByText(/^No sessions yet\./)).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Recorded sessions' }),
+    ).toHaveFocus();
+
+    await user.click(sessionsNav().getByRole('button', { name: 'Live' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Live data' }),
+    ).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  });
+
+  it('replays a recording with the keyboard', async () => {
+    const user = userEvent.setup();
+
+    render(<App pollIntervalMs={{ demo: 10 }} />);
+    await connectDemo(user);
+    await recordAndStop(user);
+    await user.click(screen.getByRole('button', { name: 'Skip' }));
+    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
+    await user.click(
+      await screen.findByRole('button', { name: /^Demo ECU, / }),
+    );
+
+    const slider = await screen.findByRole('slider', {
+      name: 'Playback position',
+    });
+    const engineSpeed = () => readingFor('Engine speed').textContent;
+    const first = engineSpeed();
+
+    expect(slider).toHaveAttribute('aria-valuemax', '1000');
+
+    slider.focus();
+    await user.keyboard('{End}');
+
+    // At the last sample, not just the last whole second.
+    const valueText = slider.getAttribute('aria-valuetext') ?? '';
+    const [at, of] = valueText.split(' of ');
+
+    expect(at).toBe(of);
+    expect(screen.getByRole('button', { name: 'Play' })).toBeVisible();
+
+    await user.keyboard('{Home}');
+
+    expect(slider).toHaveAttribute('aria-valuenow', '0');
+    expect(engineSpeed()).toBe(first);
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  });
+
+  it('stops recording on disconnect, and keeps the default name if skipped', async () => {
+    const user = userEvent.setup();
+
+    render(<App pollIntervalMs={{ demo: 10 }} />);
+    await connectDemo(user);
+    await user.click(screen.getByRole('button', { name: 'Record' }));
+    await collectSamples();
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Save recording',
+    });
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+
+    expect(dialog).not.toBeInTheDocument();
+    // The status bar went with the connection; start at the connect screen.
+    expect(
+      screen.getByRole('heading', { name: 'Connect to an ECU' }),
+    ).toHaveFocus();
+
+    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
+
+    expect(
+      await screen.findByRole('button', { name: /^Demo ECU, / }),
+    ).toBeInTheDocument();
+    expect(readingFor('Length')).toHaveTextContent(/^0:0\d$/);
+  });
+
+  it('shows a recording in progress, which cannot be deleted', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App pollIntervalMs={{ demo: 10 }} />);
+
+    await connectDemo(user);
+    await user.click(screen.getByRole('button', { name: 'Record' }));
+    await collectSamples();
+    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
+
+    await screen.findByRole('button', { name: /^Demo ECU, / });
+    expect(readingFor('Length')).toHaveTextContent('Recording…');
+    expect(
+      screen.getByRole('button', { name: /^Delete Demo ECU, / }),
+    ).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: /^Demo ECU, / }));
+
+    expect(await screen.findByText(/^Still recording\./)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Delete session' }),
+    ).toHaveAccessibleDescription(
+      'Stop recording before deleting this session.',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Delete session' }),
+    ).toBeDisabled();
+    await expectNoAxeViolations(container);
+
+    // Stopping from the status bar, on the sessions view.
+    await user.click(screen.getByRole('button', { name: 'Stop recording' }));
+    await user.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Save recording' }),
+      ).getByRole('button', { name: 'Skip' }),
+    );
+
+    await vi.waitFor(() => {
+      expect(readingFor('Length')).toHaveTextContent(/^0:0\d$/);
+    });
+    expect(screen.queryByText(/^Still recording\./)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Delete session' }));
+    await user.click(
+      within(
+        screen.getByRole('alertdialog', { name: 'Delete this session?' }),
+      ).getByRole('button', { name: 'Delete session' }),
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Recorded sessions' }),
+    ).toHaveFocus();
+    expect(screen.getByText(/^No sessions yet\./)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  });
+
+  it('keeps sessions in IndexedDB across visits', async () => {
+    const user = userEvent.setup();
+    const factory = new IDBFactory();
+    const open = () => openSessionStore(factory);
+    const { unmount } = render(
+      <App pollIntervalMs={{ demo: 10 }} openSessionStore={open} />,
+    );
+
+    await connectDemo(user);
+
+    const dialog = await recordAndStop(user);
+
+    await user.clear(within(dialog).getByRole('textbox', { name: 'Name' }));
+    await user.type(
+      within(dialog).getByRole('textbox', { name: 'Name' }),
+      'Cold start',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+    unmount();
+
+    render(<App openSessionStore={open} />);
+    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
+
+    expect(
+      await screen.findByRole('button', { name: 'Cold start' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/recordings last only until the page is closed/),
+    ).not.toBeInTheDocument();
+
+    // Replay works without a connection.
+    await user.click(screen.getByRole('button', { name: 'Cold start' }));
+
+    expect(await screen.findByRole('button', { name: 'Play' })).toBeVisible();
+    expect(readingFor('Engine speed')).toHaveTextContent(/^\d+ rpm$/);
+  });
+
+  it('says when a session has no samples, or has been deleted', async () => {
+    const user = userEvent.setup();
+    const store = new MemorySessionStore();
+    const empty = await store.create({
+      name: 'Empty',
+      source: 'serial',
+      startedAt: Date.UTC(2026, 9, 5),
+    });
+
+    render(
+      <App
+        openSessionStore={() => Promise.resolve({ store, persistent: true })}
+      />,
+    );
+    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('button', { name: 'Empty' }));
+
+    expect(
+      await screen.findByText('No samples were recorded in this session.'),
+    ).toBeInTheDocument();
+    // The page closed before this recording stopped.
+    expect(readingFor('Length')).toHaveTextContent('Unfinished');
+    expect(readingFor('Source')).toHaveTextContent('Serial ECU');
+
+    // Deleted elsewhere (another tab); the next change here notices.
+    await act(async () => {
+      await store.remove(empty.id);
+    });
+    await user.type(screen.getByRole('textbox', { name: 'Notes' }), 'x');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(
+      await screen.findByText('The changes could not be saved.'),
+    ).toBeInTheDocument();
+  });
+
+  it('stops recording and says so when the browser cannot save', async () => {
+    const user = userEvent.setup();
+
+    class FullStore extends MemorySessionStore {
+      override append(
+        _id: string,
+        _samples: readonly LiveSnapshot[],
+      ): Promise<void> {
+        return Promise.reject(
+          new DOMException('Quota exceeded', 'QuotaExceededError'),
+        );
+      }
+    }
+
+    render(
+      <App
+        pollIntervalMs={{ demo: 10 }}
+        openSessionStore={() =>
+          Promise.resolve({ store: new FullStore(), persistent: true })
+        }
+      />,
+    );
+    await connectDemo(user);
+    await user.click(screen.getByRole('button', { name: 'Record' }));
+
+    // The recorder writes once a second.
+    await vi.waitFor(
+      () => {
+        expect(screen.getByRole('status')).toHaveTextContent(
+          'Demo ECU · Polling · Recording stopped: The browser has no room for more samples. Delete old sessions to make space.',
+        );
+      },
+      { timeout: 3000 },
+    );
+    expect(screen.getByRole('button', { name: 'Record' })).toBeEnabled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  });
+});

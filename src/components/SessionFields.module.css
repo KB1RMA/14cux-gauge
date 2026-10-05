@@ -1,0 +1,42 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+.fields {
+  display: grid;
+  gap: 1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.field label {
+  font-weight: 600;
+}
+
+.hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  padding: 0.45rem 0.6rem;
+}
+
+.field textarea {
+  resize: vertical;
+  min-height: 5rem;
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}

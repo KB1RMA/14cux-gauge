@@ -10,8 +10,9 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { pushSnapshot } from '../history/pushSnapshot';
 import { SampleHistory } from '../history/sampleHistory';
-import { METRIC_KEYS, sampleOf, type MetricKey } from '../metrics';
+import { METRIC_KEYS } from '../metrics';
 import {
   createEcuConnection,
   type EcuConnection,
@@ -35,18 +36,6 @@ const NO_LIVE_DATA: LiveData = {
 /** Enough for the longest graph window (10 minutes) at 25 samples a second. */
 export const HISTORY_CAPACITY = 15_000;
 
-function recordSnapshot(
-  history: SampleHistory<MetricKey>,
-  snapshot: LiveSnapshot,
-): void {
-  history.push(
-    snapshot.timestamp,
-    Object.fromEntries(
-      METRIC_KEYS.map((key) => [key, sampleOf(snapshot, key)]),
-    ),
-  );
-}
-
 export interface EcuProviderProps {
   children: ReactNode;
   /** Pause between polling passes for each connection kind, in milliseconds. */
@@ -65,6 +54,9 @@ export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
   const [liveData, setLiveData] = useState<LiveData>(NO_LIVE_DATA);
   const [history] = useState(
     () => new SampleHistory(METRIC_KEYS, HISTORY_CAPACITY),
+  );
+  const [snapshotListeners] = useState(
+    () => new Set<(snapshot: LiveSnapshot) => void>(),
   );
   const sessionRef = useRef<Session | undefined>(undefined);
   // Bumped by every connect/disconnect, so a slow async step can tell that it
@@ -133,7 +125,12 @@ export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
       sessionRef.current.poller = startPoller(connection.ecu, {
         intervalMs: source.kind === 'demo' ? demoInterval : serialInterval,
         onSnapshot: (snapshot, stats) => {
-          recordSnapshot(history, snapshot);
+          pushSnapshot(history, snapshot);
+
+          for (const listener of snapshotListeners) {
+            listener(snapshot);
+          }
+
           setLiveData({ snapshot, stats });
         },
         onError: (error) => {
@@ -143,7 +140,7 @@ export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
       setEcu(connection.ecu);
       dispatch({ type: 'connected' });
     },
-    [teardown, fail, history, demoInterval, serialInterval],
+    [teardown, fail, history, snapshotListeners, demoInterval, serialInterval],
   );
 
   const disconnect = useCallback(async () => {
@@ -158,6 +155,17 @@ export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
     }
   }, [state, connect]);
 
+  const onSnapshot = useCallback(
+    (listener: (snapshot: LiveSnapshot) => void) => {
+      snapshotListeners.add(listener);
+
+      return () => {
+        snapshotListeners.delete(listener);
+      };
+    },
+    [snapshotListeners],
+  );
+
   useEffect(
     () => () => {
       generationRef.current++;
@@ -167,8 +175,8 @@ export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
   );
 
   const value = useMemo(
-    () => ({ state, ecu, connect, disconnect, reconnect }),
-    [state, ecu, connect, disconnect, reconnect],
+    () => ({ state, ecu, connect, disconnect, reconnect, onSnapshot }),
+    [state, ecu, connect, disconnect, reconnect, onSnapshot],
   );
 
   return (
