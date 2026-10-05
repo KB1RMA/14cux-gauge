@@ -3,7 +3,10 @@
 import { CheckIcon, GearIcon } from '@radix-ui/react-icons';
 import { DropdownMenu } from 'radix-ui';
 import { useId } from 'react';
-import type { ThemePreference } from '../preferences/context';
+import type {
+  PalettePreference,
+  ThemePreference,
+} from '../preferences/context';
 import { usePreferences } from '../preferences/usePreferences';
 import type { SpeedUnit, TemperatureUnit } from '../units';
 import styles from './PreferencesMenu.module.css';
@@ -13,6 +16,8 @@ interface Option<T extends string> {
   text: string;
   /** Short visual reminder, such as a unit symbol; not read out. */
   hint?: string;
+  /** Shows a paint chip, styled per value in the CSS module; not read out. */
+  swatch?: boolean;
 }
 
 interface ChoiceGroupProps<T extends string> {
@@ -60,6 +65,13 @@ function ChoiceGroup<T extends string>({
             <DropdownMenu.ItemIndicator className={styles['indicator']}>
               <CheckIcon aria-hidden="true" />
             </DropdownMenu.ItemIndicator>
+            {option.swatch ? (
+              <span
+                className={styles['swatch']}
+                data-paint={option.value}
+                aria-hidden="true"
+              />
+            ) : null}
             {option.text}
             {option.hint ? (
               <span className={styles['hint']} aria-hidden="true">
@@ -89,7 +101,18 @@ const THEME_OPTIONS = [
   { value: 'dark', text: 'Dark' },
 ] as const satisfies readonly Option<ThemePreference>[];
 
-/** The app bar's settings menu: display units and theme, kept off the dashboard. */
+const PALETTE_OPTIONS = [
+  { value: 'coniston', text: 'Coniston Green', swatch: true },
+  { value: 'arles', text: 'Arles Blue', swatch: true },
+  {
+    value: 'alpine-beluga',
+    text: 'Alpine White and Beluga Black',
+    swatch: true,
+  },
+  { value: 'racing-green', text: 'British Racing Green', swatch: true },
+] as const satisfies readonly Option<PalettePreference>[];
+
+/** The app bar's settings menu: display units, theme and paint, kept off the dashboard. */
 export function PreferencesMenu() {
   const {
     temperatureUnit,
@@ -98,6 +121,8 @@ export function PreferencesMenu() {
     setSpeedUnit,
     theme,
     setTheme,
+    palette,
+    setPalette,
   } = usePreferences();
 
   return (
@@ -134,6 +159,13 @@ export function PreferencesMenu() {
             options={THEME_OPTIONS}
             value={theme}
             onChange={setTheme}
+          />
+          <DropdownMenu.Separator className={styles['separator']} />
+          <ChoiceGroup
+            label="Paint"
+            options={PALETTE_OPTIONS}
+            value={palette}
+            onChange={setPalette}
           />
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

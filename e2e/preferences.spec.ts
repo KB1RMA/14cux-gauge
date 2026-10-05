@@ -8,7 +8,7 @@ import {
 } from './support/fixtures';
 
 test.describe('Preferences', () => {
-  test('changes units and theme, and remembers them after a reload', async ({
+  test('changes units, theme and paint, and remembers them after a reload', async ({
     page,
   }) => {
     // The theme is an attribute on the root element, which has no role.
@@ -32,36 +32,56 @@ test.describe('Preferences', () => {
     await expect(
       menu.getByRole('menuitemradio', { name: 'Dark' }),
     ).toBeChecked();
+    await menu.getByRole('menuitemradio', { name: 'Arles Blue' }).click();
+    await expect(
+      menu.getByRole('menuitemradio', { name: 'Arles Blue' }),
+    ).toBeChecked();
     await page.keyboard.press('Escape');
     await expect(menu).toBeHidden();
 
     await expect(reading(page, 'Coolant')).toHaveText(/°C$/);
     await expect(reading(page, 'Road speed')).toHaveText(/km\/h$/);
     await expect(root).toHaveAttribute('data-theme', 'dark');
+    await expect(root).toHaveAttribute('data-palette', 'arles');
 
     await page.reload();
 
     await expect(root).toHaveAttribute('data-theme', 'dark');
+    await expect(root).toHaveAttribute('data-palette', 'arles');
     await page.getByRole('button', { name: 'Demo mode' }).click();
     await expect(reading(page, 'Coolant')).toHaveText(/°C$/);
     await expect(reading(page, 'Road speed')).toHaveText(/km\/h$/);
   });
 
-  for (const colorScheme of ['light', 'dark'] as const) {
-    test(`meets WCAG 2.2 AA, colour contrast included, in the ${colorScheme} theme`, async ({
-      page,
-    }) => {
-      await page.emulateMedia({ colorScheme });
-      await page.goto('./');
-      await expectNoAxeViolations(page);
+  // Every paint in both modes, so axe measures each palette's real contrast.
+  for (const palette of [
+    'coniston',
+    'arles',
+    'alpine-beluga',
+    'racing-green',
+  ] as const) {
+    for (const colorScheme of ['light', 'dark'] as const) {
+      test(`meets WCAG 2.2 AA, colour contrast included, in ${palette} ${colorScheme}`, async ({
+        page,
+      }) => {
+        await page.addInitScript((stored) => {
+          localStorage.setItem('cuxGauge.preferences', stored);
+        }, JSON.stringify({ palette }));
+        await page.emulateMedia({ colorScheme });
+        await page.goto('./');
+        await expectNoAxeViolations(page);
 
-      await page.getByRole('button', { name: 'Demo mode' }).click();
-      await page.getByRole('button', { name: 'Read fault codes' }).click();
-      await expect(reading(page, 'MIL')).toHaveText('On');
-      await expect(
-        page.getByRole('list', { name: 'Stored fault codes' }),
-      ).toBeVisible();
-      await expectNoAxeViolations(page);
-    });
+        await page.getByRole('button', { name: 'Demo mode' }).click();
+        await page.getByRole('button', { name: 'Read fault codes' }).click();
+        await expect(reading(page, 'MIL')).toHaveText('On');
+        await expect(
+          page.getByRole('list', { name: 'Stored fault codes' }),
+        ).toBeVisible();
+        await expectNoAxeViolations(page);
+
+        await page.getByRole('button', { name: 'Preferences' }).click();
+        await expectNoAxeViolations(page, { within: '[role="menu"]' });
+      });
+    }
   }
 });

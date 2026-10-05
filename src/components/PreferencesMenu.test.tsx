@@ -62,7 +62,7 @@ describe('PreferencesMenu', () => {
         .getAllByRole('group')
         .map((group) => group.getAttribute('aria-labelledby'))
         .map((id) => document.getElementById(id ?? '')?.textContent),
-    ).toEqual(['Temperature', 'Speed', 'Theme']);
+    ).toEqual(['Temperature', 'Speed', 'Theme', 'Paint']);
     expect(
       within(menu).getByRole('menuitemradio', { name: 'Fahrenheit' }),
     ).toBeChecked();
@@ -71,6 +71,9 @@ describe('PreferencesMenu', () => {
     ).toBeChecked();
     expect(
       within(menu).getByRole('menuitemradio', { name: 'System' }),
+    ).toBeChecked();
+    expect(
+      within(menu).getByRole('menuitemradio', { name: 'Coniston Green' }),
     ).toBeChecked();
   });
 
@@ -164,6 +167,74 @@ describe('PreferencesMenu', () => {
     renderWithTiles();
 
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+  });
+
+  it('switches the paint palette, with Coniston Green as the default', async () => {
+    const user = userEvent.setup();
+    const root = document.documentElement;
+
+    renderWithTiles();
+
+    expect(root).not.toHaveAttribute('data-palette');
+
+    await user.click(trigger());
+    await user.click(screen.getByRole('menuitemradio', { name: 'Arles Blue' }));
+
+    expect(root).toHaveAttribute('data-palette', 'arles');
+
+    await user.click(
+      screen.getByRole('menuitemradio', {
+        name: 'Alpine White and Beluga Black',
+      }),
+    );
+
+    expect(root).toHaveAttribute('data-palette', 'alpine-beluga');
+
+    await user.click(
+      screen.getByRole('menuitemradio', { name: 'British Racing Green' }),
+    );
+
+    expect(root).toHaveAttribute('data-palette', 'racing-green');
+    expect(
+      screen.getByRole('menuitemradio', { name: 'British Racing Green' }),
+    ).toBeChecked();
+
+    await user.click(
+      screen.getByRole('menuitemradio', { name: 'Coniston Green' }),
+    );
+
+    expect(root).not.toHaveAttribute('data-palette');
+  });
+
+  it('applies a stored palette on load, alongside the theme', () => {
+    localStorage.setItem(
+      'cuxGauge.preferences',
+      JSON.stringify({ theme: 'dark', palette: 'arles' }),
+    );
+
+    renderWithTiles();
+
+    expect(document.documentElement).toHaveAttribute('data-palette', 'arles');
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+  });
+
+  it('falls back to Coniston Green for an unknown stored palette', async () => {
+    const user = userEvent.setup();
+
+    localStorage.setItem(
+      'cuxGauge.preferences',
+      JSON.stringify({ palette: 'portofino-red' }),
+    );
+
+    renderWithTiles();
+
+    expect(document.documentElement).not.toHaveAttribute('data-palette');
+
+    await user.click(trigger());
+
+    expect(
+      screen.getByRole('menuitemradio', { name: 'Coniston Green' }),
+    ).toBeChecked();
   });
 
   it('has no detectable accessibility violations, closed or open', async () => {

@@ -1,0 +1,53 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+
+/* Alpine White in light mode, Beluga Black in dark. */
+:root[data-palette='alpine-beluga'] {
+  --bg: #e4e9e6;
+  --surface: #f6f8f7;
+  --surface-raised: #dbe2de;
+  --border: #c4ccc8;
+  --control-border: #6e7873;
+  --focus: #1f2124;
+  --text: #1a1c1e;
+  --text-muted: #555c59;
+  --accent: #1f2124;
+  --accent-contrast: #f6f8f7;
+  --good: #1a6e35;
+  --warn: #9a4f00;
+  --danger: #b3262d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='alpine-beluga']:not([data-theme='light']) {
+    --bg: #0e0f10;
+    --surface: #18191b;
+    --surface-raised: #222427;
+    --border: #2e3034;
+    --control-border: #6f747a;
+    --focus: #dbe2de;
+    --text: #e9edeb;
+    --text-muted: #a0a6a3;
+    --accent: #dbe2de;
+    --accent-contrast: #18191b;
+    --good: #6fd08a;
+    --warn: #ffaa55;
+    --danger: #ff7b73;
+  }
+}
+
+:root[data-palette='alpine-beluga'][data-theme='dark'] {
+  --bg: #0e0f10;
+  --surface: #18191b;
+  --surface-raised: #222427;
+  --border: #2e3034;
+  --control-border: #6f747a;
+  --focus: #dbe2de;
+  --text: #e9edeb;
+  --text-muted: #a0a6a3;
+  --accent: #dbe2de;
+  --accent-contrast: #18191b;
+  --good: #6fd08a;
+  --warn: #ffaa55;
+  --danger: #ff7b73;
+}

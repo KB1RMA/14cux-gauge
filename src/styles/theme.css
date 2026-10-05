@@ -1,54 +1,50 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Copyright (C) 2026 14cux-gauge contributors */
+
+/* Colour palettes, one file each, are named after factory paints of the
+   North American Specification (NAS) Defenders, 1993–1997. The greens and
+   blue take saddle tan, the leather they are often trimmed in, as their
+   second colour. Each palette has a light and a dark set of the colour
+   tokens: --bg, --surface, --surface-raised, --border, --control-border,
+   --focus, --text, --text-muted, --accent, --accent-contrast, --good, --warn
+   and --danger.
+
+   Two attributes on <html> pick the colours, both set from the Preferences
+   menu: data-palette (the paint; none means Coniston) and data-theme (light
+   or dark; none follows the system). Every dark set is written twice because
+   plain CSS cannot share one block between a media query and an attribute
+   selector.
+
+   Every pair meets WCAG 2.2 AA in each palette and mode: 4.5:1 for --text,
+   --text-muted, --accent, --good, --warn and --danger against --bg, --surface
+   and --surface-raised (and --accent-contrast on --accent), and 3:1 for
+   --control-border and --focus. Check new colours the same way; jsdom
+   cannot.
+
+   Coniston must come first: it sets the defaults on :root, and the others
+   override it with selectors of equal or higher specificity. */
+@import './palettes/coniston.css';
+@import './palettes/arles.css';
+@import './palettes/alpine-beluga.css';
+@import './palettes/racing-green.css';
+
+/* Tokens shared by every palette. */
 :root {
   color-scheme: light dark;
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --radius: 8px;
-
-  --bg: #f4f5f7;
-  --surface: #ffffff;
-  --surface-raised: #eef0f3;
-  /* Decorative card edges only; controls use --control-border. */
-  --border: #d5d9df;
-  --control-border: #8a929c;
-  --focus: #995c00;
-  --text: #1b1f24;
-  --text-muted: #5b6470;
-  /* Text and UI colours meet WCAG 2.2 AA: 4.5:1 for text against --surface
-     and --bg, 3:1 for --control-border and --focus. */
-  --accent: #995c00;
-  --accent-contrast: #ffffff;
-  --good: #1e7d3a;
-  --warn: #b85c00;
-  --danger: #c0262d;
   --overlay: rgb(0 0 0 / 45%);
   --shadow-popover: 0 8px 24px rgb(0 0 0 / 14%);
   --shadow-dialog: 0 12px 40px rgb(0 0 0 / 25%);
 }
 
-/* The Preferences menu sets data-theme on <html>; without it the system
-   setting decides. The dark palette is repeated because plain CSS cannot
-   share one block between a media query and an attribute selector. */
 :root[data-theme='light'] {
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #121417;
-    --surface: #1b1f24;
-    --surface-raised: #242a31;
-    --border: #2f363f;
-    --control-border: #6b7480;
-    --focus: #f5a524;
-    --text: #e8eaed;
-    --text-muted: #9aa3ad;
-    --accent: #f5a524;
-    --accent-contrast: #1b1f24;
-    --good: #4cc26e;
-    --warn: #ff9f43;
-    --danger: #ff6b6b;
     --overlay: rgb(0 0 0 / 60%);
     --shadow-popover: 0 8px 24px rgb(0 0 0 / 45%);
     --shadow-dialog: 0 12px 40px rgb(0 0 0 / 55%);
@@ -57,19 +53,6 @@
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #121417;
-  --surface: #1b1f24;
-  --surface-raised: #242a31;
-  --border: #2f363f;
-  --control-border: #6b7480;
-  --focus: #f5a524;
-  --text: #e8eaed;
-  --text-muted: #9aa3ad;
-  --accent: #f5a524;
-  --accent-contrast: #1b1f24;
-  --good: #4cc26e;
-  --warn: #ff9f43;
-  --danger: #ff6b6b;
   --overlay: rgb(0 0 0 / 60%);
   --shadow-popover: 0 8px 24px rgb(0 0 0 / 45%);
   --shadow-dialog: 0 12px 40px rgb(0 0 0 / 55%);

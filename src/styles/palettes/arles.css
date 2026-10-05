@@ -1,0 +1,53 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+
+/* Arles Blue with saddle tan. */
+:root[data-palette='arles'] {
+  --bg: #edf0f3;
+  --surface: #fbfcfd;
+  --surface-raised: #e2e7ec;
+  --border: #cbd3db;
+  --control-border: #6e7b8a;
+  --focus: #8a5634;
+  --text: #18202a;
+  --text-muted: #526070;
+  --accent: #43546a;
+  --accent-contrast: #ffffff;
+  --good: #1a6e35;
+  --warn: #9a4f00;
+  --danger: #b3262d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='arles']:not([data-theme='light']) {
+    --bg: #121820;
+    --surface: #1b232d;
+    --surface-raised: #252f3b;
+    --border: #313d4a;
+    --control-border: #708193;
+    --focus: #d9a273;
+    --text: #e8edf2;
+    --text-muted: #9fadbc;
+    --accent: #d9a273;
+    --accent-contrast: #18202a;
+    --good: #6fd08a;
+    --warn: #ffaa55;
+    --danger: #ff7b73;
+  }
+}
+
+:root[data-palette='arles'][data-theme='dark'] {
+  --bg: #121820;
+  --surface: #1b232d;
+  --surface-raised: #252f3b;
+  --border: #313d4a;
+  --control-border: #708193;
+  --focus: #d9a273;
+  --text: #e8edf2;
+  --text-muted: #9fadbc;
+  --accent: #d9a273;
+  --accent-contrast: #18202a;
+  --good: #6fd08a;
+  --warn: #ffaa55;
+  --danger: #ff7b73;
+}

@@ -10,6 +10,7 @@ import {
 import type { SpeedUnit, TemperatureUnit } from '../units';
 import {
   PreferencesContext,
+  type PalettePreference,
   type Preferences,
   type ThemePreference,
 } from './context';
@@ -19,10 +20,22 @@ const DEFAULTS: Preferences = {
   temperatureUnit: 'F',
   speedUnit: 'mph',
   theme: 'system',
+  palette: 'coniston',
 };
+
+const PALETTES: readonly PalettePreference[] = [
+  'coniston',
+  'arles',
+  'alpine-beluga',
+  'racing-green',
+];
 
 function parseTheme(value: unknown): ThemePreference {
   return value === 'light' || value === 'dark' ? value : 'system';
+}
+
+function parsePalette(value: unknown): PalettePreference {
+  return PALETTES.find((palette) => palette === value) ?? 'coniston';
 }
 
 // Storage can be missing or throw (private windows, blocked site data), so
@@ -43,6 +56,7 @@ function load(): Preferences {
       temperatureUnit: stored.temperatureUnit === 'C' ? 'C' : 'F',
       speedUnit: stored.speedUnit === 'kmh' ? 'kmh' : 'mph',
       theme: parseTheme(stored.theme),
+      palette: parsePalette(stored.palette),
     };
   } catch {
     return DEFAULTS;
@@ -68,6 +82,17 @@ function applyTheme(theme: ThemePreference): void {
   }
 }
 
+/** `theme.css` reads `data-palette` on the root element; no attribute is Coniston. */
+function applyPalette(palette: PalettePreference): void {
+  const root = document.documentElement;
+
+  if (palette === 'coniston') {
+    delete root.dataset['palette'];
+  } else {
+    root.dataset['palette'] = palette;
+  }
+}
+
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferences] = useState(load);
 
@@ -80,6 +105,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     applyTheme(preferences.theme);
   }, [preferences.theme]);
 
+  useLayoutEffect(() => {
+    applyPalette(preferences.palette);
+  }, [preferences.palette]);
+
   const value = useMemo(
     () => ({
       ...preferences,
@@ -91,6 +120,9 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       },
       setTheme: (theme: ThemePreference) => {
         setPreferences((p) => ({ ...p, theme }));
+      },
+      setPalette: (palette: PalettePreference) => {
+        setPreferences((p) => ({ ...p, palette }));
       },
     }),
     [preferences],
