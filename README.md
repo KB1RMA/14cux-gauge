@@ -90,7 +90,7 @@ npx playwright show-report test-reports/e2e/html
 
 ### CI and releases
 
-CI checks out comm14cux-ts beside the app and builds it before installing. On every pull request and push to `main`, `validate.yml` lints, type-checks, runs the unit tests, builds, and runs the acceptance suite against that build.
+CI checks out comm14cux-ts beside the app and builds it before installing. On every pull request and push to `main`, `validate.yml` lints, type-checks, runs the unit tests, builds, and runs the acceptance suite against that build. Unit and acceptance test results both go to Codecov; acceptance runs are flagged `e2e-<browser>`.
 
 Publishing a GitHub release runs `release.yml`: it tests and builds once, runs the acceptance suite against that build in all three browsers, and only if every test passes attaches the attested build to the release (see below) and deploys the same `dist/` to GitHub Pages. A flaky test (one that passes only on retry) fails the run. The repository's Pages source must be set to **GitHub Actions** (Settings → Pages).
 
@@ -103,6 +103,8 @@ Publishing a GitHub release runs `.github/workflows/release.yml`, which tests an
 | Build provenance | `https://slsa.dev/provenance/v1`                  | `*.provenance.sigstore.json`         |
 | SBOM (CycloneDX) | `https://cyclonedx.org/bom`                       | `*.sbom.sigstore.json`, `*.cdx.json` |
 | Test results     | `https://in-toto.io/attestation/test-result/v0.1` | `*.test-result.sigstore.json`        |
+
+The test-result attestation lists every unit test and every acceptance test, the latter once per browser as `e2e/<file> > <describe> > <test> [<browser>]`.
 
 Verify a download with the [GitHub CLI](https://cli.github.com/):
 

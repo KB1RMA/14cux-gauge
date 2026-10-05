@@ -12,6 +12,9 @@ on:
         description: Name of the artifact holding the production build (dist/)
         type: string
         required: true
+    secrets:
+      CODECOV_TOKEN:
+        required: false
 
 permissions:
   contents: read
@@ -68,3 +71,14 @@ jobs:
           name: e2e-report-${{ matrix.browser }}
           path: ${{ env.APP_DIR }}/test-reports/e2e
           retention-days: 14
+      # Alongside the unit test results validate.yml uploads, flagged by
+      # browser so Codecov can tell the runs apart.
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          working-directory: ${{ env.APP_DIR }}
+          report_type: test_results
+          files: ./test-reports/e2e/junit.xml
+          flags: e2e-${{ matrix.browser }}

@@ -7,7 +7,8 @@ run-name: Release ${{ github.event.release.tag_name || github.ref_name }}
 #   - attaches the built app to the release with three signed attestations:
 #       - SLSA build provenance (which workflow, commit and runner built it)
 #       - a CycloneDX SBOM of the runtime dependencies bundled into it
-#       - an in-toto test result listing the unit tests that passed against it
+#       - an in-toto test result listing the unit and acceptance tests that
+#         passed against it
 #     Each attestation is stored by GitHub and also attached to the release as
 #     a Sigstore bundle, so it can be verified offline. See "Verifying a
 #     release" in README.md.
@@ -88,13 +89,14 @@ jobs:
 
       # https://github.com/in-toto/attestation/blob/main/spec/predicates/test-result.md
       # The configuration records the test setup, the lockfile and the exact
-      # comm14cux-ts commit the tests ran against.
-      - name: Build test result predicate
+      # comm14cux-ts commit the tests ran against. The publish job adds the
+      # acceptance results once the suite has run.
+      - name: Build unit test result predicate
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
         run: |
           configuration=$(
-            sha256sum vite.config.ts package-lock.json |
+            sha256sum vite.config.ts playwright.config.ts package-lock.json |
               jq -R -s 'split("\n") | map(select(length > 0) | split("  ") | {name: .[1], digest: {sha256: .[0]}})' |
               jq --arg commit "$(git -C "../${LIB_DIR}" rev-parse HEAD)" \
                 '. + [{name: "comm14cux-ts", uri: "git+https://github.com/KB1RMA/comm14cux-ts", digest: {gitCommit: $commit}}]'
@@ -114,7 +116,7 @@ jobs:
               passedTests: tests("passed"),
               warnedTests: [],
               failedTests: tests("failed")
-            }' test-reports/results.json > release/test-result.json
+            }' test-reports/results.json > release/unit-test-result.json
 
       - name: Upload the production build
         uses: actions/upload-artifact@v7
@@ -139,6 +141,7 @@ jobs:
     uses: ./.github/workflows/acceptance.yml
     with:
       dist-artifact: dist
+    secrets: inherit
 
   publish:
     name: Attest and upload to the release
@@ -158,6 +161,30 @@ jobs:
         with:
           name: release
           path: release
+      - name: Download the acceptance results
+        uses: actions/download-artifact@v8
+        with:
+          pattern: e2e-report-*
+          path: e2e
+
+      # Adds each browser's Playwright results to the unit test predicate,
+      # named "<file> > <describe> > <test> [<browser>]".
+      - name: Build test result predicate
+        run: |
+          jq -s '
+            def walk($prefix):
+              (.specs[]? as $spec | $spec.tests[]
+                | {name: "e2e/\($spec.file) > \($prefix)\($spec.title) [\(.projectName)]", status}),
+              (.suites[]? as $suite | $suite | walk($prefix + $suite.title + " > "));
+            .[0] as $unit
+            | [.[1:][] | .suites[] | walk("")] as $e2e
+            | $unit
+            | .passedTests += [$e2e[] | select(.status == "expected") | .name]
+            | .warnedTests += [$e2e[] | select(.status == "flaky") | .name]
+            | .failedTests += [$e2e[] | select(.status == "unexpected") | .name]
+            | .result = (if $unit.result == "PASSED" and .failedTests == [] then "PASSED" else "FAILED" end)
+          ' release/unit-test-result.json e2e/*/results.json > test-result.json
+          rm release/unit-test-result.json
 
       - name: Attest build provenance
         id: provenance
@@ -178,7 +205,7 @@ jobs:
         with:
           subject-path: release/${{ env.NAME }}.zip
           predicate-type: https://in-toto.io/attestation/test-result/v0.1
-          predicate-path: release/test-result.json
+          predicate-path: test-result.json
 
       - name: Upload to the release
         env:
@@ -187,7 +214,6 @@ jobs:
           SBOM_BUNDLE: ${{ steps.sbom.outputs.bundle-path }}
           TEST_RESULT_BUNDLE: ${{ steps.test-result.outputs.bundle-path }}
         run: |
-          rm release/test-result.json
           cp "$PROVENANCE_BUNDLE" "release/${NAME}.provenance.sigstore.json"
           cp "$SBOM_BUNDLE" "release/${NAME}.sbom.sigstore.json"
           cp "$TEST_RESULT_BUNDLE" "release/${NAME}.test-result.sigstore.json"

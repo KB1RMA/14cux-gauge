@@ -21,16 +21,15 @@ export default defineConfig({
   // the run, so a flaky test cannot let a release through.
   retries: CI ? 1 : 0,
   failOnFlakyTests: CI,
-  reporter: CI
-    ? [
-        ['github'],
-        ['list'],
-        ['html', { open: 'never', outputFolder: 'test-reports/e2e/html' }],
-      ]
-    : [
-        ['list'],
-        ['html', { open: 'never', outputFolder: 'test-reports/e2e/html' }],
-      ],
+  reporter: [
+    CI ? ['github'] : ['null'],
+    ['list'],
+    ['html', { open: 'never', outputFolder: 'test-reports/e2e/html' }],
+    // JUnit for Codecov's test analytics; JSON for the release's signed
+    // test-result attestation.
+    ['junit', { outputFile: 'test-reports/e2e/junit.xml' }],
+    ['json', { outputFile: 'test-reports/e2e/results.json' }],
+  ],
   use: {
     baseURL: BASE_URL,
     trace: 'on-first-retry',
