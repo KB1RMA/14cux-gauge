@@ -21,10 +21,9 @@ on:
   release:
     types:
       - published
-  # release-please.yml starts this on each release it publishes, with
-  # attach-assets set, because its releases do not trigger the event above.
-  # Also used to re-deploy to Pages by hand, for example after changing the
-  # Pages settings. The ref must be a release's tag; the run fails on a branch.
+  # Re-deploys a release to Pages by hand, for example after changing the
+  # Pages settings, or with attach-assets set re-attaches its attested build.
+  # The ref must be a release's tag; the run fails on a branch.
   workflow_dispatch:
     inputs:
       attach-assets:
