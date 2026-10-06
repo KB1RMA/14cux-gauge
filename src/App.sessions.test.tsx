@@ -13,7 +13,6 @@ import { snapshotAt } from './test-support/snapshots';
 
 const START = Date.UTC(2026, 9, 5, 14, 0);
 
-/** Lets the demo ECU, polled every 10 ms, take a few samples. */
 /** Waits for a few polling passes; the demo's link takes ~90 ms a pass. */
 async function collectSamples() {
   await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
@@ -492,6 +491,8 @@ describe('Recording and browsing sessions', () => {
     await user.click(screen.getByRole('button', { name: /Choose readings/ }));
     await user.click(screen.getByRole('button', { name: 'Only Coolant' }));
     await user.keyboard('{Escape}');
+    // The fuel map reads its position while shown, but that isn't recorded.
+    await user.click(screen.getByRole('tab', { name: 'Fuel map' }));
     // Let the pass that was under way when the choice changed finish.
     await collectSamples();
     await recordAndStop(user);
@@ -503,9 +504,11 @@ describe('Recording and browsing sessions', () => {
     );
     await screen.findByRole('slider', { name: 'Playback position' });
 
-    expect(screen.getAllByRole('term').map((dt) => dt.textContent)).toEqual(
-      expect.arrayContaining(['Coolant', 'MIL']),
-    );
+    const terms = screen.getAllByRole('term').map((dt) => dt.textContent);
+
+    expect(terms).toEqual(expect.arrayContaining(['Coolant', 'MIL']));
+    expect(terms).not.toContain('Fuel map row');
+    expect(terms).not.toContain('Fuel map column');
     expect(readingFor('Coolant')).toHaveTextContent(/^\d+ °F$/);
     expect(() => readingFor('Engine speed')).toThrow();
   });

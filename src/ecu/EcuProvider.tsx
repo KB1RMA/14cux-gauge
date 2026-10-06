@@ -21,6 +21,7 @@ import { SampleHistory } from '../history/sampleHistory';
 import { METRIC_KEYS, type MetricKey } from '../metrics';
 import { ReadingsContext } from '../readings/context';
 import {
+  ALWAYS_READ,
   chosenReadings,
   parseReadingSettings,
   READINGS_KEY,
@@ -40,6 +41,7 @@ import {
 } from './contexts';
 import { describeError, errorReason } from './errors';
 import {
+  pickReadings,
   startPoller,
   type LiveSnapshot,
   type Poller,
@@ -102,13 +104,22 @@ export function EcuProvider({
     () => chosenReadings(readingSettings.off),
     [readingSettings.off],
   );
-  const polled = useMemo(
-    (): ReadonlySet<ReadingKey> => new Set([...chosen, ...requested.keys()]),
+  // What the poller reads: the chosen readings and any a view has asked
+  // for. Only the chosen ones are recorded, and only those the user picked
+  // (not `ALWAYS_READ`) decide whether slow values can wait.
+  const polling = useMemo(
+    () => ({
+      polled: new Set<ReadingKey>([...chosen, ...requested.keys()]),
+      chosen: new Set<ReadingKey>(chosen),
+      watched: new Set<ReadingKey>(
+        chosen.filter((key) => !ALWAYS_READ.includes(key)),
+      ),
+    }),
     [chosen, requested],
   );
   // The poller asks before every pass, so a change applies without
   // reconnecting.
-  const polledRef = useRef(polled);
+  const pollingRef = useRef(polling);
   const sessionRef = useRef<Session | undefined>(undefined);
   // Bumped by every connect/disconnect, so a slow async step can tell that it
   // has been superseded.
@@ -152,6 +163,12 @@ export function EcuProvider({
 
       log.record('error', `Connection failed: ${detail}`);
       await teardown();
+
+      // A connection started while this one was closing takes precedence.
+      if (forGeneration !== generationRef.current) {
+        return;
+      }
+
       dispatch({
         type: 'failed',
         message: describeError(error),
@@ -167,6 +184,12 @@ export function EcuProvider({
       const myGeneration = ++generationRef.current;
 
       await teardown();
+
+      // Another connect or a disconnect came while the last one was closing.
+      if (myGeneration !== generationRef.current) {
+        return;
+      }
+
       history.clear();
       dispatch({ type: 'connect', source });
       log.record(
@@ -201,12 +224,20 @@ export function EcuProvider({
       });
       sessionRef.current.poller = startPoller(connection.ecu, {
         intervalMs: source.kind === 'demo' ? demoInterval : serialInterval,
-        readings: () => polledRef.current,
+        readings: () => pollingRef.current.polled,
+        watched: () => pollingRef.current.watched,
         onSnapshot: (snapshot, stats) => {
           pushSnapshot(history, snapshot);
 
-          for (const listener of snapshotListeners) {
-            listener(snapshot);
+          if (snapshotListeners.size > 0) {
+            const chosenOnly = pickReadings(
+              snapshot,
+              pollingRef.current.chosen,
+            );
+
+            for (const listener of snapshotListeners) {
+              listener(chosenOnly);
+            }
           }
 
           setLiveData({ snapshot, stats });
@@ -266,8 +297,8 @@ export function EcuProvider({
   );
 
   useEffect(() => {
-    polledRef.current = polled;
-  }, [polled]);
+    pollingRef.current = polling;
+  }, [polling]);
 
   const setOff = useCallback(
     (off: MetricKey[]) => {
