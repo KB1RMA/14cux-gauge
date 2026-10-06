@@ -366,11 +366,13 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
       'Closed loop tunes do not use it: the ECU keeps this value where they ' +
       'keep the even bank’s long trim, so there it follows that trim and ' +
       'means nothing.',
-    typical: () => 'Steady, and moves only when the potentiometer is turned.',
+    typical: () =>
+      'Steady, and moves only when the potentiometer is turned. On a ' +
+      'closed loop tune it just follows the even bank’s long trim.',
     group: 'fuelling',
     unit: () => 'V',
     toDisplay: same,
-    // The ECU's reading has 10 bits over 5 V, steps of about 5 mV.
+    // The ECU's reading has 10 bits over 5 V, steps of about 4.9 mV.
     format: fixed(3),
     chart: { range: [0, 5] },
   },
@@ -426,12 +428,18 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     group: 'states',
     unit: () => undefined,
     toDisplay: same,
-    format: (display) =>
-      display === PurgeValveState.Open
-        ? 'Open'
-        : display === PurgeValveState.Toggling
-          ? 'Toggling'
-          : 'Closed',
+    format: (display) => {
+      switch (display) {
+        case PurgeValveState.Closed:
+          return 'Closed';
+        case PurgeValveState.Toggling:
+          return 'Toggling';
+        case PurgeValveState.Open:
+          return 'Open';
+        default:
+          return 'No reading';
+      }
+    },
     chart: { step: true, range: [0, 2] },
   },
   acCompressorOn: onOff(
@@ -445,8 +453,7 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     'Heated screen',
     'On',
     'normal',
-    'Whether the heated windscreen is on. The ECU raises the idle speed to ' +
-      'carry the extra electrical load.',
+    'Whether the heated windscreen is switched on.',
   ),
   fuelPumpOn: onOff(
     'Fuel pump relay',

@@ -208,6 +208,7 @@ describe('metrics', () => {
     expect(formatSample(purge, 0, IMPERIAL)).toBe('Closed');
     expect(formatSample(purge, 1, IMPERIAL)).toBe('Toggling');
     expect(formatSample(purge, 2, IMPERIAL)).toBe('Open');
+    expect(formatSample(purge, 3, IMPERIAL)).toBe('No reading');
     expect(purge.chart).toEqual({ step: true, range: [0, 2] });
     expect(formatSample(metric('acCompressorOn'), 1, IMPERIAL)).toBe('On');
     expect(formatSample(metric('acCompressorOn'), 0, IMPERIAL)).toBe('Off');

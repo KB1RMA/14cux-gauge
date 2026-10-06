@@ -77,14 +77,10 @@ export const READING_PRESETS: readonly ReadingPreset[] = [
   },
   {
     name: 'Temperatures and electrics',
-    keys: [
-      'coolantTempF',
-      'fuelTempF',
-      'mainVoltage',
-      'fuelPumpOn',
-      'purgeValve',
-      'acCompressorOn',
-      'screenHeaterOn',
-    ],
+    keys: ['coolantTempF', 'fuelTempF', 'mainVoltage', 'fuelPumpOn'],
+  },
+  {
+    name: 'Valves and loads',
+    keys: ['purgeValve', 'acCompressorOn', 'screenHeaterOn'],
   },
 ];

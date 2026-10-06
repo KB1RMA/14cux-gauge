@@ -203,8 +203,10 @@ export function createDemoEngine(options: DemoEngineOptions = {}): DemoEngine {
 
   const stateAt = (seconds: number): EngineState => {
     const warm = 1 - Math.exp(-seconds / WARM_UP_TIME_CONSTANT_S);
-    const idleRpm = 1100 - 350 * warm;
     const cycle = seconds % CYCLE_S;
+    const acOn = cycle >= 20 && cycle < 40;
+    // The A/C compressor's load raises the idle speed.
+    const idleRpm = 1100 - 350 * warm + (acOn ? 100 : 0);
     const jitter = (random() - 0.5) * 20;
 
     let rpm = idleRpm + jitter;
@@ -240,7 +242,7 @@ export function createDemoEngine(options: DemoEngineOptions = {}): DemoEngine {
     return {
       rpm,
       purgeTimer,
-      acOn: cycle >= 20 && cycle < 40,
+      acOn,
       screenHeaterOn: cycle < 25,
       targetIdleRpm: Math.round(idleRpm / 10) * 10,
       roadSpeedKph,
