@@ -12,6 +12,17 @@ It does the same job as [RoverGauge](https://github.com/colinbourassa/rovergauge
 
 This project is not affiliated with or endorsed by the author of libcomm14cux or RoverGauge.
 
+## Design goals
+
+14CUX Gauge is a diagnostic and troubleshooting tool, so accuracy comes first:
+
+- **Show what the ECU reported.** Readings are not smoothed, averaged or interpolated, and history and recordings keep them at full precision in the ECU's units. Units are converted and values rounded only for display.
+- **One reading, one format.** Each reading's unit and precision is defined once and used by the tiles, graphs and recordings alike. If precision ever becomes adjustable, it will be a single preference for the whole app.
+- **Graphs you can read numbers from.** Labelled axes with gridlines, samples plotted at the time they were read, gaps where a reading was invalid, and the current, lowest and highest values as text.
+- **No reading is never zero.** Missing, invalid and stale readings are shown as such.
+
+See [AGENTS.md](AGENTS.md#design-goals) for the full rules contributors follow.
+
 ## Features
 
 - **Connect** over Web Serial at 7812 baud, or 15625 baud for double-speed firmware.

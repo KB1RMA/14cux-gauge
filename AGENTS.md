@@ -1,6 +1,45 @@
 # Agent instructions
 
-These rules apply to any AI coding agent or assistant working in this repository, including when reviewing changes. Most of them exist to keep the project compliant with the GNU GPL v3; the testing rules keep the test suite exercising the app the way it really talks to the ECU. When a rule conflicts with a task, stop and ask the maintainer instead of working around it.
+These rules apply to any AI coding agent or assistant working in this repository, including when reviewing changes. The design goals keep the app trustworthy as a diagnostic tool; most of the other rules keep the project compliant with the GNU GPL v3, and the testing rules keep the test suite exercising the app the way it really talks to the ECU. When a rule conflicts with a task, stop and ask the maintainer instead of working around it.
+
+## Design goals
+
+14CUX Gauge is a diagnostic and troubleshooting tool. People use its numbers to decide what is wrong with an engine, so a reading that looks right but is not is worse than no reading. Accuracy comes before looks, density and speed. When a feature would trade accuracy for anything else, ask the maintainer first. Review every change that shows, stores or plots a reading against these rules.
+
+### Readings
+
+- Show what the ECU reported. Do not smooth, average, filter, interpolate, clamp or extrapolate a reading. A derived or processed value (an average, a rate, an estimate) must be a separate, clearly labelled metric, never a replacement for the raw one.
+- Keep samples in the library's units at full precision in history and recordings (see `src/metrics.ts`). Convert units and round only when displaying. Never store a rounded or unit-converted value.
+- Every reading's label, unit, conversion and precision is defined once, in `src/metrics.ts`. Tiles, graph axes, min/max and cursor values, replay, exports and anything new use `formatSample` / `metric.format`; never call `toFixed` or `Math.round` on a reading elsewhere. The same reading must read the same everywhere.
+- Never show more decimals than the reading's real resolution, which would imply precision the ECU does not have, and never fewer than are needed to see the steps that matter for diagnosis. When choosing a reading's precision, note its ECU resolution in a comment.
+- Always show the unit beside a value and on a graph's axis or caption.
+- Keep "no reading", "invalid" and "not chosen" distinct from zero and from each other, in text and on graphs. An invalid sample is a gap, never drawn as 0 or joined across.
+- Never present an old value as current. When readings stop (disconnected, paused, an error), say so rather than leaving the last values looking live.
+- Simulated or synthetic data (demo mode, a test ROM) is always labelled as such where it is shown.
+
+### Precision and rounding
+
+- Precision is per reading, in `src/metrics.ts`, so all views agree.
+- If users need to change how many decimals are shown or how values are rounded, that is **one global preference** in `PreferencesMenu` and `PreferencesProvider`, applied through `src/metrics.ts` to every view. Never add precision or rounding settings to a single tile, graph, table or export, and never let two views show the same reading with different precision.
+- Rounding a value for display must never change what is stored, recorded, exported or compared against a threshold.
+
+### Graphs
+
+Graphs are for reading numbers, not for decoration. A technician must be able to read a value, its scale and its timing off a graph.
+
+- Every y axis has numeric tick labels in display units, on round-number steps, with grid lines. Every time axis is labelled.
+- Plot samples at the time they were read, not by index, so gaps and uneven sample rates are visible.
+- Draw continuous readings as lines and on/off or enumerated readings as steps, with their states named on the axis as the tile names them.
+- Bounded readings (percentages, positions, on/off) use a fixed range. An autoscaled axis must keep its numeric scale readable so small noise is not mistaken for a large swing, and must not clip values.
+- Do not drop extremes when thinning data to draw it: if you downsample, keep each bucket's minimum and maximum.
+- Show exact values as text beside the graph (current, lowest, highest), formatted by the metric. A cursor or crosshair readout shows the real sample nearest the cursor, never an interpolated value.
+- Graphs that are compared share the same time axis and cursor, as replay's timeline does.
+- Do not add visual effects that move a line away from its value: no curve smoothing, easing between samples or animated transitions of plotted data.
+
+### Tests
+
+- Test every metric's formatting and conversion with literal expected strings, including rounding boundaries, negative values, zero and invalid readings.
+- Test that history, recordings and exports keep full-precision samples in library units.
 
 ## Licence
 
