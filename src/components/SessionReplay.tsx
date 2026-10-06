@@ -3,17 +3,16 @@
 import { Tabs } from 'radix-ui';
 import { useState } from 'react';
 import type { LiveSnapshot } from '../ecu/poller';
-import { HistoryContext } from '../ecu/contexts';
 import { useReplay } from '../replay/useReplay';
-import { GraphsView } from './GraphsView';
 import { LiveTiles } from './LiveTiles';
 import { ReplayControls } from './ReplayControls';
+import { ReplayGraphs } from './ReplayGraphs';
 import dashboard from './Dashboard.module.css';
 import styles from './Sessions.module.css';
 
 /**
- * Plays a recorded session back through the same readings and graphs as
- * the live dashboard. Key it by session: the samples must not change.
+ * Plays a recorded session back through the same readings as the live
+ * dashboard, and its graphs on a timeline that can be zoomed and scrubbed. Key it by session: the samples must not change.
  */
 export function SessionReplay({
   samples,
@@ -43,9 +42,7 @@ export function SessionReplay({
           <LiveTiles snapshot={replay.snapshot} />
         </Tabs.Content>
         <Tabs.Content value="graphs">
-          <HistoryContext value={replay.history}>
-            <GraphsView />
-          </HistoryContext>
+          <ReplayGraphs samples={samples} replay={replay} />
         </Tabs.Content>
       </Tabs.Root>
     </div>
