@@ -191,6 +191,44 @@ describe('metrics', () => {
     expect(formatSample(metric('fuelPumpOn'), 0, IMPERIAL)).toBe('Off');
   });
 
+  it("formats CO trim volts at the ECU's 5 mV resolution", () => {
+    const co = metric('coTrimVoltage');
+
+    expect(formatSample(co, 0, IMPERIAL)).toBe('0.000');
+    expect(formatSample(co, 2.5, IMPERIAL)).toBe('2.500');
+    expect(formatSample(co, 1.2402, IMPERIAL)).toBe('1.240');
+    expect(formatSample(co, 4.9951, IMPERIAL)).toBe('4.995');
+    expect(co.unit(IMPERIAL)).toBe('V');
+    expect(co.chart).toEqual({ range: [0, 5] });
+  });
+
+  it('names purge valve, A/C and heated screen states in text', () => {
+    const purge = metric('purgeValve');
+
+    expect(formatSample(purge, 0, IMPERIAL)).toBe('Closed');
+    expect(formatSample(purge, 1, IMPERIAL)).toBe('Toggling');
+    expect(formatSample(purge, 2, IMPERIAL)).toBe('Open');
+    expect(purge.chart).toEqual({ step: true, range: [0, 2] });
+    expect(formatSample(metric('acCompressorOn'), 1, IMPERIAL)).toBe('On');
+    expect(formatSample(metric('acCompressorOn'), 0, IMPERIAL)).toBe('Off');
+    expect(formatSample(metric('screenHeaterOn'), 1, IMPERIAL)).toBe('On');
+    expect(formatSample(metric('screenHeaterOn'), 0, IMPERIAL)).toBe('Off');
+  });
+
+  it('keeps the new readings as library-unit samples', () => {
+    const snapshot = snapshotAt(0, {
+      coTrimVoltage: 1.2402,
+      purgeValve: 2,
+      acCompressorOn: true,
+      screenHeaterOn: false,
+    });
+
+    expect(sampleOf(snapshot, 'coTrimVoltage')).toBe(1.2402);
+    expect(sampleOf(snapshot, 'purgeValve')).toBe(2);
+    expect(sampleOf(snapshot, 'acCompressorOn')).toBe(1);
+    expect(sampleOf(snapshot, 'screenHeaterOn')).toBe(0);
+  });
+
   it('marks the MIL and fuel pump by tone as well as text', () => {
     expect(metric('milOn').tone?.(1)).toBe('warn');
     expect(metric('milOn').tone?.(0)).toBe('normal');

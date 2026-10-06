@@ -4,6 +4,7 @@ import {
   Ecu,
   Gear,
   MemoryOffset,
+  PurgeValveState,
   ThrottlePosType,
 } from '@kb1rma/libcomm14cux-ts';
 import { createDemoEngine, type DemoEngineOptions } from './demoEngine';
@@ -77,6 +78,30 @@ describe('demo engine', () => {
     await expect(
       ecu.getThrottlePosition(ThrottlePosType.Corrected),
     ).resolves.toBeGreaterThan(0.1);
+    engine.stop();
+  });
+
+  it('cycles the purge valve, A/C and screen heater', async () => {
+    const { engine, ecu } = await connectDemo();
+
+    await expect(ecu.getPurgeValveState()).resolves.toBe(
+      PurgeValveState.Closed,
+    );
+    await expect(ecu.getACCompressorState()).resolves.toBe(false);
+    await expect(ecu.getScreenHeaterState()).resolves.toBe(true);
+
+    await vi.advanceTimersByTimeAsync(22_000);
+
+    await expect(ecu.getPurgeValveState()).resolves.toBe(
+      PurgeValveState.Toggling,
+    );
+    await expect(ecu.getACCompressorState()).resolves.toBe(true);
+    await expect(ecu.getScreenHeaterState()).resolves.toBe(true);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(ecu.getPurgeValveState()).resolves.toBe(PurgeValveState.Open);
+    await expect(ecu.getScreenHeaterState()).resolves.toBe(false);
     engine.stop();
   });
 

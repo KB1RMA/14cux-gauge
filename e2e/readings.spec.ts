@@ -57,7 +57,7 @@ test.describe('Choosing readings', () => {
     await expect(picker).toBeHidden();
 
     await expect(liveTerms(page)).toHaveText(['Engine speed', 'MIL']);
-    await expect(connection).toContainText('2 of 21 readings');
+    await expect(connection).toContainText('2 of 25 readings');
 
     const oneRate = await settledRate(connection);
 

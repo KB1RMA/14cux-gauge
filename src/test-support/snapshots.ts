@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { Gear } from '@kb1rma/libcomm14cux-ts';
+import { Gear, PurgeValveState } from '@kb1rma/libcomm14cux-ts';
 import type { LiveSnapshot } from '../ecu/poller';
 
 /** A complete snapshot with plausible idle values, for tests to vary. */
@@ -30,6 +30,10 @@ export function snapshotAt(
     lambdaLongEven: 0,
     idleMode: true,
     targetIdleRpm: 750,
+    coTrimVoltage: 2.5,
+    purgeValve: PurgeValveState.Closed,
+    acCompressorOn: false,
+    screenHeaterOn: false,
     ...changes,
   };
 }

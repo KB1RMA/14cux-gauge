@@ -64,6 +64,9 @@ interface EngineState {
   lambdaShort: [odd: number, even: number];
   lambdaLong: [odd: number, even: number];
   idling: boolean;
+  purgeTimer: number;
+  acOn: boolean;
+  screenHeaterOn: boolean;
 }
 
 // One scripted cycle: idle in park, a drive, idle, then a rev sweep in neutral.
@@ -230,8 +233,15 @@ export function createDemoEngine(options: DemoEngineOptions = {}): DemoEngine {
     wander(lambdaShort, 6, 25);
     wander(lambdaLong, 0.4, 10);
 
+    // Purge valve: closed while cold, then toggling, then open in the drive.
+    const purgeTimer =
+      cycle < DRIVE_START_S ? 0 : cycle < DRIVE_START_S + 10 ? 15000 : 30000;
+
     return {
       rpm,
+      purgeTimer,
+      acOn: cycle >= 20 && cycle < 40,
+      screenHeaterOn: cycle < 25,
       targetIdleRpm: Math.round(idleRpm / 10) * 10,
       roadSpeedKph,
       gear,
@@ -320,6 +330,15 @@ export function createDemoEngine(options: DemoEngineOptions = {}): DemoEngine {
       )
       .some((byte) => byte !== 0);
 
+    // Both flags are active-low: bit 3 of 0x008A clear is A/C on, bit 2 of
+    // 0x00DD clear is the screen heater on.
+    writeByte(memory, MemoryOffset.Bits008A, state.acOn ? 0xf7 : 0xff);
+    writeByte(
+      memory,
+      MemoryOffset.Bits00DD,
+      state.screenHeaterOn ? 0xfb : 0xff,
+    );
+    writeWord(memory, MemoryOffset.PurgeValveState, state.purgeTimer);
     writeByte(memory, MemoryOffset.Port1, faultsStored ? 0xbe : 0xbf);
   };
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { Gear } from '@kb1rma/libcomm14cux-ts';
+import { PurgeValveState, type Gear } from '@kb1rma/libcomm14cux-ts';
 import type { LiveSnapshot, ReadingKey } from './ecu/poller';
 import {
   fahrenheitToCelsius,
@@ -358,6 +358,22 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     // allows, so the axis grows rather than clips.
     chart: { atLeast: [0, 100] },
   },
+  coTrimVoltage: {
+    label: 'CO trim',
+    description:
+      'The voltage on the CO trim potentiometer, which sets the mixture on ' +
+      'a tune without oxygen sensor feedback (non-catalyst, open loop). ' +
+      'Closed loop tunes do not use it: the ECU keeps this value where they ' +
+      'keep the even bank’s long trim, so there it follows that trim and ' +
+      'means nothing.',
+    typical: () => 'Steady, and moves only when the potentiometer is turned.',
+    group: 'fuelling',
+    unit: () => 'V',
+    toDisplay: same,
+    // The ECU's reading has 10 bits over 5 V, steps of about 5 mV.
+    format: fixed(3),
+    chart: { range: [0, 5] },
+  },
   lambdaShortOdd: shortTrim('Short trim, odd', 'odd'),
   lambdaShortEven: shortTrim('Short trim, even', 'even'),
   lambdaLongOdd: longTrim('Long trim, odd', 'odd'),
@@ -401,6 +417,37 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     'The malfunction indicator (check engine) lamp. On means the ECU has ' +
       'stored a fault; see Fault codes. Not every fault lights it.',
   ),
+  purgeValve: {
+    label: 'Purge valve',
+    description:
+      'The charcoal canister purge valve, which lets fuel vapour from the ' +
+      'tank into the engine. Closed, open, or toggling while the ECU ' +
+      'pulses it between the two.',
+    group: 'states',
+    unit: () => undefined,
+    toDisplay: same,
+    format: (display) =>
+      display === PurgeValveState.Open
+        ? 'Open'
+        : display === PurgeValveState.Toggling
+          ? 'Toggling'
+          : 'Closed',
+    chart: { step: true, range: [0, 2] },
+  },
+  acCompressorOn: onOff(
+    'A/C compressor',
+    'On',
+    'normal',
+    'Whether the air conditioning compressor is asking for the engine. The ' +
+      'ECU raises the idle speed to carry the extra load.',
+  ),
+  screenHeaterOn: onOff(
+    'Heated screen',
+    'On',
+    'normal',
+    'Whether the heated windscreen is on. The ECU raises the idle speed to ' +
+      'carry the extra electrical load.',
+  ),
   fuelPumpOn: onOff(
     'Fuel pump relay',
     'Running',
@@ -423,6 +470,7 @@ const ORDER: readonly MetricKey[] = [
   'mainVoltage',
   'injectorPulseUs',
   'injectorDuty',
+  'coTrimVoltage',
   'lambdaShortOdd',
   'lambdaShortEven',
   'lambdaLongOdd',
@@ -433,6 +481,9 @@ const ORDER: readonly MetricKey[] = [
   'gear',
   'milOn',
   'fuelPumpOn',
+  'purgeValve',
+  'acCompressorOn',
+  'screenHeaterOn',
 ];
 
 export const METRICS: readonly Metric[] = ORDER.map((key) => ({
