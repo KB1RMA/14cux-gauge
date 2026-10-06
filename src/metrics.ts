@@ -23,7 +23,10 @@ import {
  * user's display units. `toDisplay` converts a sample for showing.
  */
 
-export type MetricKey = ReadingKey;
+/** Metrics the app works out from readings, rather than reads. */
+export type DerivedKey = 'injectorDuty';
+
+export type MetricKey = ReadingKey | DerivedKey;
 
 export interface DisplayUnits {
   temperatureUnit: TemperatureUnit;
@@ -32,7 +35,7 @@ export interface DisplayUnits {
 
 export type MetricGroup = 'engine' | 'air' | 'fuelling' | 'fuelMap' | 'states';
 
-export type MetricTone = 'normal' | 'good' | 'warn';
+export type MetricTone = 'normal' | 'good' | 'warn' | 'alert';
 
 export interface Metric {
   key: MetricKey;
@@ -51,14 +54,30 @@ export interface Metric {
    * said simply. A guide only; engines, tunes and conditions vary.
    */
   typical?(units: DisplayUnits): string;
-  /** Colour emphasis for a sample; the text must carry the meaning alone. */
+  /** Colour emphasis for a sample; `note` must carry the meaning in text. */
   tone?(sample: number): MetricTone;
+  /** A word or two shown beside a value that needs attention. */
+  note?(sample: number): string | undefined;
+  /**
+   * For a metric worked out by the app: the readings it needs, all from the
+   * same snapshot, and how to work out its sample from their samples.
+   */
+  derived?: {
+    from: readonly ReadingKey[];
+    sample(inputs: readonly number[]): number;
+  };
   /**
    * How to plot it. `step` holds each value until the next (on/off and
    * enumerated readings). `range` fixes the y axis in display units;
-   * without it the axis fits the data.
+   * without it the axis fits the data. `atLeast` shows at least that range
+   * and grows to fit data outside it, for a value that can exceed its
+   * usual bounds.
    */
-  chart: { step?: boolean; range?: readonly [number, number] };
+  chart: {
+    step?: boolean;
+    range?: readonly [number, number];
+    atLeast?: readonly [number, number];
+  };
 }
 
 export const METRIC_GROUPS: readonly { id: MetricGroup; title: string }[] = [
@@ -76,6 +95,23 @@ const fixed = (decimals: number) => (display: number) =>
   decimals === 0 ? Math.round(display).toString() : display.toFixed(decimals);
 const temperature = (sample: number, { temperatureUnit }: DisplayUnits) =>
   temperatureUnit === 'C' ? fahrenheitToCelsius(sample) : sample;
+/**
+ * Each injector bank fires once per crankshaft revolution while the engine
+ * runs: the ECU's spark interrupt runs on every spark (four per revolution
+ * on a V8) and fuels on every other one, alternating banks. See the
+ * commented firmware disassembly, firmware/ignitionInt.asm, in
+ * https://github.com/colinbourassa/14cux-firmware.
+ */
+const US_PER_REVOLUTION_AT_1_RPM = 60_000_000;
+
+/**
+ * Injector duty cycle as a fraction (1 = held open all the time): the pulse
+ * width over the time between one bank's injections, one crank revolution.
+ */
+export function injectorDuty(pulseUs: number, rpm: number): number {
+  return (pulseUs * rpm) / US_PER_REVOLUTION_AT_1_RPM;
+}
+
 const temperatureUnit = ({ temperatureUnit: unit }: DisplayUnits) =>
   temperatureLabel(unit);
 
@@ -158,6 +194,9 @@ const onOff = (
   tone: (sample) => (sample ? tone : 'normal'),
   chart: { step: true, range: [0, 1] },
 });
+
+/** Duty above which the injectors are close to their limit (85 %). */
+const DUTY_NEAR_LIMIT = 0.85;
 
 // A Record, so the compiler insists on a definition for every reading.
 const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
@@ -276,6 +315,40 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     format: fixed(2),
     chart: {},
   },
+  injectorDuty: {
+    label: 'Injector duty',
+    description:
+      'Worked out by this app, not read from the ECU: how much of the time ' +
+      'each injector is held open, from the injector pulse and engine speed. ' +
+      'Each bank fires once per crankshaft revolution, so 100 % means the ' +
+      'injectors never close and cannot deliver more fuel. It reads low ' +
+      'while the engine is cranking, when the ECU fires twice as often, and ' +
+      'high at the rev limit, when it skips injections.',
+    typical: () =>
+      'A few percent at a warm idle; rising with speed and load. Above ' +
+      'about 85 % the injectors are near their limit.',
+    group: 'fuelling',
+    unit: () => '%',
+    toDisplay: percent,
+    // Pulse width has 1 µs and engine speed 1 rpm resolution, so the duty is
+    // known far more finely than 0.1 %; 0.1 % shows its movement at idle.
+    format: fixed(1),
+    tone: (sample) =>
+      sample >= 1 ? 'alert' : sample > DUTY_NEAR_LIMIT ? 'warn' : 'normal',
+    note: (sample) =>
+      sample >= 1
+        ? 'maxed out'
+        : sample > DUTY_NEAR_LIMIT
+          ? 'near limit'
+          : undefined,
+    derived: {
+      from: ['injectorPulseUs', 'engineRpm'],
+      sample: ([pulseUs = 0, rpm = 0]) => injectorDuty(pulseUs, rpm),
+    },
+    // Can pass 100 % when the ECU asks for more fuel than one revolution
+    // allows, so the axis grows rather than clips.
+    chart: { atLeast: [0, 100] },
+  },
   lambdaShortOdd: shortTrim('Short trim, odd', 'odd'),
   lambdaShortEven: shortTrim('Short trim, even', 'even'),
   lambdaLongOdd: longTrim('Long trim, odd', 'odd'),
@@ -340,6 +413,7 @@ const ORDER: readonly MetricKey[] = [
   'idleBypass',
   'mainVoltage',
   'injectorPulseUs',
+  'injectorDuty',
   'lambdaShortOdd',
   'lambdaShortEven',
   'lambdaLongOdd',
@@ -368,17 +442,48 @@ export function sampleOf(
   snapshot: LiveSnapshot,
   key: MetricKey,
 ): number | null {
+  const { derived } = DEFINITIONS[key];
+
+  if (derived) {
+    const inputs = derived.from.map((input) => sampleOf(snapshot, input));
+
+    // Missing or invalid if any input is.
+    return inputs.every((input) => input !== null)
+      ? derived.sample(inputs as number[])
+      : null;
+  }
+
   // A reading that was not taken (not chosen, or recorded before the metric
   // existed) has no value.
-  const value = snapshot[key];
+  const value = snapshot[key as ReadingKey];
 
   return typeof value === 'boolean' ? Number(value) : (value ?? null);
+}
+
+/**
+ * The readings to take for `keys`: the readings themselves, and the
+ * readings any derived metric among them is worked out from.
+ */
+export function readingsFor(keys: Iterable<MetricKey>): Set<ReadingKey> {
+  const readings = new Set<ReadingKey>();
+
+  for (const key of keys) {
+    const { derived } = DEFINITIONS[key];
+
+    for (const reading of derived ? derived.from : [key as ReadingKey]) {
+      readings.add(reading);
+    }
+  }
+
+  return readings;
 }
 
 /** The metrics any of `snapshots` has a value for, in display order. */
 export function recordedKeys(snapshots: readonly LiveSnapshot[]): MetricKey[] {
   return METRIC_KEYS.filter((key) =>
-    snapshots.some((snapshot) => snapshot[key] !== undefined),
+    snapshots.some((snapshot) =>
+      [...readingsFor([key])].every((input) => snapshot[input] !== undefined),
+    ),
   );
 }
 

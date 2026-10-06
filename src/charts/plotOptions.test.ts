@@ -144,6 +144,18 @@ describe('plotOptions', () => {
     expect(rpm.series[1]?.paths).toBeUndefined();
   });
 
+  it('shows injector duty from 0 to 100 %, growing to fit more', () => {
+    const duty = plotOptions(plot, metric('injectorDuty'), {
+      width: 1,
+      windowSeconds: 60,
+    });
+    const range = duty.scales?.['y']?.range;
+
+    expect(call<number[]>(range, chart, 2.9, 4.1)).toEqual([-10, 110]);
+    // Past 100 % the axis fits the data, so it does not clip.
+    expect(call<number[]>(range, chart, 3, 120)).toEqual([0, 140]);
+  });
+
   it('plots states as steps, with a labelled tick for each state', () => {
     const gear = plotOptions(plot, metric('gear'), {
       width: 1,

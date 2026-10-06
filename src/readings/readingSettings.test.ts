@@ -9,7 +9,7 @@ import {
 describe('reading settings', () => {
   it('reads everything by default', () => {
     expect(parseReadingSettings(undefined)).toEqual({ off: [] });
-    expect(chosenReadings([])).toHaveLength(20);
+    expect(chosenReadings([])).toHaveLength(21);
   });
 
   it('keeps only known readings, and never turns the MIL off', () => {

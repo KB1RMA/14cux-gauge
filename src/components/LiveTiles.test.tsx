@@ -54,9 +54,34 @@ describe('LiveTiles', () => {
     expect(readingFor('Fuel pump relay')).toHaveTextContent('Running');
     expect(readingFor('Target idle')).toHaveTextContent('740 rpm');
     expect(readingFor('Injector pulse')).toHaveTextContent('2.35 ms');
+    expect(readingFor('Injector duty')).toHaveTextContent('2.9 %');
     expect(readingFor('Fuel map row')).toHaveTextContent('2.5');
     expect(readingFor('Fuel map column')).toHaveTextContent('3.5');
     expect(readingFor('Idle control')).toHaveTextContent('Active');
+  });
+
+  it('says in words when the injectors are near or at their limit', () => {
+    const { rerender } = renderTiles({
+      ...SNAPSHOT,
+      engineRpm: 6000,
+      injectorPulseUs: 9000,
+    });
+
+    expect(readingFor('Injector duty')).toHaveTextContent(
+      /^90\.0 % near limit$/,
+    );
+
+    rerender(
+      <PreferencesProvider>
+        <LiveTiles
+          snapshot={{ ...SNAPSHOT, engineRpm: 6000, injectorPulseUs: 10500 }}
+        />
+      </PreferencesProvider>,
+    );
+
+    expect(readingFor('Injector duty')).toHaveTextContent(
+      /^105\.0 % maxed out$/,
+    );
   });
 
   it('groups readings under headings', () => {

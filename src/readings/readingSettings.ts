@@ -66,6 +66,7 @@ export const READING_PRESETS: readonly ReadingPreset[] = [
       'throttle',
       'airflow',
       'injectorPulseUs',
+      'injectorDuty',
       'lambdaShortOdd',
       'lambdaShortEven',
       'lambdaLongOdd',

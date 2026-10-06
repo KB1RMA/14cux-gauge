@@ -57,7 +57,7 @@ test.describe('Choosing readings', () => {
     await expect(picker).toBeHidden();
 
     await expect(liveTerms(page)).toHaveText(['Engine speed', 'MIL']);
-    await expect(connection).toContainText('2 of 20 readings');
+    await expect(connection).toContainText('2 of 21 readings');
 
     const oneRate = await settledRate(connection);
 
@@ -76,7 +76,7 @@ test.describe('Choosing readings', () => {
       .getByRole('radio', { name: 'All' })
       .click();
     await page.keyboard.press('Escape');
-    await expect(liveTerms(page)).toHaveCount(20);
+    await expect(liveTerms(page)).toHaveCount(21);
     await expect(connection).not.toContainText('readings');
   });
 

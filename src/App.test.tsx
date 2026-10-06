@@ -143,7 +143,7 @@ describe('App in demo mode', () => {
     expect(screen.queryByText('Engine speed')).not.toBeInTheDocument();
     await vi.waitFor(() => {
       expect(
-        screen.getByText(/^2 of 20 readings · [\d.]+ samples\/s$/),
+        screen.getByText(/^2 of 21 readings · [\d.]+ samples\/s$/),
       ).toBeInTheDocument();
     });
 

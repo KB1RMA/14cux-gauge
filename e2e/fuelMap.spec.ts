@@ -18,6 +18,7 @@ test.describe('Fuel map', () => {
     await expect(reading(page, 'Rev limit')).toHaveText('5000 rpm');
     await expect(reading(page, 'Target idle')).toHaveText(/^\d+ rpm$/);
     await expect(reading(page, 'Injector pulse')).toHaveText(/^\d+\.\d\d ms$/);
+    await expect(reading(page, 'Injector duty')).toHaveText(/^\d+\.\d %$/);
     await expect(reading(page, 'Idle control')).toHaveText('Active');
 
     await page.getByRole('tab', { name: 'Fuel map' }).click();
