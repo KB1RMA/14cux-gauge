@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Ecu, MemoryOffset, SimulatedTransport } from 'comm14cux-ts';
+import { Ecu, MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { expectNoAxeViolations } from '../test-support/a11y';
 import { FaultCodes } from './FaultCodes';
 

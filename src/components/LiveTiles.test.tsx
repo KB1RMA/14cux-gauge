@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen } from '@testing-library/react';
-import { Gear } from 'comm14cux-ts';
+import { Gear } from '@kb1rma/libcomm14cux-ts';
 import type { LiveSnapshot } from '../ecu/poller';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { expectNoAxeViolations, readingFor } from '../test-support/a11y';

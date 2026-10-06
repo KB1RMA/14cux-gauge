@@ -7,7 +7,7 @@ import {
   ThrottlePosType,
   type Ecu,
   type Gear,
-} from 'comm14cux-ts';
+} from '@kb1rma/libcomm14cux-ts';
 import { isTransientLinkError } from './errors';
 
 /** A reading, or `null` if the ECU returned a value outside its valid range. */

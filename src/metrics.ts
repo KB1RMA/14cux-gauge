@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { Gear } from 'comm14cux-ts';
+import type { Gear } from '@kb1rma/libcomm14cux-ts';
 import type { LiveSnapshot } from './ecu/poller';
 import {
   fahrenheitToCelsius,

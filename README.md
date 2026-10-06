@@ -57,17 +57,14 @@ Parts of this project were written with the help of an AI assistant. The libcomm
 
 Requires Node.js 24 (see `.nvmrc`).
 
-comm14cux-ts is not on npm yet, so the app expects it checked out **next to** this repository and depends on it as `file:../comm14cux-ts`:
+The app depends on [`@kb1rma/libcomm14cux-ts`](https://www.npmjs.com/package/@kb1rma/libcomm14cux-ts) from npm:
 
 ```sh
-git clone https://github.com/KB1RMA/comm14cux-ts.git
 git clone https://github.com/KB1RMA/14cux-gauge.git
-
-cd comm14cux-ts && npm ci && npm run build && cd ..   # builds dist/, which the app imports
 cd 14cux-gauge && npm ci
 ```
 
-After changing the library, run `npm run build` in it again; the app picks the new `dist/` up through the symlink npm creates. (`npm link` would also work for a one-off override, but it is not recorded in `package.json` or the lockfile, so `npm ci` and CI would lose it.)
+To try an unreleased change to the library, `npm link @kb1rma/libcomm14cux-ts` from a local checkout. It is not recorded in `package.json` or the lockfile, so `npm ci` and CI will not see it.
 
 ```sh
 npm run dev            # Vite dev server on http://localhost:5173
@@ -94,7 +91,7 @@ npx playwright show-report test-reports/e2e/html
 
 ### CI and releases
 
-CI checks out comm14cux-ts beside the app and builds it before installing. On every pull request and push to `main`, `validate.yml` lints, type-checks, runs the unit tests, builds, and runs the acceptance suite against that build. Unit and acceptance test results both go to Codecov; acceptance runs are flagged `e2e-<browser>`.
+On every pull request and push to `main`, `validate.yml` lints, type-checks, runs the unit tests, builds, and runs the acceptance suite against that build. Unit and acceptance test results both go to Codecov; acceptance runs are flagged `e2e-<browser>`.
 
 Releases are managed by [release-please](https://github.com/googleapis/release-please). Write commit messages (or squash-merge pull request titles) as [Conventional Commits](https://www.conventionalcommits.org/): `fix:` makes a patch release, `feat:` a minor one (a patch one while the version is below 1.0), and `feat!:` or a `BREAKING CHANGE:` footer a major one. On every push to `main`, `release-please.yml` keeps a release pull request open that bumps the version in `package.json` and updates `CHANGELOG.md`. Merging it tags the commit `v<version>` and publishes a GitHub release, which starts `release.yml` on that tag. release-please acts as a GitHub App, not with the default `GITHUB_TOKEN`, because events made with that token start no workflows: the release pull request would never get the checks the `main` ruleset requires, and the release would not start `release.yml`. The app needs read and write access to contents, issues and pull requests, and must be installed on this repository; set its client ID and a private key as the `RELEASE_APP_CLIENT_ID` and `RELEASE_APP_PRIVATE_KEY` Actions secrets.
 
@@ -124,7 +121,7 @@ Add `--bundle <file>.sigstore.json` to verify against the attached bundle instea
 
 ## Roadmap
 
-- Publish comm14cux-ts to npm (or give it a `prepare` script) and depend on a version range instead of `file:`.
+- Move from the `0.1.0-beta` library to its stable `0.1.0` release once it is published.
 - Fuel map viewer, ROM dump download, raw memory read/write, fuel pump and idle-motor tests.
 - CSV logging, charts and sparklines.
 - Electron packaging. The renderer is plain web code; the main process will need `session.on('select-serial-port')` plus `setPermissionCheckHandler` / `setDevicePermissionHandler` to let the user choose a port.

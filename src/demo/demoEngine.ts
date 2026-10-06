@@ -8,7 +8,11 @@
 // raw values an ECU would hold for a plausible engine. Each value is encoded
 // here as the inverse of the library's decoder for that location.
 
-import { Gear, MemoryOffset, SimulatedTransport } from 'comm14cux-ts';
+import {
+  Gear,
+  MemoryOffset,
+  SimulatedTransport,
+} from '@kb1rma/libcomm14cux-ts';
 import { buildSyntheticRom, DEMO_VOLTAGE_FACTORS } from './syntheticRom';
 
 export interface DemoEngineOptions {

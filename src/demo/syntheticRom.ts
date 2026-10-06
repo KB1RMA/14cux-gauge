@@ -7,7 +7,7 @@
 // derived from any ROM dump: only the handful of locations the library reads
 // are filled in, and everything else is zero.
 
-import { DataSize, MemoryOffset } from 'comm14cux-ts';
+import { DataSize, MemoryOffset } from '@kb1rma/libcomm14cux-ts';
 
 /** Main-voltage coefficients stored in the ROM (A and B are bytes, C a word). */
 export const DEMO_VOLTAGE_FACTORS = { a: 0x64, b: 0xbd, c: 0x6180 } as const;

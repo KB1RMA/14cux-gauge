@@ -8,5 +8,5 @@
 npm-debug.log*
 .env*
 !.env.example
-# Claude Code worktrees, and the comm14cux-ts symlink placed beside them
+# Claude Code worktrees
 /.claude/worktrees/

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { Gear } from 'comm14cux-ts';
+import { Gear } from '@kb1rma/libcomm14cux-ts';
 import {
   formatSample,
   METRIC_GROUPS,
