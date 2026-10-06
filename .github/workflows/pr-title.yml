@@ -13,8 +13,8 @@ run-name: PR Title
 #   feat!: drop the legacy units        -> "BREAKING CHANGES"
 #
 # How far each one bumps the version is set in release-please-config.json.
-# Before 1.0.0, bump-minor-pre-major and bump-patch-for-minor-pre-major make
-# a breaking change bump the minor version and a feat bump the patch.
+# Before 1.0.0, bump-minor-pre-major makes a breaking change bump the minor
+# version; a feat also bumps the minor version.
 #
 # The title is checked with a plain shell regex rather than a third-party
 # action, so no outside code runs with access to the PR.
