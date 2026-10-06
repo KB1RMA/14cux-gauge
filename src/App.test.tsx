@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { expectNoAxeViolations, readingFor } from './test-support/a11y';
@@ -152,6 +152,24 @@ describe('App in demo mode', () => {
     await vi.waitFor(() => {
       expect(screen.getByText(/^In use now: row 1, /)).toBeInTheDocument();
     });
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  });
+
+  it('stays connected when reconnected while the last connection is closing', async () => {
+    const user = userEvent.setup();
+
+    render(<App pollIntervalMs={{ demo: 10 }} />);
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+    await screen.findByRole('heading', { name: 'Live data' });
+
+    // The connect screen appears before the old connection has closed.
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+    await user.click(await screen.findByRole('button', { name: 'Demo mode' }));
+    await screen.findByRole('heading', { name: 'Live data' });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 300)));
+
+    expect(screen.getByRole('status')).toHaveTextContent('Demo ECU · Polling');
+    expect(readingFor('Engine speed')).toHaveTextContent(/^\d+ rpm$/);
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
   });
 });

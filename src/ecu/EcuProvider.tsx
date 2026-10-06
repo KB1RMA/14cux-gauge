@@ -118,6 +118,10 @@ export function EcuProvider({
   // polls flat out too and reading fewer values is faster.
   const demoInterval = pollIntervalMs?.demo ?? 0;
 
+  // Settles once every connection torn down so far has been disposed, so a
+  // new connection never opens the port while the last one still holds it.
+  const disposedRef = useRef<Promise<void>>(Promise.resolve());
+
   const teardown = useCallback(async () => {
     const current = sessionRef.current;
 
@@ -128,8 +132,14 @@ export function EcuProvider({
     if (current) {
       current.unwatch?.();
       current.poller?.stop();
-      await current.connection.dispose();
+      // A failed dispose has nothing to recover, and must not block the
+      // next connection.
+      disposedRef.current = disposedRef.current
+        .then(() => current.connection.dispose())
+        .catch(() => undefined);
     }
+
+    await disposedRef.current;
   }, []);
 
   const fail = useCallback(
@@ -227,10 +237,15 @@ export function EcuProvider({
   );
 
   const disconnect = useCallback(async () => {
-    generationRef.current++;
+    const myGeneration = ++generationRef.current;
+
     log.record('event', 'Disconnecting at the user’s request');
     await teardown();
-    dispatch({ type: 'disconnected' });
+
+    // A connection started while this one was closing takes precedence.
+    if (myGeneration === generationRef.current) {
+      dispatch({ type: 'disconnected' });
+    }
   }, [teardown, log]);
 
   const reconnect = useCallback(async () => {
