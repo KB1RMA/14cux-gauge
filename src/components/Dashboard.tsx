@@ -12,6 +12,7 @@ import { FaultCodes } from './FaultCodes';
 import { FuelMapView } from './FuelMapView';
 import { FuelPumpTest } from './FuelPumpTest';
 import { GraphsView } from './GraphsView';
+import { IdleAirControlTest } from './IdleAirControlTest';
 import { LiveTiles } from './LiveTiles';
 import { RomImages } from './RomImages';
 import { ReadingsPicker } from './ReadingsPicker';
@@ -74,6 +75,7 @@ export function Dashboard({ ecu, tab }: { ecu: Ecu; tab: LiveTab }) {
         <aside className={styles['side']}>
           <FaultCodes ecu={ecu} />
           <FuelPumpTest />
+          <IdleAirControlTest ecu={ecu} snapshot={snapshot} />
           <EcuInfo ecu={ecu} />
           <RomImages />
         </aside>
