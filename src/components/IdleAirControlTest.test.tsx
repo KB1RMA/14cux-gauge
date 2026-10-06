@@ -140,7 +140,7 @@ describe('IdleAirControlTest', () => {
     );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The ECU stopped responding.',
+      'The test may have partly run. The ECU stopped responding.',
     );
   });
 

@@ -72,7 +72,9 @@ export function IdleAirControlTest({
         `Commanded ${steps} ${steps === 1 ? 'step' : 'steps'} ${direction}.`,
       );
     } catch (e) {
-      setError(describeError(e));
+      // The library writes the direction bit before the step count, so a
+      // failure part-way through can leave the ECU changed.
+      setError(`The test may have partly run. ${describeError(e)}`);
     } finally {
       setRunning(false);
     }
