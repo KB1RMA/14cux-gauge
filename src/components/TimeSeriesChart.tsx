@@ -1,26 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { VisuallyHidden } from 'radix-ui';
 import { useEffect, useId, useRef } from 'react';
 import type uPlot from 'uplot';
-import {
-  canPlot,
-  loadPlot,
-  PLOT_HEIGHT,
-  plotOptions,
-} from '../charts/plotOptions';
+import { mountPlot } from '../charts/mountPlot';
+import { plotOptions } from '../charts/plotOptions';
 import { useHistory } from '../history/useHistory';
 import type { Metric } from '../metrics';
 import { usePreferences } from '../preferences/usePreferences';
+import { ChartCaption, ChartStats } from './ChartParts';
 import styles from './TimeSeriesChart.module.css';
 
-interface Summary {
-  now: number | null | undefined;
-  min: number | undefined;
-  max: number | undefined;
-}
-
-function summarise(values: readonly (number | null)[]): Summary {
+function summarise(values: readonly (number | null)[]) {
   let min: number | undefined;
   let max: number | undefined;
 
@@ -32,37 +22,6 @@ function summarise(values: readonly (number | null)[]): Summary {
   }
 
   return { now: values.at(-1), min, max };
-}
-
-function Stat({
-  term,
-  value,
-  format,
-}: {
-  term: string;
-  value: number | null | undefined;
-  format(value: number): string;
-}) {
-  return (
-    <div>
-      <dt>{term}</dt>
-      <dd>
-        {value === null ? (
-          <>
-            <span aria-hidden="true">—</span>
-            <VisuallyHidden.Root>No valid reading</VisuallyHidden.Root>
-          </>
-        ) : value === undefined ? (
-          <>
-            <span aria-hidden="true">—</span>
-            <VisuallyHidden.Root>No data yet</VisuallyHidden.Root>
-          </>
-        ) : (
-          format(value)
-        )}
-      </dd>
-    </div>
-  );
 }
 
 /**
@@ -100,46 +59,22 @@ export function TimeSeriesChart({
   useEffect(() => {
     const container = plotRef.current;
 
-    if (!container || !canPlot()) {
+    if (!container) {
       return undefined;
     }
 
-    let disposed = false;
-
-    let dispose = () => {
-      disposed = true;
-    };
-
-    void loadPlot().then((plot) => {
-      if (disposed) {
-        return;
-      }
-
-      const chart = new plot(
-        plotOptions(plot, metric, {
-          width: container.clientWidth,
-          windowSeconds,
-        }),
-        dataRef.current,
-        container,
-      );
-      const resize = new ResizeObserver(() => {
-        chart.setSize({ width: container.clientWidth, height: PLOT_HEIGHT });
-      });
-
-      chartRef.current = chart;
-      resize.observe(container);
-
-      dispose = () => {
-        resize.disconnect();
-        chart.destroy();
-        chartRef.current = null;
-      };
-    });
-
-    return () => {
-      dispose();
-    };
+    return mountPlot(
+      container,
+      (plot, width) =>
+        new plot(
+          plotOptions(plot, metric, { width, windowSeconds }),
+          dataRef.current,
+          container,
+        ),
+      (chart) => {
+        chartRef.current = chart;
+      },
+    );
   }, [metric, windowSeconds]);
 
   // After every render: keep the latest data for a chart still loading, and
@@ -154,24 +89,8 @@ export function TimeSeriesChart({
     // Named explicitly: not every accessibility API derives a figure's name
     // from its caption.
     <figure className={styles['chart']} aria-labelledby={captionId}>
-      <figcaption id={captionId} className={styles['caption']}>
-        {metric.label}
-        {unit ? (
-          <>
-            {' '}
-            <span className={styles['unit']}>({unit})</span>
-          </>
-        ) : null}
-      </figcaption>
-      <dl className={styles['stats']}>
-        <Stat term="Now" value={summary.now} format={format} />
-        {metric.chart.step ? null : (
-          <>
-            <Stat term="Min" value={summary.min} format={format} />
-            <Stat term="Max" value={summary.max} format={format} />
-          </>
-        )}
-      </dl>
+      <ChartCaption id={captionId} label={metric.label} unit={unit} />
+      <ChartStats {...summary} step={metric.chart.step} format={format} />
       <div ref={plotRef} className={styles['plot']} aria-hidden="true" />
     </figure>
   );

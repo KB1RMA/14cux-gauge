@@ -1,0 +1,96 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+
+/* The overview strip, its window slider and zoom buttons. */
+.overview {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.strip {
+  /* Reserve the height before uPlot draws, so the page does not jump. */
+  min-height: 64px;
+}
+
+/* Dragging the strip moves the window, so the browser must not scroll. */
+.strip :global(.u-over) {
+  touch-action: none;
+  cursor: grab;
+}
+
+.range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+
+.zoom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.zoom button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.shown {
+  margin: 0;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+/* The stretch of the recording the graphs show, on the strip. */
+.window {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  /* The highlight's edge marks the window, so it needs 3:1 contrast. */
+  border: 2px solid var(--accent);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* Graphs on the timeline. A horizontal pinch zooms; vertical swipes still
+   scroll the page. */
+.plot :global(.u-over) {
+  touch-action: pan-y;
+}
+
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  pointer-events: none;
+}
+
+/* The value under the pointer, beside the crosshair. */
+.readout {
+  position: absolute;
+  top: 0.25rem;
+  left: 0;
+  padding: 0.1rem 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  pointer-events: none;
+}

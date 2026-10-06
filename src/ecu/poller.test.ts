@@ -6,7 +6,7 @@ import {
   MemoryOffset,
   SimulatedTransport,
   TimeoutError,
-} from 'comm14cux-ts';
+} from '@kb1rma/libcomm14cux-ts';
 import { startPoller, type LiveSnapshot, type PollerStats } from './poller';
 
 function plantWord(memory: Uint8Array, address: number, value: number): void {

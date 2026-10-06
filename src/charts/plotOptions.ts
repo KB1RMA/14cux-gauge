@@ -2,6 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import type uPlot from 'uplot';
 import type { Metric } from '../metrics';
+import { formatDuration } from '../sessions/format';
 
 /**
  * uPlot options for one metric's live graph. The x axis is seconds relative
@@ -133,5 +134,98 @@ export function plotOptions(
         ...(stepped && step ? { paths: stepped({ align: 1 }) } : {}),
       },
     ],
+  };
+}
+
+/** Tick spacings for the timeline's x axis, in seconds. */
+const TIMELINE_INCRS = [
+  0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200,
+];
+
+/**
+ * Seconds into a recording as an axis label: "0:00", "1:05", "1:02:03".
+ * When the ticks are under a second apart, tenths are added: "0:01.5".
+ */
+export function formatTimelineTick(seconds: number, spacing: number): string {
+  const clock = formatDuration(seconds * 1000);
+
+  if (spacing >= 1) {
+    return clock;
+  }
+
+  const tenths = Math.round((seconds % 1) * 10) % 10;
+
+  return `${clock}.${String(tenths)}`;
+}
+
+/**
+ * uPlot options for one metric on replay's timeline. The x axis is seconds
+ * into the recording, over the range `xRange` returns (the visible window),
+ * so the chart zooms and pans without being rebuilt. The cursor shows a
+ * crosshair that every chart with the same `syncKey` follows.
+ */
+export function timelinePlotOptions(
+  plot: UPlot,
+  metric: Metric,
+  {
+    width,
+    syncKey,
+    xRange,
+  }: { width: number; syncKey: string; xRange(): [number, number] },
+): uPlot.Options {
+  const options = plotOptions(plot, metric, { width, windowSeconds: 0 });
+  const [xAxis, yAxis] = options.axes ?? [];
+
+  return {
+    ...options,
+    cursor: {
+      show: true,
+      x: true,
+      y: false,
+      points: { show: false },
+      // Dragging is the timeline's own gesture (see timelineGestures).
+      drag: { x: false, y: false },
+      sync: { key: syncKey, setSeries: false },
+    },
+    scales: {
+      ...options.scales,
+      x: { time: false, auto: false, range: () => xRange() },
+    },
+    axes: [
+      {
+        ...xAxis,
+        space: 70,
+        incrs: TIMELINE_INCRS,
+        values: (_chart, splits, _axis, _space, spacing) =>
+          splits.map((split) => formatTimelineTick(split, spacing)),
+      },
+      { ...yAxis },
+    ],
+  };
+}
+
+export const OVERVIEW_HEIGHT = 64;
+
+/**
+ * uPlot options for the overview strip: one metric over the whole
+ * recording, `durationSeconds` long, with time labels and no y axis.
+ */
+export function overviewPlotOptions(
+  plot: UPlot,
+  metric: Metric,
+  { width, durationSeconds }: { width: number; durationSeconds: number },
+): uPlot.Options {
+  const options = timelinePlotOptions(plot, metric, {
+    width,
+    syncKey: '',
+    xRange: () => [0, Math.max(durationSeconds, 0.001)],
+  });
+  const [xAxis] = options.axes ?? [];
+
+  return {
+    ...options,
+    height: OVERVIEW_HEIGHT,
+    cursor: { show: false, drag: { x: false, y: false } },
+    axes: [{ ...xAxis, size: 24 }, { show: false }],
   };
 }

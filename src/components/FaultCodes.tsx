@@ -4,7 +4,7 @@ import type {
   Ecu,
   FaultCodeName,
   FaultCodes as FaultCodeFlags,
-} from 'comm14cux-ts';
+} from '@kb1rma/libcomm14cux-ts';
 import { useCallback, useState } from 'react';
 import { describeError } from '../ecu/errors';
 import { ConfirmDialog } from './ConfirmDialog';

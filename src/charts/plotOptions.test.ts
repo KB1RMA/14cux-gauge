@@ -3,7 +3,16 @@
 import type uPlot from 'uplot';
 import { METRICS, type MetricKey } from '../metrics';
 import { installCanvasStandIns } from '../test-support/canvas';
-import { canPlot, formatAgo, loadPlot, plotOptions } from './plotOptions';
+import {
+  canPlot,
+  formatAgo,
+  formatTimelineTick,
+  loadPlot,
+  OVERVIEW_HEIGHT,
+  overviewPlotOptions,
+  plotOptions,
+  timelinePlotOptions,
+} from './plotOptions';
 
 function metric(key: MetricKey) {
   const found = METRICS.find((m) => m.key === key);
@@ -32,6 +41,20 @@ describe('formatAgo', () => {
     expect(formatAgo(-60)).toBe('−1 min');
     expect(formatAgo(-90)).toBe('−90 s');
     expect(formatAgo(-600)).toBe('−10 min');
+  });
+});
+
+describe('formatTimelineTick', () => {
+  it('labels the x axis as a clock from the start of the recording', () => {
+    expect(formatTimelineTick(0, 5)).toBe('0:00');
+    expect(formatTimelineTick(65, 5)).toBe('1:05');
+    expect(formatTimelineTick(3723, 60)).toBe('1:02:03');
+  });
+
+  it('adds tenths when the ticks are under a second apart', () => {
+    expect(formatTimelineTick(1.5, 0.5)).toBe('0:01.5');
+    expect(formatTimelineTick(2, 0.5)).toBe('0:02.0');
+    expect(formatTimelineTick(61.25, 0.1)).toBe('1:01.3');
   });
 });
 
@@ -137,5 +160,54 @@ describe('plotOptions', () => {
       'D / R',
       'Manual',
     ]);
+  });
+
+  it('puts the timeline on seconds into the recording, over the visible window', () => {
+    const options = timelinePlotOptions(plot, metric('engineRpm'), {
+      width: 400,
+      syncKey: 'replay',
+      xRange: () => [30, 90],
+    });
+    const x = options.axes?.[0];
+
+    expect(call<number[]>(options.scales?.['x']?.range, chart, 0, 0)).toEqual([
+      30, 90,
+    ]);
+    expect(call<string[]>(x?.values, chart, [30, 60, 90], 0, 70, 30)).toEqual([
+      '0:30',
+      '1:00',
+      '1:30',
+    ]);
+    // A crosshair shared with the other graphs.
+    expect(options.cursor).toMatchObject({
+      show: true,
+      sync: { key: 'replay' },
+    });
+    // The y axis is the live graph's.
+    expect(
+      call<number[]>(options.scales?.['y']?.range, chart, 742, 1102),
+    ).toEqual([700, 1140]);
+  });
+
+  it('draws the overview strip over the whole recording, without a y axis', () => {
+    const options = overviewPlotOptions(plot, metric('engineRpm'), {
+      width: 400,
+      durationSeconds: 275,
+    });
+    const empty = overviewPlotOptions(plot, metric('engineRpm'), {
+      width: 400,
+      durationSeconds: 0,
+    });
+
+    expect(options.height).toBe(OVERVIEW_HEIGHT);
+    expect(call<number[]>(options.scales?.['x']?.range, chart, 0, 0)).toEqual([
+      0, 275,
+    ]);
+    // A recording of one sample still has a range to draw.
+    expect(
+      call<number[]>(empty.scales?.['x']?.range, chart, 0, 0)[1],
+    ).toBeGreaterThan(0);
+    expect(options.axes?.[1]?.show).toBe(false);
+    expect(options.cursor?.show).toBe(false);
   });
 });

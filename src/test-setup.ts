@@ -27,4 +27,6 @@ Element.prototype.hasPointerCapture ??= function hasPointerCapture() {
 };
 
 Element.prototype.releasePointerCapture ??= function releasePointerCapture() {};
+
+Element.prototype.setPointerCapture ??= function setPointerCapture() {};
 /* eslint-enable @typescript-eslint/no-unnecessary-condition */

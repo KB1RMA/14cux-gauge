@@ -37,7 +37,8 @@ describe('useReplay', () => {
       speed: 1,
     });
     expect(result.current.snapshot?.engineRpm).toBe(1000);
-    expect(result.current.history.window('engineRpm').values).toEqual([1000]);
+    // The graphs show the whole recording.
+    expect(result.current.view).toEqual({ start: 0, end: 10_000 });
   });
 
   it('plays in real time, and pauses', () => {
@@ -51,9 +52,6 @@ describe('useReplay', () => {
     expect(result.current.playing).toBe(true);
     expect(result.current.position).toBe(2000);
     expect(result.current.snapshot?.engineRpm).toBe(1002);
-    expect(result.current.history.window('engineRpm').values).toEqual([
-      1000, 1001, 1002,
-    ]);
 
     act(() => {
       result.current.pause();
@@ -123,7 +121,7 @@ describe('useReplay', () => {
 
     expect(result.current.playing).toBe(true);
     expect(result.current.position).toBe(8000);
-    expect(result.current.history.window('engineRpm').values).toHaveLength(9);
+    expect(result.current.snapshot?.engineRpm).toBe(1008);
 
     act(() => {
       result.current.seek(-500);
@@ -136,6 +134,89 @@ describe('useReplay', () => {
     });
 
     expect(result.current.position).toBe(10_000);
+  });
+
+  it('pages the view forward as playback runs off its end', () => {
+    const { result } = renderHook(() => useReplay(samples));
+
+    act(() => {
+      result.current.setView({ start: 0, end: 3000 });
+      result.current.setSpeed(10);
+      result.current.play();
+    });
+    tick(200);
+
+    expect(result.current.position).toBe(2000);
+    expect(result.current.view).toEqual({ start: 0, end: 3000 });
+
+    tick(200);
+
+    expect(result.current.position).toBe(4000);
+    expect(result.current.view).toEqual({ start: 3000, end: 6000 });
+
+    tick(1000);
+
+    // The last page ends at the end of the recording.
+    expect(result.current.position).toBe(10_000);
+    expect(result.current.view).toEqual({ start: 7000, end: 10_000 });
+  });
+
+  it('leaves alone a view the user moved away from the playhead', () => {
+    const { result } = renderHook(() => useReplay(samples));
+
+    act(() => {
+      result.current.setView({ start: 6000, end: 8000 });
+      result.current.play();
+    });
+    tick(1000);
+
+    expect(result.current.position).toBe(1000);
+    expect(result.current.view).toEqual({ start: 6000, end: 8000 });
+  });
+
+  it('pages the view to a seek outside it', () => {
+    const { result } = renderHook(() => useReplay(samples));
+
+    act(() => {
+      result.current.setView({ start: 0, end: 2000 });
+    });
+    act(() => {
+      result.current.seek(1500);
+    });
+
+    expect(result.current.view).toEqual({ start: 0, end: 2000 });
+
+    act(() => {
+      result.current.seek(5000);
+    });
+
+    expect(result.current.view).toEqual({ start: 5000, end: 7000 });
+
+    // Playing again from the end goes back to the start, in view.
+    act(() => {
+      result.current.seek(10_000);
+    });
+    act(() => {
+      result.current.play();
+    });
+
+    expect(result.current.view).toEqual({ start: 0, end: 2000 });
+  });
+
+  it('fits the view inside the recording', () => {
+    const { result } = renderHook(() => useReplay(samples));
+
+    act(() => {
+      result.current.setView({ start: 9000, end: 13_000 });
+    });
+
+    expect(result.current.view).toEqual({ start: 6000, end: 10_000 });
+
+    act(() => {
+      result.current.setView({ start: 5000, end: 5100 });
+    });
+
+    expect(result.current.view).toEqual({ start: 4550, end: 5550 });
   });
 
   it('handles a recording of one sample', () => {

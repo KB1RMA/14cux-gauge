@@ -6,7 +6,7 @@ import {
   ProtocolError,
   ReadCancelledError,
   TimeoutError,
-} from 'comm14cux-ts';
+} from '@kb1rma/libcomm14cux-ts';
 
 /**
  * Whether an error is a transient link fault worth retrying: a missed or

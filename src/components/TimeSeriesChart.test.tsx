@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { act, render, screen, within } from '@testing-library/react';
-import { Gear } from 'comm14cux-ts';
+import { Gear } from '@kb1rma/libcomm14cux-ts';
 import { HistoryContext } from '../ecu/contexts';
 import { SampleHistory } from '../history/sampleHistory';
 import { METRIC_KEYS, METRICS, type MetricKey } from '../metrics';

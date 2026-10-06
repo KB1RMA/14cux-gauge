@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { BAUD, BAUD_DOUBLE_SPEED, Ecu, WebSerialTransport } from 'comm14cux-ts';
+import {
+  BAUD,
+  BAUD_DOUBLE_SPEED,
+  Ecu,
+  WebSerialTransport,
+} from '@kb1rma/libcomm14cux-ts';
 import { createDemoEngine } from '../demo/demoEngine';
 import type { DiagnosticLog } from '../diagnostics/diagnosticLog';
 import { TracingTransport } from '../diagnostics/tracingTransport';

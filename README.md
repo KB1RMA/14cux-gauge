@@ -18,7 +18,7 @@ This project is not affiliated with or endorsed by the author of libcomm14cux or
 - **Demo mode** runs a simulated ECU in the browser (warm-up, idle, a short drive and a rev sweep, with one stored fault code), so you can try the app without a car.
 - **Live data:** engine speed, road speed, coolant and fuel temperature, throttle position, airflow, main voltage, short- and long-term lambda trims for both banks, idle bypass position, gear, MIL and fuel pump relay. Choose °F/°C and mph/km/h from the Preferences menu (top right); the choice is remembered.
 - **Live graphs:** a Graphs tab plots every reading over the last 30 seconds to 10 minutes, with its current, lowest and highest values as text. Choose which graphs to show; the choice, the time window and the last tab used are remembered.
-- **Recorded sessions:** press Record in the status bar to save every reading while connected, then name the recording and add notes when you stop. The Sessions view lists recordings, replays one through the same readings and graphs as the live dashboard (play, pause, scrub and 1×–10× speed, with or without a connection), and lets you rename it, edit its notes or delete it. Recordings are kept in the browser (IndexedDB); if the browser will not store data, they last until the page is closed.
+- **Recorded sessions:** press Record in the status bar to save every reading while connected, then name the recording and add notes when you stop. The Sessions view lists recordings, replays one through the same readings as the live dashboard (play, pause, scrub and 1×–10× speed, with or without a connection), and lets you rename it, edit its notes or delete it. Replay draws its graphs on a timeline, like a video editor's: an overview strip of the whole session chooses the stretch to show (drag it, use the two-thumb slider, or the zoom buttons), and every graph shares the playhead and the pointer's crosshair. On a graph, drag across to zoom in, click to move the playhead, Ctrl and scroll (or pinch) to zoom, and Shift and scroll to pan; the stretch pages forward as playback runs off its end. Recordings are kept in the browser (IndexedDB); if the browser will not store data, they last until the page is closed.
 - **Works offline:** the app is a progressive web app. After one visit online it starts from a copy kept on the device, with no network, and can be installed from the browser's menu. It shows a notice when the device is offline, and another when a newer release has been published (by comparing the running build with `version.json`, which is never cached). An update is downloaded in the background and only applied when you choose "Reload to update", with a warning first if an ECU is connected, so it can never restart the page mid-diagnosis.
 - **Fault codes:** read on demand, and clear after a confirmation.
 - **ECU info:** tune number, ident and checksum fixer.
@@ -57,17 +57,14 @@ Parts of this project were written with the help of an AI assistant. The libcomm
 
 Requires Node.js 24 (see `.nvmrc`).
 
-comm14cux-ts is not on npm yet, so the app expects it checked out **next to** this repository and depends on it as `file:../comm14cux-ts`:
+The app depends on [`@kb1rma/libcomm14cux-ts`](https://www.npmjs.com/package/@kb1rma/libcomm14cux-ts) from npm:
 
 ```sh
-git clone https://github.com/KB1RMA/comm14cux-ts.git
 git clone https://github.com/KB1RMA/14cux-gauge.git
-
-cd comm14cux-ts && npm ci && npm run build && cd ..   # builds dist/, which the app imports
 cd 14cux-gauge && npm ci
 ```
 
-After changing the library, run `npm run build` in it again; the app picks the new `dist/` up through the symlink npm creates. (`npm link` would also work for a one-off override, but it is not recorded in `package.json` or the lockfile, so `npm ci` and CI would lose it.)
+To try an unreleased change to the library, `npm link @kb1rma/libcomm14cux-ts` from a local checkout. It is not recorded in `package.json` or the lockfile, so `npm ci` and CI will not see it.
 
 ```sh
 npm run dev            # Vite dev server on http://localhost:5173
@@ -94,7 +91,7 @@ npx playwright show-report test-reports/e2e/html
 
 ### CI and releases
 
-CI checks out comm14cux-ts beside the app and builds it before installing. On every pull request and push to `main`, `validate.yml` lints, type-checks, runs the unit tests, builds, and runs the acceptance suite against that build. Unit and acceptance test results both go to Codecov; acceptance runs are flagged `e2e-<browser>`.
+On every pull request and push to `main`, `validate.yml` lints, type-checks, runs the unit tests, builds, and runs the acceptance suite against that build. Unit and acceptance test results both go to Codecov; acceptance runs are flagged `e2e-<browser>`.
 
 Releases are managed by [release-please](https://github.com/googleapis/release-please). Write commit messages (or squash-merge pull request titles) as [Conventional Commits](https://www.conventionalcommits.org/): `fix:` makes a patch release, `feat:` a minor one (a patch one while the version is below 1.0), and `feat!:` or a `BREAKING CHANGE:` footer a major one. On every push to `main`, `release-please.yml` keeps a release pull request open that bumps the version in `package.json` and updates `CHANGELOG.md`. Merging it tags the commit `v<version>` and publishes a GitHub release, which starts `release.yml` on that tag. release-please acts as a GitHub App, not with the default `GITHUB_TOKEN`, because events made with that token start no workflows: the release pull request would never get the checks the `main` ruleset requires, and the release would not start `release.yml`. The app needs read and write access to contents, issues and pull requests, and must be installed on this repository; set its client ID and a private key as the `RELEASE_APP_CLIENT_ID` and `RELEASE_APP_PRIVATE_KEY` Actions secrets.
 
@@ -124,7 +121,7 @@ Add `--bundle <file>.sigstore.json` to verify against the attached bundle instea
 
 ## Roadmap
 
-- Publish comm14cux-ts to npm (or give it a `prepare` script) and depend on a version range instead of `file:`.
+- Move from the `0.1.0-beta` library to its stable `0.1.0` release once it is published.
 - Fuel map viewer, ROM dump download, raw memory read/write, fuel pump and idle-motor tests.
 - CSV logging, charts and sparklines.
 - Electron packaging. The renderer is plain web code; the main process will need `session.on('select-serial-port')` plus `setPermissionCheckHandler` / `setDevicePermissionHandler` to let the user choose a port.
