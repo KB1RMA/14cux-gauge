@@ -2,6 +2,15 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import type { LiveSnapshot } from '../ecu/poller';
 import {
+  BY_SESSION,
+  CHUNKS,
+  completed,
+  openDatabase,
+  request,
+  SESSIONS,
+  type DatabaseOptions,
+} from './database';
+import {
   applyChanges,
   emptySummary,
   newestFirst,
@@ -12,134 +21,23 @@ import {
   type SessionSummary,
 } from './sessionStore';
 
-/**
- * Sessions in IndexedDB, which (unlike `localStorage`) holds hours of
- * samples without blocking the page.
- *
- * Two object stores: `sessions` holds one summary per recording, and
- * `chunks` holds the samples in batches, one record per `append`. Chunk keys
- * auto-increment, so reading a session's chunks through the `sessionId`
- * index returns them in the order they were appended.
- */
-
-const DB_NAME = 'cuxGauge';
-const DB_VERSION = 2;
-const SESSIONS = 'sessions';
-const CHUNKS = 'chunks';
-const BY_SESSION = 'sessionId';
-
 interface ChunkRecord {
   sessionId: string;
   samples: LiveSnapshot[];
 }
 
-function request<T>(req: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => {
-      resolve(req.result);
-    };
-
-    req.onerror = () => {
-      reject(req.error ?? new Error('IndexedDB request failed'));
-    };
-  });
-}
+export type OpenOptions = DatabaseOptions;
 
 /**
- * Settles when `tx` commits or fails. A caller that gives up early (such as
- * after aborting for an unknown session) need not await it.
+ * Sessions in IndexedDB, which (unlike `localStorage`) holds hours of
+ * samples without blocking the page.
  */
-function completed(tx: IDBTransaction): Promise<void> {
-  const done = new Promise<void>((resolve, reject) => {
-    tx.oncomplete = () => {
-      resolve();
-    };
-
-    // The failing request carries the cause; `tx.error` is only set once
-    // the transaction has aborted.
-    tx.onerror = (event) => {
-      const request = event.target as IDBRequest | null;
-
-      reject(
-        request?.error ?? tx.error ?? new Error('IndexedDB transaction failed'),
-      );
-    };
-
-    tx.onabort = () => {
-      reject(tx.error ?? new Error('IndexedDB transaction aborted'));
-    };
-  });
-
-  void done.catch(() => undefined);
-
-  return done;
-}
-
-function upgrade(
-  db: IDBDatabase,
-  tx: IDBTransaction,
-  oldVersion: number,
-): void {
-  // Each step takes the schema from one version to the next.
-  if (oldVersion < 1) {
-    db.createObjectStore(SESSIONS, { keyPath: 'id' });
-    db.createObjectStore(CHUNKS, { autoIncrement: true }).createIndex(
-      BY_SESSION,
-      BY_SESSION,
-    );
-  }
-
-  if (oldVersion < 2) {
-    // Session format 2 adds notes.
-    const cursor = tx.objectStore(SESSIONS).openCursor();
-
-    cursor.onsuccess = () => {
-      const current = cursor.result;
-
-      if (current) {
-        current.update({
-          ...(current.value as Omit<SessionSummary, 'notes' | 'formatVersion'>),
-          notes: '',
-          formatVersion: 2,
-        });
-        current.continue();
-      }
-    };
-  }
-}
-
-export interface OpenOptions {
-  /** The IndexedDB factory; defaults to the browser's `indexedDB`. */
-  factory?: IDBFactory;
-  /** Database name; tests use their own. */
-  name?: string;
-}
-
 export class IndexedDbSessionStore implements SessionStore {
   private constructor(private readonly db: IDBDatabase) {}
 
   /** Opens (creating or upgrading if needed) the sessions database. */
-  static async open({
-    factory = indexedDB,
-    name = DB_NAME,
-  }: OpenOptions = {}): Promise<IndexedDbSessionStore> {
-    const req = factory.open(name, DB_VERSION);
-
-    req.onupgradeneeded = (event) => {
-      // Set while an upgrade is running; the steps share its transaction.
-      if (req.transaction) {
-        upgrade(req.result, req.transaction, event.oldVersion);
-      }
-    };
-
-    const db = await request(req);
-
-    // Another tab upgrading the schema must not be blocked by this one.
-    db.onversionchange = () => {
-      db.close();
-    };
-
-    return new IndexedDbSessionStore(db);
+  static async open(options: OpenOptions = {}): Promise<IndexedDbSessionStore> {
+    return new IndexedDbSessionStore(await openDatabase(options));
   }
 
   async create(session: NewSession): Promise<SessionSummary> {

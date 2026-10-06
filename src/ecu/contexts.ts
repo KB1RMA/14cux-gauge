@@ -22,6 +22,14 @@ export interface EcuContextValue {
    * context, no snapshot is skipped between renders, and each holds only
    * the chosen readings, not those a view asked for (see `request`).
    */
+  /** Whether live polling is paused so another read has the link to itself. */
+  pollingPaused: boolean;
+  /**
+   * Pauses live polling and settles once the link is free. The live readings
+   * are cleared while paused, so no old value looks current. Call the result
+   * to carry on; it does nothing if the connection has ended meanwhile.
+   */
+  pausePolling(): Promise<() => void>;
   onSnapshot(listener: (snapshot: LiveSnapshot) => void): () => void;
 }
 

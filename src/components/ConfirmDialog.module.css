@@ -48,3 +48,10 @@
 .error {
   color: var(--danger);
 }
+
+.progress {
+  display: block;
+  width: 100%;
+  height: 1rem;
+  accent-color: var(--accent);
+}

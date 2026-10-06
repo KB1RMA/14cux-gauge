@@ -160,6 +160,13 @@ export interface PollerOptions {
 export interface Poller {
   /** Stops polling. A pass in progress is abandoned after its current read. */
   stop(): void;
+  /**
+   * Stops taking passes until {@link Poller.resume}. Settles once the pass
+   * in progress, if any, has finished, so the link is free for other reads.
+   */
+  pause(): Promise<void>;
+  /** Carries on after {@link Poller.pause}, with a pass straight away. */
+  resume(): void;
   readonly running: boolean;
 }
 
@@ -178,6 +185,18 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
   let pass = 0;
   let consecutiveErrors = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let paused = false;
+  let passing = false;
+  let idleWaiters: (() => void)[] = [];
+
+  const settleIdle = () => {
+    const waiters = idleWaiters;
+
+    idleWaiters = [];
+    waiters.forEach((waiter) => {
+      waiter();
+    });
+  };
 
   // Reads one value. Out-of-range readings blank just that value; every
   // other error abandons the pass.
@@ -236,12 +255,13 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
     options.onError(error);
   };
 
-  const tick = async () => {
+  // Takes one pass; false if polling has ended.
+  const runPass = async (): Promise<boolean> => {
     try {
       const snapshot = await readPass();
 
       if (signal.aborted) {
-        return;
+        return false;
       }
 
       pass++;
@@ -256,13 +276,13 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
       options.onSnapshot(snapshot, { sampleRateHz: sampleRate() });
     } catch (error) {
       if (signal.aborted || error instanceof PollAborted) {
-        return;
+        return false;
       }
 
       if (!isTransientLinkError(error)) {
         fail(error);
 
-        return;
+        return false;
       }
 
       consecutiveErrors++;
@@ -270,14 +290,29 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
       if (consecutiveErrors >= maxErrors) {
         fail(error);
 
-        return;
+        return false;
       }
 
       options.onRetry?.(error, consecutiveErrors);
     }
 
-    // setTimeout rather than setInterval, so passes can never overlap.
-    timer = setTimeout(() => void tick(), intervalMs);
+    return true;
+  };
+
+  const tick = async () => {
+    timer = undefined;
+    passing = true;
+
+    const again = await runPass();
+
+    passing = false;
+    settleIdle();
+
+    // A paused poller waits for `resume` to start the next pass.
+    if (again && !paused) {
+      // setTimeout rather than setInterval, so passes can never overlap.
+      timer = setTimeout(() => void tick(), intervalMs);
+    }
   };
 
   void tick();
@@ -286,6 +321,25 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
     stop() {
       controller.abort();
       clearTimeout(timer);
+      settleIdle();
+    },
+    pause() {
+      paused = true;
+      clearTimeout(timer);
+      timer = undefined;
+
+      return passing
+        ? new Promise<void>((resolve) => {
+            idleWaiters.push(resolve);
+          })
+        : Promise.resolve();
+    },
+    resume() {
+      paused = false;
+
+      if (!passing && timer === undefined && !signal.aborted) {
+        void tick();
+      }
     },
     get running() {
       return !signal.aborted;

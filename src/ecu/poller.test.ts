@@ -147,6 +147,54 @@ describe('startPoller', () => {
     expect(poller.running).toBe(false);
   });
 
+  it('takes no passes while paused, and carries on when resumed', async () => {
+    const { ecu } = await plantedEcu();
+    const sink = collect();
+    const poller = startPoller(ecu, { intervalMs: 100, ...sink });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sink.snapshots).toHaveLength(1);
+
+    await poller.pause();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(sink.snapshots).toHaveLength(1);
+    expect(poller.running).toBe(true);
+
+    poller.resume();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sink.snapshots).toHaveLength(2);
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(sink.snapshots).toHaveLength(3);
+    poller.stop();
+  });
+
+  it('settles a pause once the pass in progress has finished', async () => {
+    const { ecu } = await plantedEcu();
+    const sink = collect();
+    const poller = startPoller(ecu, { intervalMs: 100, ...sink });
+    let settled = false;
+
+    // The first pass is still reading.
+    const paused = poller.pause().then(() => {
+      settled = true;
+    });
+
+    expect(settled).toBe(false);
+    await paused;
+    expect(sink.snapshots).toHaveLength(1);
+    poller.stop();
+  });
+
+  it('settles a pause when polling is stopped', async () => {
+    const { ecu } = await plantedEcu();
+    const poller = startPoller(ecu, { intervalMs: 100, ...collect() });
+    const paused = poller.pause();
+
+    poller.stop();
+    await expect(paused).resolves.toBeUndefined();
+  });
+
   it('reads slow-changing values only every Nth pass', async () => {
     const { transport, ecu } = await plantedEcu();
     const sink = collect();
