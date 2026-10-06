@@ -18,8 +18,11 @@ function libraryVersionString(): string {
 
 interface TuneInfo {
   revision: TuneRevision;
-  /** The rev limit in rpm, or `null` if the tune holds an invalid one. */
-  rpmLimit: number | null;
+  /**
+   * The rev limit in rpm, `null` if the tune holds an invalid one, or
+   * `undefined` if it could not be read.
+   */
+  rpmLimit: number | null | undefined;
 }
 
 async function readTune(ecu: Ecu): Promise<TuneInfo> {
@@ -29,7 +32,8 @@ async function readTune(ecu: Ecu): Promise<TuneInfo> {
       return null;
     }
 
-    throw e;
+    // Don't lose the tune revision over a failed rev limit read.
+    return undefined;
   });
 
   return { revision, rpmLimit };
@@ -77,7 +81,9 @@ export function EcuInfo({ ecu }: { ecu: Ecu }) {
             ? '…'
             : info.rpmLimit === null
               ? 'Not valid'
-              : `${info.rpmLimit} rpm`}
+              : info.rpmLimit === undefined
+                ? 'Unavailable'
+                : `${info.rpmLimit} rpm`}
         </dd>
         <dt>comm14cux-ts</dt>
         <dd>{libraryVersionString()}</dd>

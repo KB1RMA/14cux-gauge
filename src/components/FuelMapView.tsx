@@ -7,7 +7,7 @@ import {
   type FuelMap,
 } from '@kb1rma/libcomm14cux-ts';
 import { VisuallyHidden } from 'radix-ui';
-import { useEffect, useId, useState, type CSSProperties } from 'react';
+import { memo, useEffect, useId, useState, type CSSProperties } from 'react';
 import { describeError } from '../ecu/errors';
 import type { LiveSnapshot } from '../ecu/poller';
 import { hex, hexDigits } from '../hex';
@@ -19,6 +19,12 @@ interface LoadedMap {
   map: FuelMap;
   /** Engine speed at the start of each column, lowest first. */
   rpm: number[];
+}
+
+interface Outcome {
+  ecu: Ecu;
+  loaded?: LoadedMap;
+  error?: string;
 }
 
 const ROWS = Array.from({ length: FUEL_MAP_ROWS }, (_, row) => row);
@@ -40,8 +46,9 @@ export function FuelMapView({
   ecu: Ecu;
   snapshot: LiveSnapshot | undefined;
 }) {
-  const [loaded, setLoaded] = useState<LoadedMap | undefined>(undefined);
-  const [error, setError] = useState<string | undefined>(undefined);
+  // Keyed by the ECU it was read from, so a new ECU never shows an old map or
+  // error.
+  const [outcome, setOutcome] = useState<Outcome | undefined>(undefined);
   const captionId = useId();
 
   useEffect(() => {
@@ -60,12 +67,12 @@ export function FuelMapView({
     load().then(
       (result) => {
         if (current) {
-          setLoaded(result);
+          setOutcome({ ecu, loaded: result });
         }
       },
       (e: unknown) => {
         if (current) {
-          setError(describeError(e));
+          setOutcome({ ecu, error: describeError(e) });
         }
       },
     );
@@ -74,6 +81,8 @@ export function FuelMapView({
       current = false;
     };
   }, [ecu]);
+
+  const { loaded, error } = outcome?.ecu === ecu ? outcome : {};
 
   if (error) {
     return (
@@ -123,45 +132,70 @@ export function FuelMapView({
         // eslint-disable-next-line jsx-a11y-x/no-noninteractive-tabindex -- a scrolling region must be focusable to scroll by keyboard (WCAG 2.1.1)
         tabIndex={0}
       >
-        <table className={styles['table']} aria-labelledby={captionId}>
-          <thead>
-            <tr>
-              <th scope="col">Row</th>
-              {COLUMNS.map((col) => (
-                <th key={col} scope="col">
-                  {rpm[col]}
-                  <VisuallyHidden.Root> rpm</VisuallyHidden.Root>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {ROWS.map((r) => (
-              <tr key={r}>
-                <th scope="row">{r + 1}</th>
-                {COLUMNS.map((col) => {
-                  const value = map.data[r * FUEL_MAP_COLUMNS + col] ?? 0;
-                  const current = r === row && col === column;
-
-                  return (
-                    <td
-                      key={col}
-                      className={styles['cell']}
-                      data-current={current || undefined}
-                      style={{ '--level': value / 0xff } as CSSProperties}
-                    >
-                      {hexDigits(value, 2)}
-                      {current ? (
-                        <VisuallyHidden.Root>, in use now</VisuallyHidden.Root>
-                      ) : null}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <MapTable id={id} map={map} rpm={rpm} row={row} column={column} />
       </section>
     </div>
   );
 }
+
+interface MapTableProps {
+  id: number;
+  map: FuelMap;
+  rpm: number[];
+  row: number | undefined;
+  column: number | undefined;
+}
+
+// Memoised: the live snapshot arrives every pass, but the table only changes
+// when the cell in use moves.
+const MapTable = memo(function MapTable({
+  id,
+  map,
+  rpm,
+  row,
+  column,
+}: MapTableProps) {
+  return (
+    <table className={styles['table']}>
+      <caption>
+        <VisuallyHidden.Root>Fuel map {id}</VisuallyHidden.Root>
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Row</th>
+          {COLUMNS.map((col) => (
+            <th key={col} scope="col">
+              {rpm[col]}
+              <VisuallyHidden.Root> rpm</VisuallyHidden.Root>
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {ROWS.map((r) => (
+          <tr key={r}>
+            <th scope="row">{r + 1}</th>
+            {COLUMNS.map((col) => {
+              const value = map.data[r * FUEL_MAP_COLUMNS + col] ?? 0;
+              const current = r === row && col === column;
+
+              return (
+                <td
+                  key={col}
+                  className={styles['cell']}
+                  data-current={current || undefined}
+                  style={{ '--level': value / 0xff } as CSSProperties}
+                >
+                  {hexDigits(value, 2)}
+                  {current ? (
+                    <VisuallyHidden.Root>, in use now</VisuallyHidden.Root>
+                  ) : null}
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+});

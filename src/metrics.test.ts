@@ -102,6 +102,9 @@ describe('metrics', () => {
     expect(metric('milOn').chart).toEqual({ step: true, range: [0, 1] });
     expect(metric('gear').chart).toEqual({ step: true, range: [0, 3] });
     expect(metric('throttle').chart).toEqual({ range: [0, 100] });
+    // Positions shown from 1 can reach just under one past the table size.
+    expect(metric('fuelMapRow').chart).toEqual({ range: [1, 9] });
+    expect(metric('fuelMapColumn').chart).toEqual({ range: [1, 17] });
     expect(metric('engineRpm').chart).toEqual({});
   });
 });

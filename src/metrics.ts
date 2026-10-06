@@ -86,7 +86,9 @@ const mapPosition = (label: string, size: number): Omit<Metric, 'key'> => ({
   unit: () => undefined,
   toDisplay: (sample) => sample + 1,
   format: fixed(1),
-  chart: { range: [1, size] },
+  // Positions run from 0 up to size - 1/16, so just under size + 1 once shown
+  // from 1.
+  chart: { range: [1, size + 1] },
 });
 const onOff = (
   label: string,
