@@ -7,6 +7,8 @@ import { useEcu } from '../ecu/useEcu';
 import { useLiveData } from '../ecu/useLiveData';
 import { METRICS } from '../metrics';
 import { useReadings } from '../readings/useReadings';
+import type { FuelPumpPhase } from '../pump/context';
+import { useFuelPump } from '../pump/useFuelPump';
 import { useRecording } from '../recording/useRecording';
 import { formatDuration, sourceLabel } from '../sessions/format';
 import { FailureDialog } from './FailureDialog';
@@ -27,22 +29,33 @@ function describe(
   recording: boolean,
   paused: boolean,
   recordingError: string | undefined,
+  pump: FuelPumpPhase | undefined,
 ): string {
   switch (state.status) {
     case 'connecting':
       return `Connecting to ${sourceName(state)}…`;
-    case 'connected':
+
+    case 'connected': {
+      const pumpText =
+        pump === 'stopped'
+          ? ' · Fuel pump stopped'
+          : pump
+            ? ' · Fuel pump running'
+            : '';
+
       if (paused) {
-        return `${sourceName(state)} · Polling paused while the ROM is read`;
+        return `${sourceName(state)} · Polling paused while the ROM is read${pumpText}`;
       }
 
       if (recording) {
-        return `${sourceName(state)} · Polling · Recording`;
+        return `${sourceName(state)} · Polling · Recording${pumpText}`;
       }
 
       return recordingError
-        ? `${sourceName(state)} · Polling · Recording stopped: ${recordingError}`
-        : `${sourceName(state)} · Polling`;
+        ? `${sourceName(state)} · Polling · Recording stopped: ${recordingError}${pumpText}`
+        : `${sourceName(state)} · Polling${pumpText}`;
+    }
+
     case 'error':
       return `Disconnected: ${state.message}`;
   }
@@ -53,6 +66,7 @@ export function StatusBar() {
   const { snapshot, stats } = useLiveData();
   const { chosen } = useReadings();
   const recording = useRecording();
+  const { phase: pump } = useFuelPump();
   const { active } = recording;
   const reconnectRef = useRef<HTMLButtonElement>(null);
   const detailsRef = useRef<HTMLButtonElement>(null);
@@ -78,7 +92,13 @@ export function StatusBar() {
       {/* Only the connection state is a live region; the sample rate below
           changes several times a second and must not be announced. */}
       <output className={styles['text']}>
-        {describe(state, active !== undefined, pollingPaused, recording.error)}
+        {describe(
+          state,
+          active !== undefined,
+          pollingPaused,
+          recording.error,
+          pump,
+        )}
       </output>
       {/* Not announced: it changes every second. */}
       {active ? (

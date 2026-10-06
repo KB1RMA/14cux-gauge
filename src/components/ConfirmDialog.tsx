@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { AlertDialog } from 'radix-ui';
-import { useRef, type ReactNode } from 'react';
+import { useRef, type ReactNode, type RefObject } from 'react';
 import styles from './ConfirmDialog.module.css';
 
 export interface ConfirmDialogProps {
@@ -15,6 +15,11 @@ export interface ConfirmDialogProps {
    * the ECU; `primary` for one that only needs the user to know what it does.
    */
   tone?: 'danger' | 'primary';
+  /**
+   * Where focus goes on close, if that is on the page, instead of back to the
+   * opener. For an action that replaces the opener (Run becomes Stop).
+   */
+  returnFocusTo?: RefObject<HTMLElement | null>;
   onConfirm(): void;
   onCancel(): void;
 }
@@ -34,6 +39,7 @@ export function ConfirmDialog({
   children,
   confirmLabel,
   tone = 'danger',
+  returnFocusTo,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -68,8 +74,10 @@ export function ConfirmDialog({
             returnFocusRef.current = null;
 
             // The opener may have gone (or been disabled) while it was open.
-            if (opener?.isConnected) {
-              opener.focus();
+            const target = returnFocusTo?.current ?? opener;
+
+            if (target?.isConnected) {
+              target.focus();
             }
           }}
         >

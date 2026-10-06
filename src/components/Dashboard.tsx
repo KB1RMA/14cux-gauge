@@ -10,6 +10,7 @@ import { useNavigateOnce } from '../routing/useNavigateOnce';
 import { EcuInfo } from './EcuInfo';
 import { FaultCodes } from './FaultCodes';
 import { FuelMapView } from './FuelMapView';
+import { FuelPumpTest } from './FuelPumpTest';
 import { GraphsView } from './GraphsView';
 import { LiveTiles } from './LiveTiles';
 import { RomImages } from './RomImages';
@@ -72,6 +73,7 @@ export function Dashboard({ ecu, tab }: { ecu: Ecu; tab: LiveTab }) {
         </section>
         <aside className={styles['side']}>
           <FaultCodes ecu={ecu} />
+          <FuelPumpTest />
           <EcuInfo ecu={ecu} />
           <RomImages />
         </aside>
