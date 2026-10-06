@@ -1,0 +1,59 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+
+/* No transitions: the bar jumps straight to each reading, so it never shows
+   a value the ECU did not report. */
+.meter {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+/* Less fuel and more fuel at the ends of a centred bar. Pseudo-elements, so
+   they stay out of the reading's text. */
+.meter[data-centred]::before {
+  content: '−';
+}
+
+.meter[data-centred]::after {
+  content: '+';
+}
+
+.meter[data-empty] {
+  visibility: hidden;
+}
+
+/* --control-border keeps the track's outline at 3:1 against the tile, and
+   --accent the fill at 4.5:1 against the track, in every palette. */
+.track {
+  position: relative;
+  flex: 1;
+  height: 0.5rem;
+  background: var(--surface-raised);
+  border: 1px solid var(--control-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent);
+}
+
+/* The zero line: no correction. */
+.meter[data-centred] .track::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: calc(50% - 1px);
+  width: 2px;
+  background: var(--text);
+}

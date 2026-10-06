@@ -59,6 +59,12 @@ export interface Metric {
    * without it the axis fits the data.
    */
   chart: { step?: boolean; range?: readonly [number, number] };
+  /**
+   * A bar drawn under the value, over a fixed `range` in display units. A
+   * `centred` bar grows left or right from 0; otherwise it fills from the
+   * low end. Only a picture of the value, which the text still carries.
+   */
+  meter?: { range: readonly [number, number]; centred?: boolean };
 }
 
 export const METRIC_GROUPS: readonly { id: MetricGroup; title: string }[] = [
@@ -97,6 +103,8 @@ const trim = (label: string): Omit<Metric, 'key' | 'description'> => ({
   toDisplay: same,
   format: formatSigned,
   chart: {},
+  // The library's full range of trim counts, centred on no correction.
+  meter: { range: [-256, 255], centred: true },
 });
 const BANKS = {
   odd: 'odd-numbered bank (cylinders 1, 3, 5 and 7)',
@@ -251,6 +259,7 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     toDisplay: percent,
     format: fixed(0),
     chart: { range: [0, 100] },
+    meter: { range: [0, 100] },
   },
   mainVoltage: {
     label: 'Main voltage',
@@ -389,4 +398,28 @@ export function formatSample(
   units: DisplayUnits,
 ): string {
   return metric.format(metric.toDisplay(sample, units));
+}
+
+/**
+ * Where a metric's meter bar starts and ends for a display value, as
+ * fractions (0–1) of the meter's width. A centred bar runs between the zero
+ * line and the value, scaled separately either side of zero so each end of
+ * the range reaches its edge. A value outside the range stops at the edge;
+ * the text beside it still shows the reading.
+ */
+export function meterSpan(
+  meter: NonNullable<Metric['meter']>,
+  display: number,
+): readonly [number, number] {
+  const [low, high] = meter.range;
+  const edge = (fraction: number) => Math.min(Math.max(fraction, 0), 1);
+
+  if (!meter.centred) {
+    return [0, edge((display - low) / (high - low))];
+  }
+
+  const position =
+    display < 0 ? 0.5 - (display / low) * 0.5 : 0.5 + (display / high) * 0.5;
+
+  return display < 0 ? [edge(position), 0.5] : [0.5, edge(position)];
 }

@@ -32,6 +32,16 @@ const SNAPSHOT: LiveSnapshot = {
   targetIdleRpm: 740,
 };
 
+/** The filled part of a reading's meter bar, if it draws one. */
+function meterFill(reading: HTMLElement): Element | null {
+  const meter = reading.querySelector('[aria-hidden="true"]');
+
+  expect(meter).not.toBeNull();
+
+  // The fill is the track's only child element; it has no role or text.
+  return meter?.firstElementChild?.firstElementChild ?? null;
+}
+
 function renderTiles(snapshot: LiveSnapshot | undefined) {
   return render(
     <PreferencesProvider>
@@ -195,6 +205,37 @@ describe('LiveTiles', () => {
     expect(info).toHaveTextContent(/automatic gearbox/);
     expect(info).not.toHaveTextContent('Typical');
     expect(info).not.toHaveTextContent('specification');
+  });
+
+  it('pictures fuel trims on bars centred on zero, hidden from screen readers', () => {
+    renderTiles({ ...SNAPSHOT, lambdaShortOdd: -128, lambdaLongEven: 255 });
+
+    const shortOdd = readingFor('Short trim, odd');
+    const longEven = readingFor('Long trim, even');
+
+    // The bar adds no text: the value stays the reading.
+    expect(shortOdd).toHaveTextContent(/^-128 counts$/);
+    expect(meterFill(shortOdd)).toHaveStyle({ left: '25%', width: '25%' });
+    expect(meterFill(longEven)).toHaveStyle({ left: '50%', width: '50%' });
+    expect(meterFill(readingFor('Idle bypass'))).toHaveStyle({
+      left: '0%',
+      width: '50%',
+    });
+    expect(
+      readingFor('Engine speed').querySelector('[aria-hidden]'),
+    ).toBeNull();
+  });
+
+  it('draws no bar for an invalid reading or before the first one', () => {
+    const { unmount } = renderTiles({ ...SNAPSHOT, lambdaShortOdd: null });
+
+    expect(meterFill(readingFor('Short trim, odd'))).toBeNull();
+    expect(meterFill(readingFor('Short trim, even'))).not.toBeNull();
+    unmount();
+
+    renderTiles(undefined);
+
+    expect(meterFill(readingFor('Short trim, odd'))).toBeNull();
   });
 
   it('has no detectable accessibility violations', async () => {
