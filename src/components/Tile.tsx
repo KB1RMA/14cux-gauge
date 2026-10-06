@@ -17,6 +17,8 @@ export interface TileProps {
   note?: string | undefined;
   /** An explanation control shown beside the label, such as `MetricInfo`. */
   info?: ReactNode;
+  /** A picture of the value under it, such as `Meter`; hidden from assistive tech. */
+  meter?: ReactNode;
 }
 
 /** One name/value pair. Render inside a `<dl>`. */
@@ -27,6 +29,7 @@ export function Tile({
   tone = 'normal',
   note,
   info,
+  meter,
 }: TileProps) {
   return (
     <div className={styles['tile']} data-tone={tone}>
@@ -49,6 +52,7 @@ export function Tile({
             {note ? <span className={styles['note']}> {note}</span> : null}
           </>
         )}
+        {meter}
       </dd>
     </div>
   );
