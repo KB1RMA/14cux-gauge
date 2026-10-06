@@ -5,9 +5,13 @@ import { useEffect, useRef, useState } from 'react';
 import { downloadText } from '../diagnostics/report';
 import { usePreferences } from '../preferences/usePreferences';
 import { useRecording } from '../recording/useRecording';
+<<<<<<< HEAD
 import { sessionCsv, sessionCsvFileName } from '../sessions/exportCsv';
+||||||| b756615
+=======
 import { Link, useNavigate } from 'react-router';
 import { SESSIONS_PATH, sessionPath, type ReplayTab } from '../routing/paths';
+>>>>>>> origin/main
 import { useSessionList } from '../sessions/useSessionList';
 import { useSessionSamples } from '../sessions/useSessionSamples';
 import { useSessions } from '../sessions/useSessions';

@@ -65,6 +65,7 @@ Clearing fault codes writes to the ECU's memory. Writing to a running ECU can af
 - ECU protocol and data decoding: [comm14cux-ts](https://github.com/KB1RMA/comm14cux-ts), derived from [libcomm14cux](https://github.com/colinbourassa/libcomm14cux) © Colin Bourassa, licensed under the GNU GPL v3.
 - Graphs: [uPlot](https://github.com/leeoniya/uPlot) © Leon Sorokin, licensed under the MIT licence.
 - UI components: [Radix Primitives](https://www.radix-ui.com/primitives) and [Radix Icons](https://www.radix-ui.com/icons) © WorkOS, licensed under the MIT licence.
+- Routing: [React Router](https://reactrouter.com) © Remix Software Inc., licensed under the MIT licence.
 - The demo mode's memory layout and value encodings come from libcomm14cux via comm14cux-ts. Its ROM image is synthetic and contains no data from a real ROM.
 
 Because it includes a GPL-3.0-only library, this app is licensed under the **GNU General Public License v3.0 only** (`GPL-3.0-only`); see [LICENSE](LICENSE). The deployed build ships source maps, and the app's footer links back to this repository.
