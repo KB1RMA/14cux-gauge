@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.3.0...v0.4.0) (2026-10-06)
+
+
+### Features
+
+* fuel pump test, run once or continuously, behind a confirmation ([#26](https://github.com/KB1RMA/14cux-gauge/issues/26)) ([#51](https://github.com/KB1RMA/14cux-gauge/issues/51)) ([84e0f38](https://github.com/KB1RMA/14cux-gauge/commit/84e0f38672ad35f52e2d9788bf04497e748eda30))
+* idle air control motor test, behind a confirmation ([#50](https://github.com/KB1RMA/14cux-gauge/issues/50)) ([3ff92be](https://github.com/KB1RMA/14cux-gauge/commit/3ff92be8d46ef95b3e45a9a4e4e5c87bc0db3510))
+* show CO trim voltage, purge valve, A/C and heated screen states ([#48](https://github.com/KB1RMA/14cux-gauge/issues/48)) ([d48a925](https://github.com/KB1RMA/14cux-gauge/commit/d48a92590e919d6caaebb24cc499b1571ccb82e0))
+
+
+### Bug Fixes
+
+* announce every ECU write's start, end or failure in the status bar, including fuel pump failures ([bfbd421](https://github.com/KB1RMA/14cux-gauge/commit/bfbd4219c3f9896573dfff2c0d1d85235fe1d81e))
+* hold other ECU writes until the fuel pump has actually stopped ([bfbd421](https://github.com/KB1RMA/14cux-gauge/commit/bfbd4219c3f9896573dfff2c0d1d85235fe1d81e))
+* report a write that fails part-way, or loses its connection part-way, as possibly incomplete ([bfbd421](https://github.com/KB1RMA/14cux-gauge/commit/bfbd4219c3f9896573dfff2c0d1d85235fe1d81e))
+* run only one ECU write at a time, and keep each write's result when you leave the view ([#52](https://github.com/KB1RMA/14cux-gauge/issues/52)) ([bfbd421](https://github.com/KB1RMA/14cux-gauge/commit/bfbd4219c3f9896573dfff2c0d1d85235fe1d81e))
+
 ## [0.3.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.2.0...v0.3.0) (2026-10-06)
 
 
