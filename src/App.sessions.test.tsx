@@ -302,6 +302,56 @@ describe('Recording and browsing sessions', () => {
     expect(readingFor('Length')).toHaveTextContent(/^0:0\d$/);
   });
 
+  it('exports a session as CSV with the unit in each heading', async () => {
+    const user = userEvent.setup();
+    const blobs: Blob[] = [];
+    const names: string[] = [];
+
+    URL.createObjectURL = (blob: Blob | MediaSource) => {
+      blobs.push(blob as Blob);
+
+      return 'blob:csv';
+    };
+
+    URL.revokeObjectURL = () => undefined;
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      names.push(this.download);
+    });
+    render(<App pollIntervalMs={{ demo: 10 }} />);
+    await connectDemo(user);
+    await recordAndStop(user);
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Save recording' })).getByRole(
+        'button',
+        { name: 'Skip' },
+      ),
+    );
+    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
+    await user.click(
+      await screen.findByRole('button', { name: /^Demo ECU, / }),
+    );
+
+    const exportButton = screen.getByRole('button', { name: 'Export CSV' });
+
+    await vi.waitFor(() => {
+      expect(exportButton).toBeEnabled();
+    });
+    await user.click(exportButton);
+
+    expect(names).toHaveLength(1);
+    expect(names[0]).toMatch(/^Demo-ECU-.*\.csv$/);
+
+    const text = await blobs[0]?.text();
+
+    expect(text?.split('\r\n')[0]).toMatch(
+      /^Time since start \(s\),Time \(UTC\),Engine speed \(rpm\),/,
+    );
+    vi.restoreAllMocks();
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  });
+
   it('shows a recording in progress, which cannot be deleted', async () => {
     const user = userEvent.setup();
     const { container } = render(<App pollIntervalMs={{ demo: 10 }} />);
