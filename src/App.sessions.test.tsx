@@ -324,10 +324,8 @@ describe('Recording and browsing sessions', () => {
         { name: 'Skip' },
       ),
     );
-    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
-    await user.click(
-      await screen.findByRole('button', { name: /^Demo ECU, / }),
-    );
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: /^Demo ECU, / }));
 
     const exportButton = screen.getByRole('button', { name: 'Export CSV' });
 
