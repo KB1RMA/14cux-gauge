@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 14cux-gauge contributors
+import { useEcuWrite } from '../ecuWrite/useEcuWrite';
+import { WRITES, type WriteId } from '../ecuWrite/writes';
+import styles from './Panel.module.css';
+
+/**
+ * How a write last went on this connection, the same way for every write:
+ * a failure is an alert, a success an `<output>`. Nothing while it runs.
+ */
+export function WriteResult({ id }: { id: WriteId }) {
+  const outcome = useEcuWrite().outcomes[id];
+
+  if (!outcome || outcome.status === 'running') {
+    return null;
+  }
+
+  return outcome.status === 'done' ? (
+    <output className={styles['result']}>{outcome.message}</output>
+  ) : (
+    <p role="alert" className={styles['error']}>
+      {outcome.message}
+    </p>
+  );
+}
+
+/**
+ * Says why a write's controls are disabled while a different write runs.
+ * Point the disabled controls' `aria-describedby` at `noteId`.
+ */
+export function WriteBlocked({ id, noteId }: { id: WriteId; noteId: string }) {
+  const { running } = useEcuWrite();
+
+  if (running === undefined || running === id) {
+    return null;
+  }
+
+  return (
+    <p id={noteId} className={styles['muted']}>
+      Disabled while another write to the ECU runs: {WRITES[running].name}.
+    </p>
+  );
+}

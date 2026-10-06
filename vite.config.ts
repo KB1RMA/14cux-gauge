@@ -55,6 +55,8 @@ export default defineConfig({
         'src/**/*.test.{ts,tsx}',
         'build/**/*.test.ts',
         'src/test-setup.ts',
+        // Helpers for the tests, not shipped in the app.
+        'src/test-support/**',
         'src/main.tsx',
       ],
       // Floors, not targets: raise them as coverage improves; never lower

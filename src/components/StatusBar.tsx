@@ -5,10 +5,10 @@ import { useRef, useState } from 'react';
 import type { ConnectionState } from '../ecu/connectionState';
 import { useEcu } from '../ecu/useEcu';
 import { useLiveData } from '../ecu/useLiveData';
+import { useEcuWrite } from '../ecuWrite/useEcuWrite';
+import { describeOutcome } from '../ecuWrite/writes';
 import { METRICS } from '../metrics';
 import { useReadings } from '../readings/useReadings';
-import type { FuelPumpPhase } from '../pump/context';
-import { useFuelPump } from '../pump/useFuelPump';
 import { useRecording } from '../recording/useRecording';
 import { formatDuration, sourceLabel } from '../sessions/format';
 import { FailureDialog } from './FailureDialog';
@@ -29,31 +29,27 @@ function describe(
   recording: boolean,
   paused: boolean,
   recordingError: string | undefined,
-  pump: FuelPumpPhase | undefined,
+  /** The latest ECU write's start or end, if any. */
+  write: string | undefined,
 ): string {
   switch (state.status) {
     case 'connecting':
       return `Connecting to ${sourceName(state)}…`;
 
     case 'connected': {
-      const pumpText =
-        pump === 'stopped'
-          ? ' · Fuel pump stopped'
-          : pump
-            ? ' · Fuel pump running'
-            : '';
+      const writeText = write ? ` · ${write}` : '';
 
       if (paused) {
-        return `${sourceName(state)} · Polling paused while the ROM is read${pumpText}`;
+        return `${sourceName(state)} · Polling paused while the ROM is read${writeText}`;
       }
 
       if (recording) {
-        return `${sourceName(state)} · Polling · Recording${pumpText}`;
+        return `${sourceName(state)} · Polling · Recording${writeText}`;
       }
 
       return recordingError
-        ? `${sourceName(state)} · Polling · Recording stopped: ${recordingError}${pumpText}`
-        : `${sourceName(state)} · Polling${pumpText}`;
+        ? `${sourceName(state)} · Polling · Recording stopped: ${recordingError}${writeText}`
+        : `${sourceName(state)} · Polling${writeText}`;
     }
 
     case 'error':
@@ -66,7 +62,8 @@ export function StatusBar() {
   const { snapshot, stats } = useLiveData();
   const { chosen } = useReadings();
   const recording = useRecording();
-  const { phase: pump } = useFuelPump();
+  const writes = useEcuWrite();
+  const latestWrite = writes.latest && writes.outcomes[writes.latest];
   const { active } = recording;
   const reconnectRef = useRef<HTMLButtonElement>(null);
   const detailsRef = useRef<HTMLButtonElement>(null);
@@ -97,7 +94,9 @@ export function StatusBar() {
           active !== undefined,
           pollingPaused,
           recording.error,
-          pump,
+          writes.latest && latestWrite
+            ? describeOutcome(writes.latest, latestWrite)
+            : undefined,
         )}
       </output>
       {/* Not announced: it changes every second. */}

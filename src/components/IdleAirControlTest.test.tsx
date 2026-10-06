@@ -3,9 +3,9 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Ecu, MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
-import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { expectNoAxeViolations } from '../test-support/a11y';
 import { snapshotAt } from '../test-support/snapshots';
+import { WriteHarness } from '../test-support/WriteHarness';
 import { IdleAirControlTest } from './IdleAirControlTest';
 
 async function setup(bits = 0b1010_1010) {
@@ -18,15 +18,16 @@ async function setup(bits = 0b1010_1010) {
   await ecu.connect();
 
   const ui = (
-    <PreferencesProvider>
-      <IdleAirControlTest
-        ecu={ecu}
-        snapshot={snapshotAt(0, { idleBypass: 0.5 })}
-      />
-    </PreferencesProvider>
+    <WriteHarness ecu={ecu}>
+      <IdleAirControlTest snapshot={snapshotAt(0, { idleBypass: 0.5 })} />
+    </WriteHarness>
   );
 
   return { transport, ui };
+}
+
+function panel() {
+  return within(screen.getByRole('region', { name: 'Idle air control test' }));
 }
 
 async function setSteps(user: ReturnType<typeof userEvent.setup>, to: string) {
@@ -66,7 +67,7 @@ describe('IdleAirControlTest', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Run test' }));
 
-    expect(await screen.findByText('Commanded 25 steps open.')).toBeVisible();
+    expect(await panel().findByText('Commanded 25 steps open.')).toBeVisible();
     expect(transport.memory[MemoryOffset.IdleAirControlStepCount]).toBe(25);
     expect(transport.memory[MemoryOffset.Bits008A]).toBe(0b1010_1010);
   });
@@ -85,7 +86,7 @@ describe('IdleAirControlTest', () => {
       }),
     );
 
-    expect(await screen.findByText('Commanded 1 step close.')).toBeVisible();
+    expect(await panel().findByText('Commanded 1 step close.')).toBeVisible();
     expect(transport.memory[MemoryOffset.IdleAirControlStepCount]).toBe(1);
     expect(transport.memory[MemoryOffset.Bits008A]).toBe(0b1010_1011);
   });
@@ -139,8 +140,8 @@ describe('IdleAirControlTest', () => {
       }),
     );
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The test may have partly run. The ECU stopped responding.',
+    expect(await panel().findByRole('alert')).toHaveTextContent(
+      'The idle air control test may have partly run. The ECU stopped responding.',
     );
   });
 

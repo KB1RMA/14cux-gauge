@@ -16,6 +16,11 @@ export interface ConfirmDialogProps {
    */
   tone?: 'danger' | 'primary';
   /**
+   * The action writes to the ECU: adds the standard risk and warranty
+   * paragraph after `children`, which then only need the action's own risk.
+   */
+  writesToEcu?: boolean;
+  /**
    * Where focus goes on close, if that is on the page, instead of back to the
    * opener. For an action that replaces the opener (Run becomes Stop).
    */
@@ -39,6 +44,7 @@ export function ConfirmDialog({
   children,
   confirmLabel,
   tone = 'danger',
+  writesToEcu = false,
   returnFocusTo,
   onConfirm,
   onCancel,
@@ -85,7 +91,15 @@ export function ConfirmDialog({
             {title}
           </AlertDialog.Title>
           <AlertDialog.Description asChild>
-            <div>{children}</div>
+            <div>
+              {children}
+              {writesToEcu ? (
+                <p>
+                  Writing to a running ECU can affect the engine. This software
+                  comes with no warranty; continue only if you accept the risk.
+                </p>
+              ) : null}
+            </div>
           </AlertDialog.Description>
           <div className={styles['actions']}>
             <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>

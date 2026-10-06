@@ -75,7 +75,7 @@ export function Dashboard({ ecu, tab }: { ecu: Ecu; tab: LiveTab }) {
         <aside className={styles['side']}>
           <FaultCodes ecu={ecu} />
           <FuelPumpTest />
-          <IdleAirControlTest ecu={ecu} snapshot={snapshot} />
+          <IdleAirControlTest snapshot={snapshot} />
           <EcuInfo ecu={ecu} />
           <RomImages />
         </aside>

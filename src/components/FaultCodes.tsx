@@ -5,10 +5,12 @@ import type {
   FaultCodeName,
   FaultCodes as FaultCodeFlags,
 } from '@kb1rma/libcomm14cux-ts';
-import { useCallback, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { describeError } from '../ecu/errors';
+import { useEcuWrite } from '../ecuWrite/useEcuWrite';
 import { ConfirmDialog } from './ConfirmDialog';
 import styles from './Panel.module.css';
+import { WriteBlocked, WriteResult } from './WriteStatus';
 
 const FAULT_LABELS: Record<FaultCodeName, string> = {
   romChecksumFailure: 'ROM checksum failure',
@@ -43,16 +45,18 @@ function activeFaults(codes: FaultCodeFlags): FaultCodeName[] {
   );
 }
 
-type Status = 'idle' | 'reading' | 'clearing';
-
 export function FaultCodes({ ecu }: { ecu: Ecu }) {
+  const writes = useEcuWrite();
+  const blockedId = useId();
   const [faults, setFaults] = useState<FaultCodeName[] | undefined>(undefined);
-  const [status, setStatus] = useState<Status>('idle');
+  const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [confirming, setConfirming] = useState(false);
+  const clearing = writes.running === 'clearFaultCodes';
+  const blocked = writes.running !== undefined && !clearing;
 
   const read = useCallback(async () => {
-    setStatus('reading');
+    setReading(true);
     setError(undefined);
 
     try {
@@ -60,32 +64,28 @@ export function FaultCodes({ ecu }: { ecu: Ecu }) {
     } catch (e) {
       setError(describeError(e));
     } finally {
-      setStatus('idle');
+      setReading(false);
     }
   }, [ecu]);
 
   const clear = async () => {
     setConfirming(false);
-    setStatus('clearing');
     setError(undefined);
 
-    try {
-      await ecu.clearFaultCodes();
-    } catch (e) {
-      setError(`Clearing may be incomplete. ${describeError(e)}`);
-      setStatus('idle');
+    const cleared = await writes.run('clearFaultCodes', async (target) => {
+      await target.clearFaultCodes();
 
-      return;
+      return 'Fault codes cleared.';
+    });
+
+    if (cleared) {
+      await read();
     }
-
-    await read();
   };
 
   const cancel = useCallback(() => {
     setConfirming(false);
   }, []);
-
-  const busy = status !== 'idle';
 
   return (
     <section className={styles['panel']} aria-labelledby="fault-codes-title">
@@ -110,20 +110,27 @@ export function FaultCodes({ ecu }: { ecu: Ecu }) {
           {error}
         </p>
       ) : null}
+      <WriteResult id="clearFaultCodes" />
+      <WriteBlocked id="clearFaultCodes" noteId={blockedId} />
 
       <div className={styles['actions']}>
-        <button type="button" disabled={busy} onClick={() => void read()}>
-          {status === 'reading' ? 'Reading…' : 'Read fault codes'}
+        <button
+          type="button"
+          disabled={reading || clearing}
+          onClick={() => void read()}
+        >
+          {reading ? 'Reading…' : 'Read fault codes'}
         </button>
         <button
           type="button"
           className="danger"
-          disabled={busy}
+          disabled={reading || writes.running !== undefined}
+          aria-describedby={blocked ? blockedId : undefined}
           onClick={() => {
             setConfirming(true);
           }}
         >
-          {status === 'clearing' ? 'Clearing…' : 'Clear fault codes'}
+          {clearing ? 'Clearing…' : 'Clear fault codes'}
         </button>
       </div>
 
@@ -131,6 +138,7 @@ export function FaultCodes({ ecu }: { ecu: Ecu }) {
         open={confirming}
         title="Clear fault codes?"
         confirmLabel="Clear fault codes"
+        writesToEcu
         onConfirm={() => void clear()}
         onCancel={cancel}
       >
@@ -138,10 +146,6 @@ export function FaultCodes({ ecu }: { ecu: Ecu }) {
           This writes to the ECU&apos;s memory, erasing every stored fault code.
           The codes cannot be recovered, so note them first if you need them for
           diagnosis.
-        </p>
-        <p>
-          Writing to a running ECU can affect the engine. This software comes
-          with no warranty; continue only if you accept the risk.
         </p>
       </ConfirmDialog>
     </section>

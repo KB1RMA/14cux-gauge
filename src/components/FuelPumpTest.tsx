@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { useEffect, useRef, useState } from 'react';
-import { PUMP_LIMIT_MS } from '../pump/FuelPumpProvider';
-import { useFuelPump } from '../pump/useFuelPump';
+import { useId, useRef, useState } from 'react';
+import { useEcuWrite } from '../ecuWrite/useEcuWrite';
+import {
+  PUMP_LIMIT_MS,
+  useFuelPumpRun,
+  type PumpMode,
+} from '../ecuWrite/useFuelPumpRun';
 import { ConfirmDialog } from './ConfirmDialog';
 import panel from './Panel.module.css';
 import styles from './RomImages.module.css';
-
-type Mode = 'once' | 'continuous';
+import { WriteBlocked, WriteResult } from './WriteStatus';
 
 const LIMIT_MINUTES = PUMP_LIMIT_MS / 60_000;
 
@@ -17,14 +20,16 @@ const LIMIT_MINUTES = PUMP_LIMIT_MS / 60_000;
  * is really running is shown by the Fuel pump relay reading.
  */
 export function FuelPumpTest() {
-  const { phase, notice, runOnce, runContinuously, stop } = useFuelPump();
-  const [confirming, setConfirming] = useState<Mode | undefined>(undefined);
+  const { mode, start, stop } = useFuelPumpRun();
+  const { running } = useEcuWrite();
+  const blockedId = useId();
+  const [confirming, setConfirming] = useState<PumpMode | undefined>(undefined);
   const stopRef = useRef<HTMLButtonElement>(null);
-  const continuous = phase === 'continuous';
-  const running = continuous || phase === 'once';
-
-  // Leaving the view ends a test; the provider outlives this panel.
-  useEffect(() => stop, [stop]);
+  const continuous = mode === 'continuous';
+  // Any write, this test's included, holds the ECU.
+  const disabled = running !== undefined;
+  const blocked = disabled && running !== 'fuelPump';
+  const describedBy = blocked ? blockedId : undefined;
 
   const confirmMode = confirming;
 
@@ -36,7 +41,8 @@ export function FuelPumpTest() {
         or listen to the pump. The Fuel pump relay reading shows whether the ECU
         is running it.
       </p>
-      {notice ? <p className={panel['muted']}>{notice}</p> : null}
+      <WriteResult id="fuelPump" />
+      <WriteBlocked id="fuelPump" noteId={blockedId} />
       <div className={panel['actions']}>
         {continuous ? (
           <button
@@ -50,7 +56,8 @@ export function FuelPumpTest() {
         ) : (
           <button
             type="button"
-            disabled={running}
+            disabled={disabled}
+            aria-describedby={describedBy}
             onClick={() => {
               setConfirming('continuous');
             }}
@@ -60,7 +67,8 @@ export function FuelPumpTest() {
         )}
         <button
           type="button"
-          disabled={running}
+          disabled={disabled}
+          aria-describedby={describedBy}
           onClick={() => {
             setConfirming('once');
           }}
@@ -77,15 +85,14 @@ export function FuelPumpTest() {
             : 'Run the fuel pump once?'
         }
         confirmLabel="Run fuel pump"
+        writesToEcu
         // A continuous run replaces its button with Stop.
         returnFocusTo={stopRef}
         onConfirm={() => {
           setConfirming(undefined);
 
-          if (confirmMode === 'continuous') {
-            runContinuously();
-          } else {
-            runOnce();
+          if (confirmMode) {
+            start(confirmMode);
           }
         }}
         onCancel={() => {
@@ -103,15 +110,11 @@ export function FuelPumpTest() {
             The pump keeps running until you press Stop fuel pump, you leave
             this view, the connection is lost or closed, or {LIMIT_MINUTES}{' '}
             minutes have passed. After you stop it, it runs on for about two
-            seconds more.
+            seconds more, and other writes to the ECU wait until it has stopped.
           </p>
         ) : (
           <p>The ECU runs the pump for about two seconds, then stops it.</p>
         )}
-        <p>
-          Writing to a running ECU can affect the engine. This software comes
-          with no warranty; continue only if you accept the risk.
-        </p>
       </ConfirmDialog>
     </section>
   );
