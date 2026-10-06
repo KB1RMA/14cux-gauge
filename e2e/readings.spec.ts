@@ -5,6 +5,7 @@ import {
   expect,
   expectNoAxeViolations,
   reading,
+  tabKey,
   test,
 } from './support/fixtures';
 
@@ -90,5 +91,37 @@ test.describe('Choosing readings', () => {
 
     await page.getByRole('tab', { name: 'Fuel map' }).click();
     await expect(page.getByRole('cell', { name: /in use now/ })).toHaveCount(1);
+  });
+});
+
+test.describe('Reading help', () => {
+  test('explains a reading on demand, by pointer or keyboard', async ({
+    page,
+    browserName,
+  }) => {
+    await page.goto('./');
+    await page.getByRole('button', { name: 'Demo mode' }).click();
+    await expect(reading(page, 'Coolant')).toHaveText(/^\d+ °F$/);
+
+    const about = page.getByRole('button', { name: 'About Coolant' });
+
+    await about.click();
+
+    const info = page.getByRole('dialog', { name: 'Coolant' });
+
+    await expect(info).toContainText('Typical: About 176–203 °F once warm.');
+    await expect(info).toContainText('not a specification');
+    await expectNoAxeViolations(page, { within: '[role="dialog"]' });
+    await page.keyboard.press('Escape');
+    await expect(info).toBeHidden();
+    await expect(about).toBeFocused();
+
+    // The next info button is reachable by keyboard and opens with Enter.
+    const next = page.getByRole('button', { name: 'About Fuel temp' });
+
+    await page.keyboard.press(tabKey(browserName));
+    await expect(next).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog', { name: 'Fuel temp' })).toBeVisible();
   });
 });

@@ -108,6 +108,31 @@ describe('metrics', () => {
     expect(metric('engineRpm').tone).toBeUndefined();
   });
 
+  it('explains every reading', () => {
+    expect(
+      METRICS.filter((m) => !/^[A-Z].{20,}\.$/.test(m.description)).map(
+        (m) => m.key,
+      ),
+    ).toEqual([]);
+  });
+
+  it('gives typical values in the chosen units', () => {
+    expect(metric('coolantTempF').typical?.(IMPERIAL)).toBe(
+      'About 176–203 °F once warm.',
+    );
+    expect(metric('coolantTempF').typical?.(METRIC)).toBe(
+      'About 80–95 °C once warm.',
+    );
+    expect(metric('lambdaLongEven').typical?.(METRIC)).toBe('Near 0.');
+    expect(metric('lambdaLongEven').description).toContain(
+      'cylinders 2, 4, 6 and 8',
+    );
+    expect(metric('lambdaShortOdd').description).toContain(
+      'cylinders 1, 3, 5 and 7',
+    );
+    expect(metric('gear').typical).toBeUndefined();
+  });
+
   it('plots on/off and gear readings as steps on a fixed axis', () => {
     expect(metric('milOn').chart).toEqual({ step: true, range: [0, 1] });
     expect(metric('gear').chart).toEqual({ step: true, range: [0, 3] });

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Ecu, MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { buildSyntheticRom } from '../demo/syntheticRom';
 import { expectNoAxeViolations, readingFor } from '../test-support/a11y';
@@ -41,5 +42,31 @@ describe('EcuInfo', () => {
 
     expect(await screen.findByText('Not valid')).toBeInTheDocument();
     expect(readingFor('Tune number')).toHaveTextContent('1234');
+  });
+
+  it('explains each fact on demand', async () => {
+    const user = userEvent.setup();
+    const ecu = await ecuWithRpmLimitPeriod(1500);
+
+    render(<EcuInfo ecu={ecu} />);
+    await screen.findByText('5000 rpm');
+
+    for (const label of [
+      'Tune number',
+      'Tune ident',
+      'Checksum fixer',
+      'Rev limit',
+    ]) {
+      expect(
+        screen.getByRole('button', { name: `About ${label}` }),
+      ).toBeInTheDocument();
+    }
+
+    await user.click(screen.getByRole('button', { name: 'About Rev limit' }));
+
+    const info = screen.getByRole('dialog', { name: 'Rev limit' });
+
+    expect(info).toHaveTextContent(/limits the engine to/);
+    await expectNoAxeViolations(info);
   });
 });

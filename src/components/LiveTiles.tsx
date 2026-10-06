@@ -12,6 +12,7 @@ import {
   type MetricKey,
 } from '../metrics';
 import { usePreferences } from '../preferences/usePreferences';
+import { MetricInfo } from './MetricInfo';
 import { Tile } from './Tile';
 import styles from './LiveTiles.module.css';
 
@@ -47,6 +48,7 @@ function MetricTile({
       }
       unit={metric.unit(units)}
       tone={sample == null ? 'normal' : (metric.tone?.(sample) ?? 'normal')}
+      info={<MetricInfo metric={metric} />}
     />
   );
 }

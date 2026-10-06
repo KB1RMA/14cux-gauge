@@ -66,10 +66,10 @@ test.describe('Fuel map', () => {
       ),
     ).toBe(true);
 
-    // The region is in the tab order after the tab list, so the browser's
-    // arrow-key scrolling reaches it.
+    // The region is in the tab order after the tab list (and the three info
+    // buttons), so the browser's arrow-key scrolling reaches it.
     await page.getByRole('tab', { name: 'Fuel map' }).focus();
-    await tabTo(page, region, tabKey(browserName), 3);
+    await tabTo(page, region, tabKey(browserName), 6);
     await expect(region).toBeFocused();
   });
 });
