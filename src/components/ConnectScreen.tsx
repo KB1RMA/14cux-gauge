@@ -4,8 +4,11 @@ import { CheckIcon } from '@radix-ui/react-icons';
 import { Checkbox, Label } from 'radix-ui';
 import { useEffect, useId, useRef, useState } from 'react';
 import { describeError, isPortPickerCancelled } from '../ecu/errors';
+import { describeRawError } from '../diagnostics/diagnosticLog';
+import { useDiagnostics } from '../diagnostics/useDiagnostics';
 import { useEcu } from '../ecu/useEcu';
 import { useStoredState } from '../storage/useStoredState';
+import { DownloadLogButton } from './DownloadLogButton';
 import { ExternalLink } from './ExternalLink';
 import styles from './ConnectScreen.module.css';
 
@@ -24,6 +27,7 @@ function isWebSerialSupported(): boolean {
 
 export function ConnectScreen() {
   const { state, connect } = useEcu();
+  const log = useDiagnostics();
   const [doubleSpeed, setDoubleSpeed] = useStoredState(
     DOUBLE_SPEED_KEY,
     parseDoubleSpeed,
@@ -48,10 +52,18 @@ export function ConnectScreen() {
 
     let port: SerialPort;
 
+    log.record('event', 'Asking the browser for a serial port');
+
     try {
       port = await navigator.serial.requestPort();
     } catch (error) {
-      if (!isPortPickerCancelled(error)) {
+      if (isPortPickerCancelled(error)) {
+        log.record('event', 'The port picker was dismissed');
+      } else {
+        log.record(
+          'error',
+          `The port picker failed: ${describeRawError(error)}`,
+        );
         setPickerError(describeError(error));
       }
 
@@ -131,6 +143,16 @@ export function ConnectScreen() {
         >
           Demo mode
         </button>
+      </section>
+
+      <section className={styles['card']} aria-labelledby="trouble-title">
+        <h2 id="trouble-title">Having trouble?</h2>
+        <p>
+          The app keeps a log of every byte sent to and received from the ECU,
+          and of each connection attempt. Download it and send it to whoever is
+          helping you. It stays on this computer until you do.
+        </p>
+        <DownloadLogButton />
       </section>
     </div>
   );

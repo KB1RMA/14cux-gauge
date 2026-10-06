@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { expectNoAxeViolations } from './test-support/a11y';
@@ -42,9 +42,42 @@ function installSerial(port: FakeSerialPort) {
   });
 }
 
+/** Captures what the app hands the browser to download. */
+function captureDownloads() {
+  const files: { name: string; blob: Blob }[] = [];
+  const blobs = new Map<string, Blob>();
+
+  Object.defineProperty(URL, 'createObjectURL', {
+    configurable: true,
+    value: (blob: Blob) => {
+      const url = `blob:test/${String(blobs.size)}`;
+
+      blobs.set(url, blob);
+
+      return url;
+    },
+  });
+  Object.defineProperty(URL, 'revokeObjectURL', {
+    configurable: true,
+    value: () => undefined,
+  });
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+    this: HTMLAnchorElement,
+  ) {
+    const blob = blobs.get(this.href);
+
+    if (blob) {
+      files.push({ name: this.download, blob });
+    }
+  });
+
+  return files;
+}
+
 describe('App with a serial ECU', () => {
   afterEach(() => {
     Reflect.deleteProperty(navigator, 'serial');
+    vi.restoreAllMocks();
   });
 
   it('reports a port that will not open and lets the user try again', async () => {
@@ -114,6 +147,45 @@ describe('App with a serial ECU', () => {
     expect(
       await screen.findByRole('button', { name: /^Serial ECU, / }),
     ).toBeInTheDocument();
+  });
+
+  it('saves a diagnostic log that shows why the port would not open', async () => {
+    const user = userEvent.setup();
+    const port = new FakeSerialPort();
+    const downloads = captureDownloads();
+
+    port.failOpen = true;
+    installSerial(port);
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
+    await screen.findByRole('button', { name: 'Reconnect' });
+
+    const trouble = screen.getByRole('region', { name: 'Having trouble?' });
+
+    await user.click(
+      within(trouble).getByRole('button', { name: 'Download diagnostic log' }),
+    );
+
+    expect(downloads).toHaveLength(1);
+    expect(downloads[0]?.name).toMatch(/^14cux-gauge-log-.*\.txt$/);
+
+    const text = (await downloads[0]?.blob.text()) ?? '';
+
+    expect(text).toContain('Web Serial:  available');
+    expect(text).toContain(
+      'Connection:  error (serial): The serial port could not be opened',
+    );
+    expect(text).toContain('Asking the browser for a serial port');
+    expect(text).toContain(
+      'Serial port: USB vendor unknown, product unknown; 7812 baud, 8N1, no flow control',
+    );
+    expect(text).toContain(
+      'ERR Opening serial port failed: NetworkError: Failed to open serial port.',
+    );
+    expect(text).toContain(
+      'ERR Connection failed: NetworkError: Failed to open serial port.',
+    );
+    await expectNoAxeViolations(document.body);
   });
 
   it('stays put when the user dismisses the port picker', async () => {

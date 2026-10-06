@@ -1,0 +1,7 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}

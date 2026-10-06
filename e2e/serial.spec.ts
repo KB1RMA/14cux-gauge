@@ -2,6 +2,7 @@
 // Derived from libcomm14cux (https://github.com/colinbourassa/libcomm14cux)
 // Copyright (C) Colin Bourassa. Licensed under the GNU GPL v3.
 // ECU memory offsets and raw value encodings; written for 14cux-gauge, 2026.
+import { readFile } from 'node:fs/promises';
 import {
   expect,
   expectNoAxeViolations,
@@ -119,6 +120,45 @@ test.describe('Serial ECU over Web Serial', () => {
       'Disconnected: The ECU stopped responding. Check the cable, that the ignition is on, and that the baud rate matches the ECU firmware.',
     );
     await expect(page.getByRole('button', { name: 'Reconnect' })).toBeFocused();
+  });
+
+  test('saves a diagnostic log of the serial traffic for remote debugging', async ({
+    page,
+    emulatedSerial,
+  }) => {
+    await page.goto('./');
+    await emulatedSerial.poke(ENGINE_SPEED_FILTERED, PULSE_WIDTH_750_RPM);
+    await page.getByRole('button', { name: 'Connect to ECU' }).click();
+    await expect(reading(page, 'Engine speed')).toHaveText('750 rpm');
+
+    await emulatedSerial.setSilent(true);
+    await expect(page.getByRole('button', { name: 'Reconnect' })).toBeFocused();
+
+    const trouble = page.getByRole('region', { name: 'Having trouble?' });
+
+    await expectNoAxeViolations(page);
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      trouble.getByRole('button', { name: 'Download diagnostic log' }).click(),
+    ]);
+
+    expect(download.suggestedFilename()).toMatch(
+      /^14cux-gauge-log-\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d\.txt$/,
+    );
+
+    const log = await readFile(await download.path(), 'utf8');
+
+    expect(log).toContain('Connecting to a serial ECU');
+    expect(log).toContain('7812 baud, 8N1, no flow control');
+    // The engine speed read: the command for 0x007C, then the planted bytes.
+    expect(log).toMatch(
+      /TX {2}04\n.*RX {2}04 .*\n.*TX {2}01\n.*RX {2}01 .*\n.*TX {2}FC\n.*RX {2}27 10 /,
+    );
+    expect(log).toMatch(
+      /ERR Polling pass failed \(1 in a row\), retrying: TimeoutError: /,
+    );
+    expect(log).toMatch(/ERR Connection failed: TimeoutError: /);
   });
 
   test('stays on the connect screen when the port picker is dismissed', async ({

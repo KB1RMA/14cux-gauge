@@ -47,11 +47,16 @@ function collect() {
   const snapshots: LiveSnapshot[] = [];
   const stats: PollerStats[] = [];
   const errors: unknown[] = [];
+  const retries: number[] = [];
 
   return {
     snapshots,
     stats,
     errors,
+    retries,
+    onRetry: (_error: unknown, consecutiveErrors: number) => {
+      retries.push(consecutiveErrors);
+    },
     onSnapshot: (snapshot: LiveSnapshot, s: PollerStats) => {
       snapshots.push(snapshot);
       stats.push(s);
@@ -194,12 +199,14 @@ describe('startPoller', () => {
 
     expect(poller.running).toBe(true);
     expect(sink.errors).toEqual([]);
+    expect(sink.retries).toEqual([1, 2]);
 
     await vi.advanceTimersByTimeAsync(100);
 
     expect(poller.running).toBe(false);
     expect(sink.errors).toHaveLength(1);
     expect(sink.errors[0]).toBeInstanceOf(TimeoutError);
+    expect(sink.retries).toEqual([1, 2]);
     expect(sink.snapshots).toHaveLength(1);
   });
 
