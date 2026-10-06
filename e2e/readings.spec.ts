@@ -76,7 +76,7 @@ test.describe('Choosing readings', () => {
       .getByRole('radio', { name: 'All' })
       .click();
     await page.keyboard.press('Escape');
-    await expect(liveTerms(page)).toHaveCount(21);
+    await expect(liveTerms(page)).toHaveCount(25);
     await expect(connection).not.toContainText('readings');
   });
 
