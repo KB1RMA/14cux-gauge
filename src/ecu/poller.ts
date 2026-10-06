@@ -107,6 +107,19 @@ export const SLOW_READINGS: ReadonlySet<ReadingKey> = new Set([
   'targetIdleRpm',
 ]);
 
+/** `snapshot` with only the readings in `keys`. */
+export function pickReadings(
+  snapshot: LiveSnapshot,
+  keys: ReadonlySet<ReadingKey>,
+): LiveSnapshot {
+  return {
+    ...(Object.fromEntries(
+      Object.entries(snapshot).filter(([key]) => keys.has(key as ReadingKey)),
+    ) as Partial<LiveReadings>),
+    timestamp: snapshot.timestamp,
+  };
+}
+
 export interface PollerStats {
   /** Completed passes per second, averaged over the last few passes. */
   sampleRateHz: number;
@@ -122,6 +135,13 @@ export interface PollerOptions {
    * the next one. Defaults to all of them. Fewer readings make faster passes.
    */
   readings?(): ReadonlySet<ReadingKey>;
+  /**
+   * The readings the user is watching, from those in `readings()`. Slow
+   * values wait for every Nth pass only while one of these is a faster
+   * value: readings taken in the background, such as the MIL or the fuel
+   * map's position, don't hold them back. Defaults to `readings()`.
+   */
+  watched?(): ReadonlySet<ReadingKey>;
   /** Consecutive failed passes (timeouts or protocol errors) before giving up. */
   maxConsecutiveErrors?: number;
   onSnapshot(snapshot: LiveSnapshot, stats: PollerStats): void;
@@ -180,8 +200,11 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
   const readPass = async (): Promise<LiveSnapshot> => {
     const wanted = options.readings?.() ?? ALL_READINGS;
     const keys = READING_ORDER.filter((key) => wanted.has(key));
-    const anyFast = keys.some((key) => !SLOW_READINGS.has(key));
-    // Slow values are read every Nth pass, unless nothing faster is wanted.
+    const watched = options.watched?.() ?? wanted;
+    const anyFast = keys.some(
+      (key) => watched.has(key) && !SLOW_READINGS.has(key),
+    );
+    // Slow values are read every Nth pass, unless nothing faster is watched.
     const slowDue = !anyFast || pass % slowEvery === 0;
     const values: Partial<Record<ReadingKey, unknown>> = {};
 

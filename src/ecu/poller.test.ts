@@ -223,6 +223,47 @@ describe('startPoller', () => {
     expect(sink.snapshots.map((s) => s.coolantTempF)).toEqual([190, 266]);
   });
 
+  it('reads a watched slow value on every pass despite faster background readings', async () => {
+    const { transport, ecu } = await plantedEcu();
+    const sink = collect();
+    const poller = startPoller(ecu, {
+      intervalMs: 100,
+      slowEvery: 3,
+      // The MIL is always read, but the user is watching only coolant.
+      readings: () => new Set(['milOn', 'coolantTempF']),
+      watched: () => new Set(['coolantTempF']),
+      ...sink,
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    transport.memory[MemoryOffset.CoolantTemp] = 0; // 266 °F
+    await vi.advanceTimersByTimeAsync(100);
+    poller.stop();
+
+    expect(sink.snapshots.map((s) => s.coolantTempF)).toEqual([190, 266]);
+  });
+
+  it('keeps slow values for every Nth pass when a fast one is watched', async () => {
+    const { transport, ecu } = await plantedEcu();
+    const sink = collect();
+    const poller = startPoller(ecu, {
+      intervalMs: 100,
+      slowEvery: 3,
+      readings: () => new Set(['engineRpm', 'coolantTempF']),
+      watched: () => new Set(['engineRpm', 'coolantTempF']),
+      ...sink,
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    transport.memory[MemoryOffset.CoolantTemp] = 0; // 266 °F
+    await vi.advanceTimersByTimeAsync(300);
+    poller.stop();
+
+    expect(sink.snapshots.map((s) => s.coolantTempF)).toEqual([
+      190, 190, 190, 266,
+    ]);
+  });
+
   it('reads a slow value straight away when it is newly asked for', async () => {
     const { ecu } = await plantedEcu();
     const sink = collect();
