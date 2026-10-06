@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { ArrowLeftIcon } from '@radix-ui/react-icons';
+import { ArrowLeftIcon, DownloadIcon } from '@radix-ui/react-icons';
 import { useEffect, useRef, useState } from 'react';
+import { downloadText } from '../diagnostics/report';
+import { usePreferences } from '../preferences/usePreferences';
 import { useRecording } from '../recording/useRecording';
+import { sessionCsv, sessionCsvFileName } from '../sessions/exportCsv';
 import { Link, useNavigate } from 'react-router';
 import { SESSIONS_PATH, sessionPath, type ReplayTab } from '../routing/paths';
 import { useSessionList } from '../sessions/useSessionList';
@@ -76,6 +79,7 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
   const { active } = useRecording();
   const list = useSessionList();
   const samples = useSessionSamples(id);
+  const { temperatureUnit, speedUnit } = usePreferences();
   const [deleting, setDeleting] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -172,6 +176,33 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
               Name and notes
             </h3>
             <DetailsForm key={session.id} session={session} />
+          </section>
+          <section aria-labelledby="export-title">
+            <h3 id="export-title" className={styles['subtitle']}>
+              Export
+            </h3>
+            <p className={styles['hint']}>
+              One row per sample, in your chosen units, with the unit in each
+              column heading. Invalid readings are left empty.
+            </p>
+            <button
+              type="button"
+              disabled={
+                samples.status !== 'loaded' || samples.samples.length === 0
+              }
+              onClick={() => {
+                if (samples.status === 'loaded') {
+                  downloadText(
+                    sessionCsvFileName(session.name, session.startedAt),
+                    sessionCsv(samples.samples, { temperatureUnit, speedUnit }),
+                    'text/csv',
+                  );
+                }
+              }}
+            >
+              <DownloadIcon aria-hidden="true" />
+              Export CSV
+            </button>
           </section>
           <section aria-labelledby="delete-title">
             <h3 id="delete-title" className={styles['subtitle']}>
