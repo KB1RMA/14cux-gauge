@@ -79,6 +79,13 @@ test.describe('Preferences', () => {
         ).toBeVisible();
         await expectNoAxeViolations(page);
 
+        // The fuel map tints its cells, so measure them in every palette.
+        await page.getByRole('tab', { name: 'Fuel map' }).click();
+        await expect(
+          page.getByRole('cell', { name: /in use now/ }),
+        ).toBeVisible();
+        await expectNoAxeViolations(page);
+
         await page.getByRole('button', { name: 'Preferences' }).click();
         await expectNoAxeViolations(page, { within: '[role="menu"]' });
       });

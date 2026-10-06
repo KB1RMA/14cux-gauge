@@ -7,6 +7,7 @@ import { useLiveData } from '../ecu/useLiveData';
 import { useStoredState } from '../storage/useStoredState';
 import { EcuInfo } from './EcuInfo';
 import { FaultCodes } from './FaultCodes';
+import { FuelMapView } from './FuelMapView';
 import { GraphsView } from './GraphsView';
 import { DASHBOARD_VIEW_KEY, parseDashboardView } from './graphSettings';
 import { LiveTiles } from './LiveTiles';
@@ -41,6 +42,9 @@ export function Dashboard({ ecu }: { ecu: Ecu }) {
         <Tabs.Trigger value="graphs" className={styles['tab']}>
           Graphs
         </Tabs.Trigger>
+        <Tabs.Trigger value="fuelMap" className={styles['tab']}>
+          Fuel map
+        </Tabs.Trigger>
       </Tabs.List>
 
       <Tabs.Content value="overview" className={styles['dashboard']}>
@@ -72,6 +76,20 @@ export function Dashboard({ ecu }: { ecu: Ecu }) {
             Live graphs
           </h2>
           <GraphsView />
+        </section>
+      </Tabs.Content>
+
+      <Tabs.Content value="fuelMap">
+        <section aria-labelledby="fuel-map-title">
+          <h2
+            id="fuel-map-title"
+            ref={headingRef}
+            tabIndex={-1}
+            className={styles['title']}
+          >
+            Fuel map
+          </h2>
+          <FuelMapView ecu={ecu} snapshot={snapshot} />
         </section>
       </Tabs.Content>
     </Tabs.Root>

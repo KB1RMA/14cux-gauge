@@ -10,6 +10,7 @@ import {
   type DisplayUnits,
   type MetricKey,
 } from './metrics';
+import type { LiveSnapshot } from './ecu/poller';
 import { snapshotAt } from './test-support/snapshots';
 
 const IMPERIAL: DisplayUnits = { temperatureUnit: 'F', speedUnit: 'mph' };
@@ -49,6 +50,22 @@ describe('metrics', () => {
     ).toBeNull();
   });
 
+  it('treats a metric missing from an older recording as no reading', () => {
+    const { injectorPulseUs: _dropped, ...older } = snapshotAt(0);
+
+    expect(sampleOf(older as LiveSnapshot, 'injectorPulseUs')).toBeNull();
+  });
+
+  it('shows fuel map positions from 1 and pulse widths in milliseconds', () => {
+    expect(formatSample(metric('fuelMapRow'), 0, IMPERIAL)).toBe('1.0');
+    expect(formatSample(metric('fuelMapColumn'), 6.75, IMPERIAL)).toBe('7.8');
+    expect(formatSample(metric('injectorPulseUs'), 2350, IMPERIAL)).toBe(
+      '2.35',
+    );
+    expect(formatSample(metric('idleMode'), 1, IMPERIAL)).toBe('Active');
+    expect(formatSample(metric('idleMode'), 0, IMPERIAL)).toBe('Off');
+  });
+
   it('converts temperatures and speeds to the chosen units', () => {
     expect(formatSample(metric('coolantTempF'), 212, IMPERIAL)).toBe('212');
     expect(formatSample(metric('coolantTempF'), 212, METRIC)).toBe('100');
@@ -85,6 +102,9 @@ describe('metrics', () => {
     expect(metric('milOn').chart).toEqual({ step: true, range: [0, 1] });
     expect(metric('gear').chart).toEqual({ step: true, range: [0, 3] });
     expect(metric('throttle').chart).toEqual({ range: [0, 100] });
+    // Positions shown from 1 can reach just under one past the table size.
+    expect(metric('fuelMapRow').chart).toEqual({ range: [1, 9] });
+    expect(metric('fuelMapColumn').chart).toEqual({ range: [1, 17] });
     expect(metric('engineRpm').chart).toEqual({});
   });
 });

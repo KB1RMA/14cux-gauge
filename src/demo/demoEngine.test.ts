@@ -107,6 +107,50 @@ describe('demo engine', () => {
     engine.stop();
   });
 
+  it('serves a synthetic fuel map 5 with its RPM table and limits', async () => {
+    const { engine, ecu } = await connectDemo();
+
+    await expect(ecu.getCurrentFuelMap()).resolves.toBe(5);
+    await expect(ecu.getRPMLimit()).resolves.toBe(5000);
+    await expect(ecu.getRpmTable()).resolves.toEqual([
+      500, 600, 750, 800, 1000, 1200, 1500, 1875, 2000, 2400, 2500, 3000, 3750,
+      4000, 5000, 6000,
+    ]);
+
+    const map = await ecu.getFuelMap(5);
+
+    expect(map.adjustmentFactor).toBe(0x5a00);
+    expect(map.rowScaler).toBe(0xb0);
+    expect([...map.data.subarray(0, 4)]).toEqual([0x1c, 0x1e, 0x20, 0x22]);
+    expect([...map.data.subarray(16, 18)]).toEqual([0x34, 0x36]);
+    expect(map.data[127]).toBe(0xff);
+    engine.stop();
+  });
+
+  it('moves through the fuel map with engine speed and load', async () => {
+    const { engine, ecu } = await connectDemo();
+
+    // Cold idle at about 1100 rpm: the top row, in the 1000 rpm column.
+    await expect(ecu.getFuelMapRowIndex()).resolves.toMatchObject({
+      index: 0,
+    });
+    await expect(ecu.getFuelMapColumnIndex()).resolves.toMatchObject({
+      index: 4,
+    });
+    await expect(ecu.getTargetIdle()).resolves.toBe(1100);
+    await expect(ecu.getInjectorPulseWidth()).resolves.toBeGreaterThan(1800);
+
+    // The middle of the rev sweep, at high load.
+    await vi.advanceTimersByTimeAsync(56_000);
+
+    expect((await ecu.getFuelMapRowIndex()).index).toBeGreaterThanOrEqual(5);
+    expect((await ecu.getFuelMapColumnIndex()).index).toBeGreaterThanOrEqual(
+      11,
+    );
+    await expect(ecu.getIdleMode()).resolves.toBe(false);
+    engine.stop();
+  });
+
   it('stores a fault and lights the MIL until the codes are cleared', async () => {
     const { engine, ecu } = await connectDemo();
     const faults = await ecu.getFaultCodes();

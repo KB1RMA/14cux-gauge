@@ -1,0 +1,65 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+.map {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.now {
+  margin: 0;
+}
+
+/* Positioned, so the visually hidden text in the cells (absolutely
+   positioned) is clipped with the table instead of widening the page. */
+.scroller {
+  position: relative;
+  overflow-x: auto;
+  border-radius: var(--radius);
+}
+
+.scroller:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.table {
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.caption {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.table th,
+.table td {
+  padding: 0.3rem 0.45rem;
+  text-align: center;
+  border: 1px solid var(--border);
+}
+
+.table th {
+  background: var(--surface-raised);
+  font-weight: 600;
+}
+
+/* Larger values are tinted more strongly. The tint stops well short of the
+   full colour so --text keeps 4.5:1 on every cell, in every palette. */
+.cell {
+  background: color-mix(
+    in srgb,
+    var(--warn) calc(var(--level) * 32%),
+    var(--surface)
+  );
+}
+
+/* The cell in use is outlined and bold, not marked by colour alone. */
+.cell[data-current] {
+  outline: 3px solid var(--text);
+  outline-offset: -3px;
+  font-weight: 700;
+}

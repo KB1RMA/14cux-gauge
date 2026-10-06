@@ -59,7 +59,7 @@ describe('ReplayGraphs', () => {
     expect(stat('Engine speed (rpm)', 'Min')).toBe('1000 rpm');
     expect(stat('Engine speed (rpm)', 'Max')).toBe('3000 rpm');
     expect(stat('Main voltage (V)', 'Now')).toBe('14.0 V');
-    expect(screen.getAllByRole('figure')).toHaveLength(15);
+    expect(screen.getAllByRole('figure')).toHaveLength(20);
     expect(screen.getByRole('slider', { name: 'Graphs from' })).toHaveAttribute(
       'aria-valuetext',
       '0.0 seconds',
@@ -166,7 +166,7 @@ describe('ReplayGraphs', () => {
     );
     renderReplay();
 
-    expect(screen.getAllByRole('figure')).toHaveLength(14);
+    expect(screen.getAllByRole('figure')).toHaveLength(19);
     expect(
       screen.queryByRole('figure', { name: 'Engine speed (rpm)' }),
     ).not.toBeInTheDocument();
@@ -180,7 +180,7 @@ describe('ReplayGraphs', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Engine speed' }));
     await user.keyboard('{Escape}');
 
-    expect(screen.getAllByRole('figure')).toHaveLength(14);
+    expect(screen.getAllByRole('figure')).toHaveLength(19);
     expect(
       JSON.parse(localStorage.getItem('cuxGauge.graphs') ?? '{}'),
     ).toMatchObject({
@@ -230,7 +230,7 @@ describe('ReplayGraphs drawing', () => {
   /** The plot area of a graph, or of the overview strip, once drawn. */
   async function plotArea(container: HTMLElement, index: number) {
     await vi.waitFor(() => {
-      expect(container.querySelectorAll('.u-over')).toHaveLength(16);
+      expect(container.querySelectorAll('.u-over')).toHaveLength(21);
     });
 
     const over = container.querySelectorAll<HTMLElement>('.u-over')[index];
@@ -359,7 +359,7 @@ describe('ReplayGraphs drawing', () => {
         ...container.querySelectorAll<HTMLElement>('[class*="readout"]'),
       ];
 
-      expect(readouts.filter((readout) => !readout.hidden)).toHaveLength(15);
+      expect(readouts.filter((readout) => !readout.hidden)).toHaveLength(20);
     });
 
     expect(

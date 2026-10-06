@@ -2,6 +2,9 @@
 /* Copyright (C) 2026 14cux-gauge contributors */
 .views {
   display: grid;
+  /* minmax(0, …) so a wide panel (the fuel map table) scrolls inside itself
+     instead of widening the page. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.25rem;
 }
 

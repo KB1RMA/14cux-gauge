@@ -19,11 +19,16 @@ const SNAPSHOT: LiveSnapshot = {
   gear: Gear.DriveOrReverse,
   milOn: true,
   fuelPumpOn: true,
+  injectorPulseUs: 2350,
+  fuelMapRow: 1.5,
+  fuelMapColumn: 2.5,
   coolantTempF: 212,
   fuelTempF: 95,
   mainVoltage: null,
   lambdaLongOdd: 4,
   lambdaLongEven: -4,
+  idleMode: true,
+  targetIdleRpm: 740,
 };
 
 function renderTiles(snapshot: LiveSnapshot | undefined) {
@@ -46,6 +51,11 @@ describe('LiveTiles', () => {
     expect(readingFor('Gear')).toHaveTextContent('D / R');
     expect(readingFor('MIL')).toHaveTextContent('On');
     expect(readingFor('Fuel pump relay')).toHaveTextContent('Running');
+    expect(readingFor('Target idle')).toHaveTextContent('740 rpm');
+    expect(readingFor('Injector pulse')).toHaveTextContent('2.35 ms');
+    expect(readingFor('Fuel map row')).toHaveTextContent('2.5');
+    expect(readingFor('Fuel map column')).toHaveTextContent('3.5');
+    expect(readingFor('Idle control')).toHaveTextContent('Active');
   });
 
   it('groups readings under headings', () => {
@@ -57,6 +67,7 @@ describe('LiveTiles', () => {
       'Engine',
       'Airflow and throttle',
       'Electrics and fuelling',
+      'Fuel map position',
       'States',
     ]);
     expect(screen.getByRole('region', { name: 'Engine' })).toBeInTheDocument();

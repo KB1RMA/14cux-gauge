@@ -9,11 +9,16 @@
 // here as the inverse of the library's decoder for that location.
 
 import {
+  FUEL_MAP_ROWS,
   Gear,
   MemoryOffset,
   SimulatedTransport,
 } from '@kb1rma/libcomm14cux-ts';
-import { buildSyntheticRom, DEMO_VOLTAGE_FACTORS } from './syntheticRom';
+import {
+  buildSyntheticRom,
+  DEMO_RPM_TABLE,
+  DEMO_VOLTAGE_FACTORS,
+} from './syntheticRom';
 
 export interface DemoEngineOptions {
   /** How often the simulated engine state advances, in milliseconds. */
@@ -63,7 +68,8 @@ const GEAR_BYTE: Record<Gear, number> = {
 };
 
 const THROTTLE_MINIMUM_RAW = 0x003c;
-const RPM_LIMIT = 5500;
+// 7,500,000 / 5000 is a whole period, so this decodes exactly.
+const RPM_LIMIT = 5000;
 const CURRENT_FUEL_MAP = 5;
 const DEMO_FAULT_BYTE = 1; // 0x004A
 const DEMO_FAULT_MASK = 0x80; // purge valve leak
@@ -112,6 +118,36 @@ function voltsToStored(volts: number): number {
 /** Lambda trims are stored as `(counts + 256) × 128`. */
 function trimToRaw(counts: number): number {
   return (Math.round(clamp(counts, -256, 255)) + 256) * 0x80 + 0x40;
+}
+
+/**
+ * A fuel map index byte: the index in the high nibble and the weighting
+ * towards the next row or column, in 16ths, in the low nibble.
+ */
+function indexByte(position: number, size: number): number {
+  const clamped = clamp(position, 0, size - 1);
+  const index = Math.floor(clamped);
+
+  return (index << 4) | Math.floor((clamped - index) * 16);
+}
+
+/** Where `rpm` falls in the demo RPM table, as a fractional column. */
+function columnFor(rpm: number): number {
+  const table = DEMO_RPM_TABLE;
+  const next = table.findIndex((start) => start > rpm);
+
+  if (next === -1) {
+    return table.length - 1;
+  }
+
+  if (next === 0) {
+    return 0;
+  }
+
+  const start = table[next - 1] ?? 0;
+  const end = table[next] ?? start;
+
+  return next - 1 + (rpm - start) / (end - start);
 }
 
 function bump(phase: number): number {
@@ -247,6 +283,17 @@ export function createDemoEngine(options: DemoEngineOptions = {}): DemoEngine {
       1800 + 4000 * state.airflow,
     );
     writeByte(memory, MemoryOffset.IdleMode, state.idling ? 0x01 : 0x00);
+    // Load picks the row; a full meter would reach the bottom row.
+    writeByte(
+      memory,
+      MemoryOffset.FuelMapRowIndex,
+      indexByte(state.airflow * 2 * (FUEL_MAP_ROWS - 1), FUEL_MAP_ROWS),
+    );
+    writeByte(
+      memory,
+      MemoryOffset.FuelMapColumnIndex,
+      indexByte(columnFor(state.rpm), DEMO_RPM_TABLE.length),
+    );
 
     // Port 1 is active-low: bit 6 clear runs the fuel pump, bit 0 clear lights
     // the MIL. The MIL follows the stored fault codes, so clearing them in the
