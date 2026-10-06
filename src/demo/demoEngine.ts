@@ -35,6 +35,11 @@ export interface DemoEngineOptions {
  * Roughly a 7812-baud link with a 1 ms FTDI latency timer: each byte takes
  * about 1.3 ms on the wire.
  */
+/** How long the demo pump primes at start-up. */
+const PUMP_PRIME_MS = 2000;
+/** How long a full fuel pump timer (0xFF) keeps the demo pump running. */
+const PUMP_TIMER_MS = 2000;
+
 export const DEMO_LATENCY: LatencyOptions = { perReadMs: 1, perByteMs: 1.3 };
 
 export interface DemoEngine {
@@ -180,6 +185,8 @@ export function createDemoEngine(options: DemoEngineOptions = {}): DemoEngine {
   const lambdaShort: [number, number] = [0, 0];
   const lambdaLong: [number, number] = [4, -3];
   let elapsedMs = 0;
+  // A test loads the timer with 0xFF, which lasts about two seconds.
+  const pumpTimerStep = Math.ceil((0xff * tickMs) / PUMP_TIMER_MS);
 
   transport.loadRom(buildSyntheticRom());
   writeWord(memory, MemoryOffset.ThrottleMinimumPosition, THROTTLE_MINIMUM_RAW);
@@ -324,13 +331,18 @@ export function createDemoEngine(options: DemoEngineOptions = {}): DemoEngine {
 
     // Port 1 is active-low: bit 6 clear runs the fuel pump, bit 0 clear lights
     // the MIL. The MIL follows the stored fault codes, so clearing them in the
-    // UI turns it off.
+    // UI turns it off. The pump runs for the first moments (the ignition
+    // prime) and while a test has loaded the pump timer, which counts down.
     const faultsStored = memory
       .subarray(
         MemoryOffset.FaultCodes,
         MemoryOffset.FaultCodes + FAULT_BLOCK_SIZE,
       )
       .some((byte) => byte !== 0);
+    const timer = memory[MemoryOffset.FuelPumpTimer] ?? 0;
+    const pumpOn = timer > 0 || elapsedMs < PUMP_PRIME_MS;
+
+    memory[MemoryOffset.FuelPumpTimer] = Math.max(0, timer - pumpTimerStep);
 
     // Both flags are active-low: bit 3 of 0x008A clear is A/C on, bit 2 of
     // 0x00DD clear is the screen heater on.
@@ -341,7 +353,11 @@ export function createDemoEngine(options: DemoEngineOptions = {}): DemoEngine {
       state.screenHeaterOn ? 0xfb : 0xff,
     );
     writeWord(memory, MemoryOffset.PurgeValveState, state.purgeTimer);
-    writeByte(memory, MemoryOffset.Port1, faultsStored ? 0xbe : 0xbf);
+    writeByte(
+      memory,
+      MemoryOffset.Port1,
+      (pumpOn ? 0x80 : 0xc0) | (faultsStored ? 0x3e : 0x3f),
+    );
   };
 
   write(stateAt(0));

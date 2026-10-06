@@ -35,6 +35,7 @@ See [AGENTS.md](AGENTS.md#design-goals) for the full rules contributors follow.
 - **Fuel map:** a Fuel map tab shows the map the ECU is using as a table of hex values by engine load and speed, with its adjustment factor and row scaler. The cell the ECU is using now is outlined and named in text, and follows the engine as it runs.
 - **ROM image:** Save ROM image on the Overview tab reads the ECU's 16 KiB ROM after a confirmation (live readings pause and a recording in progress stops while it reads), shows a progress bar with Cancel, downloads it as a `.bin` named for the tune number and ident, and keeps a copy in the browser (IndexedDB) with its size and SHA-256 so you can download it again or compare dumps. Demo mode's image is synthetic and labelled so.
 - **Fault codes:** read on demand, and clear after a confirmation.
+- **Fuel pump test:** Run pump (once) runs the ECU's own two-second pump run; Run pump (continuous) keeps renewing it until you press Stop, you leave the Overview tab, the connection goes, or two minutes pass. Each asks first, because the pump pressurises the fuel rail with the engine stopped. The Fuel pump relay reading shows whether the ECU is running it, and the status bar announces when a test starts and stops. In demo mode the simulated pump runs for two seconds at start-up and for each test.
 - **ECU info:** tune number, ident, checksum fixer and rev limit.
 - **Preferences:** units, a light, dark or system theme, and a choice of colour palettes named after NAS Defender factory paints (Coniston Green, Arles Blue, Alpine White and Beluga Black, British Racing Green), in a menu in the top-right corner so the dashboard stays focused on the readings.
 
@@ -58,7 +59,7 @@ The published site counts visits and a few anonymous events with [GoatCounter](h
 
 ## Safety
 
-Clearing fault codes writes to the ECU's memory. Writing to a running ECU can affect the engine, so the app asks for confirmation first. Stored fault codes cannot be recovered once cleared. This software is provided with absolutely no warranty; see sections 15 and 16 of the licence.
+Clearing fault codes and running the fuel pump write to the ECU's memory. Writing to a running ECU can affect the engine, so the app asks for confirmation first. Stored fault codes cannot be recovered once cleared. This software is provided with absolutely no warranty; see sections 15 and 16 of the licence.
 
 ## Credits and licence
 

@@ -64,6 +64,25 @@ describe('demo engine', () => {
     engine.stop();
   });
 
+  it('runs the fuel pump for a moment at start-up, then only for a pump test', async () => {
+    const { engine, ecu } = await connectDemo();
+
+    await expect(ecu.getFuelPumpRelayState()).resolves.toBe(true);
+    await vi.advanceTimersByTimeAsync(3000);
+    await expect(ecu.getFuelPumpRelayState()).resolves.toBe(false);
+
+    await ecu.runFuelPump();
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(ecu.getFuelPumpRelayState()).resolves.toBe(true);
+
+    // The timer written is 0xFF, which runs for about two seconds.
+    await vi.advanceTimersByTimeAsync(1500);
+    await expect(ecu.getFuelPumpRelayState()).resolves.toBe(true);
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(ecu.getFuelPumpRelayState()).resolves.toBe(false);
+    engine.stop();
+  });
+
   it('changes engine speed, road speed and gear over time', async () => {
     const { engine, ecu } = await connectDemo();
     const idleRpm = await ecu.getEngineRPM();
