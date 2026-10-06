@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EcuProvider } from '../ecu/EcuProvider';
 import { expectNoAxeViolations } from '../test-support/a11y';
@@ -86,5 +86,35 @@ describe('ConnectScreen', () => {
     expect(
       screen.getByRole('checkbox', { name: /Double-speed firmware/ }),
     ).toBeChecked();
+  });
+
+  it('offers the diagnostic log when the port picker fails', async () => {
+    const user = userEvent.setup();
+
+    Object.defineProperty(navigator, 'serial', {
+      value: {
+        requestPort: () =>
+          Promise.reject(new DOMException('Blocked.', 'SecurityError')),
+      },
+      configurable: true,
+    });
+    renderScreen();
+
+    expect(
+      screen.queryByRole('region', { name: 'Having trouble?' }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The browser blocked access to the serial port.',
+    );
+
+    const trouble = screen.getByRole('region', { name: 'Having trouble?' });
+
+    expect(
+      within(trouble).getByRole('button', { name: 'Download diagnostic log' }),
+    ).toBeInTheDocument();
+    await expectNoAxeViolations(document.body);
   });
 });

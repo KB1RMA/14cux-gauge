@@ -131,11 +131,13 @@ test.describe('Serial ECU over Web Serial', () => {
     await page.getByRole('button', { name: 'Connect to ECU' }).click();
     await expect(reading(page, 'Engine speed')).toHaveText('750 rpm');
 
-    await emulatedSerial.setSilent(true);
-    await expect(page.getByRole('button', { name: 'Reconnect' })).toBeFocused();
-
     const trouble = page.getByRole('region', { name: 'Having trouble?' });
 
+    await expect(trouble).toHaveCount(0);
+
+    await emulatedSerial.setSilent(true);
+    await expect(page.getByRole('button', { name: 'Reconnect' })).toBeFocused();
+    await expect(trouble).toBeVisible();
     await expectNoAxeViolations(page);
 
     const [download] = await Promise.all([

@@ -157,6 +157,12 @@ describe('App with a serial ECU', () => {
     port.failOpen = true;
     installSerial(port);
     render(<App />);
+
+    // Offered prominently only once something has gone wrong.
+    expect(
+      screen.queryByRole('region', { name: 'Having trouble?' }),
+    ).not.toBeInTheDocument();
+
     await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
     await screen.findByRole('button', { name: 'Reconnect' });
 

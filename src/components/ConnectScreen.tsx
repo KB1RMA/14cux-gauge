@@ -35,6 +35,7 @@ export function ConnectScreen() {
   const [pickerError, setPickerError] = useState<string | undefined>(undefined);
   const supported = isWebSerialSupported();
   const busy = state.status === 'connecting';
+  const failed = state.status === 'error' || pickerError !== undefined;
   const doubleSpeedId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
   // After a disconnect the dashboard (and the focused control) is gone; start
@@ -75,6 +76,23 @@ export function ConnectScreen() {
 
   return (
     <div className={styles['screen']}>
+      {/* First, so the way to get help is the first thing seen after a failure. */}
+      {failed ? (
+        <section
+          className={`${styles['card']} ${styles['trouble']}`}
+          aria-labelledby="trouble-title"
+        >
+          <h2 id="trouble-title">Having trouble?</h2>
+          <p>
+            The connection failed. The app has logged every byte sent to and
+            received from the ECU, and each connection attempt. Download the log
+            and send it to whoever is helping you. It stays on this computer
+            until you do.
+          </p>
+          <DownloadLogButton />
+        </section>
+      ) : null}
+
       <section className={styles['card']} aria-labelledby="connect-title">
         <h2 id="connect-title" ref={headingRef} tabIndex={-1}>
           Connect to an ECU
@@ -143,16 +161,6 @@ export function ConnectScreen() {
         >
           Demo mode
         </button>
-      </section>
-
-      <section className={styles['card']} aria-labelledby="trouble-title">
-        <h2 id="trouble-title">Having trouble?</h2>
-        <p>
-          The app keeps a log of every byte sent to and received from the ECU,
-          and of each connection attempt. Download it and send it to whoever is
-          helping you. It stays on this computer until you do.
-        </p>
-        <DownloadLogButton />
       </section>
     </div>
   );
