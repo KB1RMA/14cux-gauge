@@ -5,24 +5,22 @@ import { Tabs } from 'radix-ui';
 import { useEffect, useRef } from 'react';
 import { useLiveData } from '../ecu/useLiveData';
 import { useReadings } from '../readings/useReadings';
-import { useStoredState } from '../storage/useStoredState';
+import { LIVE_TAB_PATHS, type LiveTab } from '../routing/paths';
+import { useNavigateOnce } from '../routing/useNavigateOnce';
 import { EcuInfo } from './EcuInfo';
 import { FaultCodes } from './FaultCodes';
 import { FuelMapView } from './FuelMapView';
 import { GraphsView } from './GraphsView';
-import { DASHBOARD_VIEW_KEY, parseDashboardView } from './graphSettings';
 import { LiveTiles } from './LiveTiles';
 import { RomImages } from './RomImages';
 import { ReadingsPicker } from './ReadingsPicker';
 import styles from './Dashboard.module.css';
 
-export function Dashboard({ ecu }: { ecu: Ecu }) {
+/** The live views; which one is showing is part of the address. */
+export function Dashboard({ ecu, tab }: { ecu: Ecu; tab: LiveTab }) {
+  const navigate = useNavigateOnce();
   const { snapshot } = useLiveData();
   const { chosen } = useReadings();
-  const [view, setView] = useStoredState(
-    DASHBOARD_VIEW_KEY,
-    parseDashboardView,
-  );
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   // The control that started the connection is gone once the dashboard
@@ -33,9 +31,15 @@ export function Dashboard({ ecu }: { ecu: Ecu }) {
 
   return (
     <Tabs.Root
-      value={view}
+      value={tab}
       onValueChange={(next) => {
-        setView(parseDashboardView(next));
+        const chosen = (Object.keys(LIVE_TAB_PATHS) as LiveTab[]).find(
+          (candidate) => candidate === next,
+        );
+
+        if (chosen) {
+          navigate(LIVE_TAB_PATHS[chosen]);
+        }
       }}
       className={styles['views']}
     >

@@ -6,6 +6,7 @@ import { cleanup } from '@testing-library/react';
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  window.location.hash = '';
   delete document.documentElement.dataset['theme'];
   delete document.documentElement.dataset['palette'];
 });

@@ -37,11 +37,3 @@ export function parseGraphSettings(stored: unknown): GraphSettings {
     hidden: METRIC_KEYS.filter((key) => hidden.includes(key)),
   };
 }
-
-export type DashboardView = 'overview' | 'graphs' | 'fuelMap';
-
-export const DASHBOARD_VIEW_KEY = 'dashboardView';
-
-export function parseDashboardView(stored: unknown): DashboardView {
-  return oneOf(stored, ['overview', 'graphs', 'fuelMap'], 'overview');
-}
