@@ -177,6 +177,13 @@ describe('FuelPumpTest', () => {
 
     await click(stop);
     clearPump(transport);
+
+    // It runs on for one run, and holds the ECU until then.
+    expect(running()).toBe('fuelPump');
+    expect(
+      screen.getByRole('button', { name: 'Run pump (continuous)' }),
+    ).toBeDisabled();
+
     await advance(10_000);
 
     expect(pumpWritten(transport)).toBe(false);
@@ -195,6 +202,9 @@ describe('FuelPumpTest', () => {
     await advance(119_000);
     expect(running()).toBe('fuelPump');
     await advance(1_100);
+    // Asked to stop at the limit; it runs on until the last run ends.
+    expect(running()).toBe('fuelPump');
+    await advance(2_000);
 
     expect(running()).toBe('none');
     expect(announcement()).toBe(

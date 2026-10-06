@@ -24,6 +24,17 @@ class FailsAfterFirstClear extends SimulatedTransport {
   }
 }
 
+/** The link drops once the first fault code byte has been cleared. */
+class ClosesAfterFirstClear extends SimulatedTransport {
+  override async write(data: Uint8Array): Promise<void> {
+    await super.write(data);
+
+    if (this.memory[MemoryOffset.FaultCodes] === 0) {
+      await this.close();
+    }
+  }
+}
+
 async function connect(transport: SimulatedTransport | LatencyTransport) {
   const ecu = new Ecu(transport);
 
@@ -104,7 +115,18 @@ describe('ECU writes', () => {
 
     await user.click(screen.getByRole('button', { name: 'Stop fuel pump' }));
 
-    expect(announcement()).toBe('Fuel pump stopped.');
+    // The pump runs on for about two seconds, and holds the ECU until then.
+    expect(announcement()).toBe('Fuel pump running');
+    expect(clear).toBeDisabled();
+    expect(clear).toHaveAccessibleDescription(BLOCKED);
+    expect(iac).toBeDisabled();
+
+    await waitFor(
+      () => {
+        expect(announcement()).toBe('Fuel pump stopped.');
+      },
+      { timeout: 3000 },
+    );
     expect(clear).toBeEnabled();
     expect(clear).not.toHaveAccessibleDescription();
     expect(iac).toBeEnabled();
@@ -135,6 +157,25 @@ describe('ECU writes', () => {
     expect(
       screen.getByRole('button', { name: 'Clear fault codes' }),
     ).toBeEnabled();
+  });
+
+  it('reports a write as possibly incomplete when the link drops part-way', async () => {
+    const user = userEvent.setup();
+    const transport = withFaults(new ClosesAfterFirstClear());
+    const ecu = await connect(transport);
+
+    render(<Panels ecu={ecu} />);
+    await user.click(screen.getByRole('button', { name: 'Clear fault codes' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', {
+        name: 'Clear fault codes',
+      }),
+    );
+
+    expect(await panel('Fault codes').findByRole('alert')).toHaveTextContent(
+      'Clearing may be incomplete. The connection to the ECU was closed.',
+    );
+    expect(faultBlock(transport)).toEqual([0, 0x80, 0, 0, 0, 0]);
   });
 
   it('says nothing was written when the connection had already closed', async () => {

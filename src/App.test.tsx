@@ -177,10 +177,17 @@ describe('App in demo mode', () => {
       screen.getByRole('button', { name: 'Clear fault codes' }),
     ).toBeDisabled();
 
-    // Leaving the view stops the pump test and says so.
+    // A single run is not cut short by leaving the view, and is reported
+    // only once the pump has stopped.
     await user.click(screen.getByRole('tab', { name: 'Graphs' }));
-    expect(status).toHaveTextContent(
-      'Demo ECU · Polling · Fuel pump stopped when you left the view.',
+    expect(status).toHaveTextContent('Demo ECU · Polling · Fuel pump running');
+    await vi.waitFor(
+      () => {
+        expect(status).toHaveTextContent(
+          'Demo ECU · Polling · Fuel pump stopped.',
+        );
+      },
+      { timeout: 3000 },
     );
 
     await user.click(screen.getByRole('tab', { name: 'Overview' }));

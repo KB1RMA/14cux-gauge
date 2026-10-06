@@ -53,9 +53,23 @@ export const WRITES: Record<WriteId, WriteText> = {
 };
 
 /**
- * The outcome of a write that threw. The library rejects a closed connection
- * or a bad argument before any I/O, so only those count as nothing written;
- * any other error may have come after the first memory write.
+ * The outcome of a write that was refused because the connection had already
+ * closed, so nothing was sent. Check `Ecu.isConnected()` before starting a
+ * write to tell this apart from a link lost part-way through.
+ */
+export function notConnectedOutcome(id: WriteId): FinishedOutcome {
+  return {
+    status: 'failed',
+    message: `${WRITES[id].failed}. ${describeError(new NotConnectedError('Not connected to ECU'))}`,
+  };
+}
+
+/**
+ * The outcome of a write that threw after it started. Only a bad argument,
+ * which the library rejects before any I/O, counts as nothing written. A
+ * `NotConnectedError` does not: the transport also throws it when the link
+ * drops part-way through, after earlier memory writes (see
+ * `notConnectedOutcome` for a connection that was already closed).
  *
  * @param afterWrites - The write had already written to the ECU before this
  *   error, as a repeating test does, so it is partial whatever the error.
@@ -65,9 +79,7 @@ export function failureOutcome(
   error: unknown,
   afterWrites = false,
 ): FinishedOutcome {
-  const nothingWritten =
-    !afterWrites &&
-    (error instanceof NotConnectedError || error instanceof RangeError);
+  const nothingWritten = !afterWrites && error instanceof RangeError;
   const text = WRITES[id];
 
   return nothingWritten

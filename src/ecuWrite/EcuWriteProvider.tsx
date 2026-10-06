@@ -4,7 +4,12 @@ import type { Ecu } from '@kb1rma/libcomm14cux-ts';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useEcu } from '../ecu/useEcu';
 import { EcuWriteContext, type WriteHandle } from './context';
-import { failureOutcome, type WriteId, type WriteOutcome } from './writes';
+import {
+  failureOutcome,
+  notConnectedOutcome,
+  type WriteId,
+  type WriteOutcome,
+} from './writes';
 
 interface Writes {
   /** The connection these outcomes belong to. */
@@ -83,6 +88,14 @@ export function EcuWriteProvider({ children }: { children: ReactNode }) {
       const handle = begin(id);
 
       if (!handle) {
+        return false;
+      }
+
+      // A connection that is already closed sends nothing. One that closes
+      // after this check may still have been written to, so it is partial.
+      if (!handle.ecu.isConnected()) {
+        handle.finish(notConnectedOutcome(id));
+
         return false;
       }
 

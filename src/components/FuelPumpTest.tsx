@@ -4,9 +4,9 @@ import { useId, useRef, useState } from 'react';
 import { useEcuWrite } from '../ecuWrite/useEcuWrite';
 import {
   PUMP_LIMIT_MS,
-  useFuelPumpTest,
+  useFuelPumpRun,
   type PumpMode,
-} from '../pump/useFuelPumpTest';
+} from '../ecuWrite/useFuelPumpRun';
 import { ConfirmDialog } from './ConfirmDialog';
 import panel from './Panel.module.css';
 import styles from './RomImages.module.css';
@@ -20,7 +20,7 @@ const LIMIT_MINUTES = PUMP_LIMIT_MS / 60_000;
  * is really running is shown by the Fuel pump relay reading.
  */
 export function FuelPumpTest() {
-  const { mode, start, stop } = useFuelPumpTest();
+  const { mode, start, stop } = useFuelPumpRun();
   const { running } = useEcuWrite();
   const blockedId = useId();
   const [confirming, setConfirming] = useState<PumpMode | undefined>(undefined);
@@ -110,7 +110,7 @@ export function FuelPumpTest() {
             The pump keeps running until you press Stop fuel pump, you leave
             this view, the connection is lost or closed, or {LIMIT_MINUTES}{' '}
             minutes have passed. After you stop it, it runs on for about two
-            seconds more.
+            seconds more, and other writes to the ECU wait until it has stopped.
           </p>
         ) : (
           <p>The ECU runs the pump for about two seconds, then stops it.</p>
