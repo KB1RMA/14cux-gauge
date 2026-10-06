@@ -95,13 +95,13 @@ export function RomsProvider({
       cancelling: false,
     });
 
-    // Samples recorded while polling is paused would leave a gap that
-    // replay could draw across, so the recording ends here.
-    await recording.interrupt();
-
-    const resume = await pausePolling();
+    let resume = () => undefined as void;
 
     try {
+      // Samples recorded while polling is paused would leave a gap that
+      // replay could draw across, so the recording ends here.
+      await recording.interrupt();
+      resume = await pausePolling();
       const tune = await ecu.getTuneRevision();
       const bytes = await readRomImage(ecu, {
         onProgress: (bytesRead, total) => {

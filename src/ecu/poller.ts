@@ -336,6 +336,9 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
     },
     resume() {
       paused = false;
+      // Slow readings kept from before the pause would be old by now, so
+      // the first pass back reads every value afresh.
+      previous = undefined;
 
       if (!passing && timer === undefined && !signal.aborted) {
         void tick();

@@ -294,6 +294,9 @@ export function EcuProvider({
 
     // The pass that was finishing may have published a snapshot.
     setLiveData(NO_LIVE_DATA);
+    // An invalid sample marks the pause in the history, so graphs break the
+    // line there rather than join the readings either side of it.
+    pushSnapshot(history, { timestamp: Date.now() });
 
     return () => {
       if (sessionRef.current === current) {
@@ -301,7 +304,7 @@ export function EcuProvider({
         poller.resume();
       }
     };
-  }, []);
+  }, [history]);
 
   const reconnect = useCallback(async () => {
     if (state.status !== 'idle') {

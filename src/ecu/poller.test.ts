@@ -169,6 +169,24 @@ describe('startPoller', () => {
     poller.stop();
   });
 
+  it('reads the slow values afresh on the first pass after a pause', async () => {
+    const { ecu, transport } = await plantedEcu();
+    const sink = collect();
+    const poller = startPoller(ecu, { intervalMs: 100, ...sink });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sink.snapshots[0]?.coolantTempF).toBe(190);
+
+    await poller.pause();
+    transport.memory[MemoryOffset.CoolantTemp] = 42; // 176 °F
+    poller.resume();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Not due: without a pause the next pass would repeat the old 190.
+    expect(sink.snapshots[1]?.coolantTempF).toBe(176);
+    poller.stop();
+  });
+
   it('settles a pause once the pass in progress has finished', async () => {
     const { ecu } = await plantedEcu();
     const sink = collect();
