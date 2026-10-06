@@ -109,6 +109,35 @@ test.describe('Recorded sessions', () => {
     ).toBeFocused();
   });
 
+  test('exports a session as a CSV file', async ({ page }) => {
+    const dialog = await recordDemo(page);
+
+    await dialog.getByRole('textbox', { name: 'Name' }).fill('Warm idle');
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await nav(page).getByRole('button', { name: 'Sessions' }).click();
+    await page.getByRole('button', { name: 'Warm idle', exact: true }).click();
+    await expectNoAxeViolations(page);
+
+    const download = page.waitForEvent('download');
+
+    await page.getByRole('button', { name: 'Export CSV' }).click();
+
+    const file = await download;
+
+    expect(file.suggestedFilename()).toMatch(
+      /^Warm-idle-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.csv$/,
+    );
+
+    const path = await file.path();
+    const { readFile } = await import('node:fs/promises');
+    const [header, first] = (await readFile(path, 'utf8')).split('\r\n');
+
+    expect(header).toMatch(
+      /^Time since start \(s\),Time \(UTC\),Engine speed \(rpm\),/,
+    );
+    expect(first).toMatch(/^0,\d{4}-\d{2}-\d{2}T/);
+  });
+
   test('zooms, pans and scrubs the replay graphs on a timeline', async ({
     page,
   }) => {

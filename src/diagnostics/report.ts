@@ -90,9 +90,13 @@ export function reportFileName(generatedAt: number): string {
 }
 
 /** Saves `text` as a file through the browser's normal download. */
-export function downloadText(fileName: string, text: string): void {
+export function downloadText(
+  fileName: string,
+  text: string,
+  type = 'text/plain',
+): void {
   const url = URL.createObjectURL(
-    new Blob([text], { type: 'text/plain;charset=utf-8' }),
+    new Blob([text], { type: `${type};charset=utf-8` }),
   );
   const link = document.createElement('a');
 
