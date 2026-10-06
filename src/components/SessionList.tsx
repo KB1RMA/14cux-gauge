@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { VisuallyHidden } from 'radix-ui';
+import { Link } from 'react-router';
 import { useEffect, useRef, useState } from 'react';
 import { useRecording } from '../recording/useRecording';
 import { useSessionList } from '../sessions/useSessionList';
 import { useSessions } from '../sessions/useSessions';
+import { sessionPath } from '../routing/paths';
 import type { SessionSummary } from '../storage/sessionStore';
 import { DeleteSessionDialog } from './DeleteSessionDialog';
 import { SessionMeta } from './SessionMeta';
@@ -12,15 +14,9 @@ import styles from './Sessions.module.css';
 
 /**
  * Every recorded session, newest first. `returnTo` is the session the user
- * has just come back from; its Open button gets focus, or else the heading.
+ * has just come back from; its link gets focus, or else the heading.
  */
-export function SessionList({
-  returnTo,
-  onOpen,
-}: {
-  returnTo: string | undefined;
-  onOpen(id: string): void;
-}) {
+export function SessionList({ returnTo }: { returnTo: string | undefined }) {
   const { store, persistent } = useSessions();
   const { active } = useRecording();
   const list = useSessionList();
@@ -29,7 +25,7 @@ export function SessionList({
   );
   const [deleteFailed, setDeleteFailed] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const openButtonsRef = useRef(new Map<string, HTMLButtonElement>());
+  const openLinksRef = useRef(new Map<string, HTMLAnchorElement>());
   const loaded = list.status === 'loaded';
 
   // Once the list is on screen, put the user where they were.
@@ -39,7 +35,7 @@ export function SessionList({
     }
 
     const target =
-      returnTo === undefined ? undefined : openButtonsRef.current.get(returnTo);
+      returnTo === undefined ? undefined : openLinksRef.current.get(returnTo);
 
     (target ?? headingRef.current)?.focus();
   }, [loaded, returnTo]);
@@ -88,22 +84,19 @@ export function SessionList({
             return (
               <li key={session.id} className={styles['item']}>
                 <h3 className={styles['name']}>
-                  <button
-                    ref={(button) => {
-                      if (button) {
-                        openButtonsRef.current.set(session.id, button);
+                  <Link
+                    ref={(link) => {
+                      if (link) {
+                        openLinksRef.current.set(session.id, link);
                       } else {
-                        openButtonsRef.current.delete(session.id);
+                        openLinksRef.current.delete(session.id);
                       }
                     }}
-                    type="button"
+                    to={sessionPath(session.id)}
                     className={styles['open']}
-                    onClick={() => {
-                      onOpen(session.id);
-                    }}
                   >
                     {session.name}
-                  </button>
+                  </Link>
                 </h3>
                 <SessionMeta session={session} recording={recording} />
                 {session.notes ? (

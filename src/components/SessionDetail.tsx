@@ -3,6 +3,8 @@
 import { ArrowLeftIcon } from '@radix-ui/react-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useRecording } from '../recording/useRecording';
+import { Link, useNavigate } from 'react-router';
+import { SESSIONS_PATH, type ReplayTab } from '../routing/paths';
 import { useSessionList } from '../sessions/useSessionList';
 import { useSessionSamples } from '../sessions/useSessionSamples';
 import { useSessions } from '../sessions/useSessions';
@@ -68,13 +70,8 @@ function DetailsForm({ session }: { session: SessionSummary }) {
 }
 
 /** One recorded session: replay it, rename it, keep notes, or delete it. */
-export function SessionDetail({
-  id,
-  onClose,
-}: {
-  id: string;
-  onClose(): void;
-}) {
+export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
+  const navigate = useNavigate();
   const { store } = useSessions();
   const { active } = useRecording();
   const list = useSessionList();
@@ -96,10 +93,10 @@ export function SessionDetail({
   }, [found]);
 
   const back = (
-    <button type="button" className={styles['back']} onClick={onClose}>
+    <Link to={SESSIONS_PATH} className={styles['back']}>
       <ArrowLeftIcon aria-hidden="true" />
       All sessions
-    </button>
+    </Link>
   );
 
   if (list.status !== 'loaded') {
@@ -160,7 +157,12 @@ export function SessionDetail({
             <p>No samples were recorded in this session.</p>
           ) : null}
           {samples.status === 'loaded' && samples.samples.length > 0 ? (
-            <SessionReplay key={id} samples={samples.samples} />
+            <SessionReplay
+              key={id}
+              id={id}
+              tab={tab}
+              samples={samples.samples}
+            />
           ) : null}
         </section>
 
@@ -208,9 +210,15 @@ export function SessionDetail({
         onConfirm={(target) => {
           setDeleting(false);
           setDeleteFailed(false);
-          store?.remove(target.id).then(onClose, () => {
-            setDeleteFailed(true);
-          });
+          store?.remove(target.id).then(
+            () => {
+              // Back would only lead to the session that is now gone.
+              void navigate(SESSIONS_PATH, { replace: true });
+            },
+            () => {
+              setDeleteFailed(true);
+            },
+          );
         }}
       />
     </section>

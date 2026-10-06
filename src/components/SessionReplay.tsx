@@ -2,6 +2,8 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { Tabs } from 'radix-ui';
 import { useState } from 'react';
+import { sessionPath, type ReplayTab } from '../routing/paths';
+import { useNavigateOnce } from '../routing/useNavigateOnce';
 import type { LiveSnapshot } from '../ecu/poller';
 import { recordedKeys } from '../metrics';
 import { useReplay } from '../replay/useReplay';
@@ -16,12 +18,16 @@ import styles from './Sessions.module.css';
  * dashboard, and its graphs on a timeline that can be zoomed and scrubbed. Key it by session: the samples must not change.
  */
 export function SessionReplay({
+  id,
+  tab,
   samples,
 }: {
+  id: string;
+  tab: ReplayTab;
   samples: readonly LiveSnapshot[];
 }) {
+  const navigate = useNavigateOnce();
   const replay = useReplay(samples);
-  const [view, setView] = useState('readings');
   // Only the readings that were taken while recording.
   const [keys] = useState(() => recordedKeys(samples));
 
@@ -29,8 +35,10 @@ export function SessionReplay({
     <div className={styles['replay']}>
       <ReplayControls replay={replay} />
       <Tabs.Root
-        value={view}
-        onValueChange={setView}
+        value={tab}
+        onValueChange={(next) => {
+          navigate(sessionPath(id, next === 'graphs' ? 'graphs' : 'readings'));
+        }}
         className={dashboard['views']}
       >
         <Tabs.List aria-label="Replay views" className={dashboard['tabs']}>

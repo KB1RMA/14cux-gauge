@@ -75,11 +75,8 @@
   font-size: 1rem;
 }
 
-/* The session's name, styled as a link-like heading but a real button. */
+/* The session's name, a real link so it can be opened in a new tab. */
 .open {
-  padding: 0;
-  border: 0;
-  background: transparent;
   color: var(--accent);
   font-weight: 600;
   text-align: start;
@@ -88,7 +85,7 @@
   overflow-wrap: anywhere;
 }
 
-.open:hover:not(:disabled) {
+.open:hover {
   text-decoration-thickness: 2px;
 }
 
@@ -126,6 +123,7 @@
 
 .back {
   justify-self: start;
+  padding: 0.45rem 0;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
