@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Ecu, MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { buildSyntheticRom } from '../demo/syntheticRom';
 import { EcuProvider } from '../ecu/EcuProvider';
@@ -134,5 +135,29 @@ describe('FuelMapView', () => {
 
     await screen.findByRole('table');
     await expectNoAxeViolations(container);
+  });
+
+  it('explains the map in use and its factors on demand', async () => {
+    const user = userEvent.setup();
+    const { ecu } = await ecuOnMap5();
+
+    renderView(<FuelMapView ecu={ecu} snapshot={undefined} />);
+    await screen.findByRole('table');
+
+    expect(
+      screen.getByRole('button', { name: 'About Adjustment factor' }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'About Row scaler' }));
+
+    const info = screen.getByRole('dialog', { name: 'Row scaler' });
+
+    expect(info).toHaveTextContent(/by engine load/);
+    await expectNoAxeViolations(info);
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'About Map in use' }));
+
+    expect(
+      screen.getByRole('dialog', { name: 'Map in use' }),
+    ).toHaveTextContent(/always use map 5/);
   });
 });

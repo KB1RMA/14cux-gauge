@@ -44,6 +44,13 @@ export interface Metric {
   toDisplay(sample: number, units: DisplayUnits): number;
   /** Formats a display value as text. */
   format(display: number): string;
+  /** What the reading is, in a sentence or two of plain language. */
+  description: string;
+  /**
+   * What the reading usually looks like on a healthy engine, if that can be
+   * said simply. A guide only; engines, tunes and conditions vary.
+   */
+  typical?(units: DisplayUnits): string;
   /** Colour emphasis for a sample; the text must carry the meaning alone. */
   tone?(sample: number): MetricTone;
   /**
@@ -71,7 +78,19 @@ const temperature = (sample: number, { temperatureUnit }: DisplayUnits) =>
   temperatureUnit === 'C' ? fahrenheitToCelsius(sample) : sample;
 const temperatureUnit = ({ temperatureUnit: unit }: DisplayUnits) =>
   temperatureLabel(unit);
-const trim = (label: string): Omit<Metric, 'key'> => ({
+
+/** A Fahrenheit range in the user's temperature unit, such as "80–95 °C". */
+const temperatureRange = (
+  lowF: number,
+  highF: number,
+  units: DisplayUnits,
+): string => {
+  const show = (f: number) => Math.round(temperature(f, units)).toString();
+
+  return `${show(lowF)}–${show(highF)} ${temperatureUnit(units)}`;
+};
+
+const trim = (label: string): Omit<Metric, 'key' | 'description'> => ({
   label,
   group: 'fuelling',
   unit: () => 'counts',
@@ -79,9 +98,43 @@ const trim = (label: string): Omit<Metric, 'key'> => ({
   format: formatSigned,
   chart: {},
 });
+const BANKS = {
+  odd: 'odd-numbered bank (cylinders 1, 3, 5 and 7)',
+  even: 'even-numbered bank (cylinders 2, 4, 6 and 8)',
+} as const;
+const shortTrim = (
+  label: string,
+  bank: keyof typeof BANKS,
+): Omit<Metric, 'key'> => ({
+  ...trim(label),
+  description:
+    `The quick fuelling correction the ECU makes for the ${BANKS[bank]} ` +
+    'from that bank’s oxygen sensor. Positive adds fuel, negative takes it ' +
+    'away. Tunes without oxygen sensors do not use it.',
+  typical: () =>
+    'Swings either side of 0 while the engine is warm and the ECU is ' +
+    'correcting from the oxygen sensors.',
+});
+const longTrim = (
+  label: string,
+  bank: keyof typeof BANKS,
+): Omit<Metric, 'key'> => ({
+  ...trim(label),
+  description:
+    'The fuelling correction the ECU has learned over time for the ' +
+    `${BANKS[bank]}, kept between drives. Positive adds fuel. A large value ` +
+    'means the bank needs constant correction, for example from an air ' +
+    'leak or a failing sensor.',
+  typical: () => 'Near 0.',
+});
 // Positions are stored from 0, and shown from 1 to match the fuel map table.
-const mapPosition = (label: string, size: number): Omit<Metric, 'key'> => ({
+const mapPosition = (
+  label: string,
+  size: number,
+  description: string,
+): Omit<Metric, 'key'> => ({
   label,
+  description,
   group: 'fuelMap',
   unit: () => undefined,
   toDisplay: (sample) => sample + 1,
@@ -94,8 +147,10 @@ const onOff = (
   label: string,
   on: string,
   tone: MetricTone,
+  description: string,
 ): Omit<Metric, 'key'> => ({
   label,
+  description,
   group: 'states',
   unit: () => undefined,
   toDisplay: same,
@@ -108,6 +163,9 @@ const onOff = (
 const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
   engineRpm: {
     label: 'Engine speed',
+    description:
+      'Crankshaft speed, measured from the ignition. 0 with the ignition on and the engine stopped.',
+    typical: () => 'Steady and close to the target idle speed at idle.',
     group: 'engine',
     unit: () => 'rpm',
     toDisplay: same,
@@ -116,6 +174,8 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
   },
   roadSpeedMph: {
     label: 'Road speed',
+    description:
+      'Vehicle speed from the road speed sensor, as the ECU sees it.',
     group: 'engine',
     unit: ({ speedUnit }) => speedLabel(speedUnit),
     toDisplay: (sample, { speedUnit }) =>
@@ -125,6 +185,9 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
   },
   targetIdleRpm: {
     label: 'Target idle',
+    description:
+      'The idle speed the ECU is aiming for. It is higher while the engine is cold, and the ECU opens or closes the idle bypass to reach it.',
+    typical: () => 'Roughly 600–800 rpm when warm; higher when cold.',
     group: 'engine',
     unit: () => 'rpm',
     toDisplay: same,
@@ -133,6 +196,9 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
   },
   coolantTempF: {
     label: 'Coolant',
+    description:
+      'Engine coolant temperature from the ECU’s coolant sensor. The ECU adds fuel and raises the idle speed while the engine is cold, so a faulty sensor upsets fuelling.',
+    typical: (units) => `About ${temperatureRange(176, 203, units)} once warm.`,
     group: 'engine',
     unit: temperatureUnit,
     toDisplay: temperature,
@@ -141,6 +207,10 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
   },
   fuelTempF: {
     label: 'Fuel temp',
+    description:
+      'Temperature of the fuel in the fuel rail. The ECU adds fuel when it is hot, to help a hot engine restart.',
+    typical: () =>
+      'Near the air temperature on a cold engine; rises as the engine bay heats up, and most after a hot engine is switched off.',
     group: 'engine',
     unit: temperatureUnit,
     toDisplay: temperature,
@@ -149,6 +219,10 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
   },
   throttle: {
     label: 'Throttle',
+    description:
+      'How far the throttle is open, from the throttle position sensor. Shown from the lowest position the ECU has seen, so a closed throttle reads 0 %.',
+    typical: () =>
+      'Near 0 % with your foot off the pedal; near 100 % at full throttle.',
     group: 'air',
     unit: () => '%',
     toDisplay: percent,
@@ -157,6 +231,9 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
   },
   airflow: {
     label: 'Airflow (MAF)',
+    description:
+      'How much air the engine is drawing in, from the hot-wire mass airflow sensor, as a percentage of the most it can measure. With engine speed, it decides how much fuel to inject.',
+    typical: () => 'Low at idle; rises with engine speed and load.',
     group: 'air',
     unit: () => '%',
     toDisplay: percent,
@@ -165,6 +242,10 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
   },
   idleBypass: {
     label: 'Idle bypass',
+    description:
+      'How far the stepper motor has opened the air passage around the closed throttle. The ECU moves it to hold the target idle speed.',
+    typical: () =>
+      'A small opening at a warm idle; more when cold or with extra load such as lights or air conditioning.',
     group: 'air',
     unit: () => '% open',
     toDisplay: percent,
@@ -173,6 +254,10 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
   },
   mainVoltage: {
     label: 'Main voltage',
+    description:
+      'Supply voltage reaching the ECU through the main relay. It should be close to battery voltage.',
+    typical: () =>
+      'About 13.5–14.5 V with the engine running and the alternator charging; about 12–12.8 V with it stopped.',
     group: 'fuelling',
     unit: () => 'V',
     toDisplay: same,
@@ -181,29 +266,66 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
   },
   injectorPulseUs: {
     label: 'Injector pulse',
+    description:
+      'How long each injector is held open each time it fires: longer means more fuel. The ECU keeps one value for both banks, so while it corrects each bank separately this may show either.',
+    typical: () =>
+      'A few milliseconds at a warm idle; longer under load and when cold.',
     group: 'fuelling',
     unit: () => 'ms',
     toDisplay: (sample) => sample / 1000,
     format: fixed(2),
     chart: {},
   },
-  lambdaShortOdd: trim('Short trim, odd'),
-  lambdaShortEven: trim('Short trim, even'),
-  lambdaLongOdd: trim('Long trim, odd'),
-  lambdaLongEven: trim('Long trim, even'),
+  lambdaShortOdd: shortTrim('Short trim, odd', 'odd'),
+  lambdaShortEven: shortTrim('Short trim, even', 'even'),
+  lambdaLongOdd: longTrim('Long trim, odd', 'odd'),
+  lambdaLongEven: longTrim('Long trim, even', 'even'),
   gear: {
     label: 'Gear',
+    description:
+      'Gear selector position, from the automatic gearbox’s switch: P / N or D / R. A manual gearbox does not report a gear.',
     group: 'states',
     unit: () => undefined,
     toDisplay: same,
     format: (display) => formatGear(display as Gear),
     chart: { step: true, range: [0, 3] },
   },
-  fuelMapRow: mapPosition('Fuel map row', 8),
-  fuelMapColumn: mapPosition('Fuel map column', 16),
-  idleMode: onOff('Idle control', 'Active', 'normal'),
-  milOn: onOff('MIL', 'On', 'warn'),
-  fuelPumpOn: onOff('Fuel pump relay', 'Running', 'good'),
+  fuelMapRow: mapPosition(
+    'Fuel map row',
+    8,
+    'Where the engine is on the fuel map’s load axis, worked out from ' +
+      'airflow: 1 is the lightest load, 8 the heaviest. The fraction is how ' +
+      'far it is towards the next row; the ECU blends neighbouring cells.',
+  ),
+  fuelMapColumn: mapPosition(
+    'Fuel map column',
+    16,
+    'Where the engine is on the fuel map’s engine speed axis: 1 is the ' +
+      'slowest band, 16 the fastest. The fraction is how far it is towards ' +
+      'the next column.',
+  ),
+  idleMode: onOff(
+    'Idle control',
+    'Active',
+    'normal',
+    'Whether the ECU is holding the engine at the target idle speed with ' +
+      'the idle bypass. Usually active with the throttle closed and the ' +
+      'engine near idle speed.',
+  ),
+  milOn: onOff(
+    'MIL',
+    'On',
+    'warn',
+    'The malfunction indicator (check engine) lamp. On means the ECU has ' +
+      'stored a fault; see Fault codes. Not every fault lights it.',
+  ),
+  fuelPumpOn: onOff(
+    'Fuel pump relay',
+    'Running',
+    'good',
+    'Whether the ECU is running the fuel pump. It runs for a moment when ' +
+      'the ignition is switched on, then only while the engine turns.',
+  ),
 };
 
 /** Display order: by group, then as listed. */

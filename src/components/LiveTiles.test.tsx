@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Gear } from '@kb1rma/libcomm14cux-ts';
 import type { LiveSnapshot } from '../ecu/poller';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
@@ -131,6 +132,69 @@ describe('LiveTiles', () => {
     expect(readingFor('Coolant')).toHaveTextContent('212 °F');
     expect(readingFor('Road speed')).toHaveTextContent('62 mph');
     getItem.mockRestore();
+  });
+
+  it('explains a reading and its typical values on demand, in the chosen units', async () => {
+    localStorage.setItem(
+      'cuxGauge.preferences',
+      JSON.stringify({ temperatureUnit: 'C' }),
+    );
+
+    const user = userEvent.setup();
+
+    renderTiles(SNAPSHOT);
+
+    const about = screen.getByRole('button', { name: 'About Coolant' });
+
+    // The button sits in the label without changing the reading's name.
+    expect(readingFor('Coolant')).toHaveTextContent('100 °C');
+    expect(about).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(about);
+
+    const info = screen.getByRole('dialog', { name: 'Coolant' });
+
+    expect(info).toHaveTextContent(/coolant sensor/);
+    expect(info).toHaveTextContent('Typical: About 80–95 °C once warm.');
+    expect(info).toHaveTextContent(/rough guide, not a specification/);
+    await expectNoAxeViolations(info);
+
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(about).toHaveFocus();
+  });
+
+  it('opens the explanation from the keyboard', async () => {
+    const user = userEvent.setup();
+
+    renderTiles(SNAPSHOT);
+
+    await user.tab();
+
+    expect(
+      screen.getByRole('button', { name: 'About Engine speed' }),
+    ).toHaveFocus();
+
+    await user.keyboard('{Enter}');
+
+    const info = screen.getByRole('dialog', { name: 'Engine speed' });
+
+    expect(info).toHaveTextContent('Typical: Steady and close to the target');
+    expect(within(info).getByText(/^Crankshaft speed/)).toBeInTheDocument();
+  });
+
+  it('leaves out the typical line and its caveat when there is none', async () => {
+    const user = userEvent.setup();
+
+    renderTiles(SNAPSHOT);
+    await user.click(screen.getByRole('button', { name: 'About Gear' }));
+
+    const info = screen.getByRole('dialog', { name: 'Gear' });
+
+    expect(info).toHaveTextContent(/automatic gearbox/);
+    expect(info).not.toHaveTextContent('Typical');
+    expect(info).not.toHaveTextContent('specification');
   });
 
   it('has no detectable accessibility violations', async () => {

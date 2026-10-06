@@ -12,6 +12,7 @@ import { describeError } from '../ecu/errors';
 import type { LiveSnapshot } from '../ecu/poller';
 import { hex, hexDigits } from '../hex';
 import { useReadings } from '../readings/useReadings';
+import { InfoPopover } from './InfoPopover';
 import panel from './Panel.module.css';
 import styles from './FuelMapView.module.css';
 
@@ -109,11 +110,36 @@ export function FuelMapView({
   return (
     <div className={styles['map']}>
       <dl className={panel['facts']}>
-        <dt>Map in use</dt>
+        <dt>
+          Map in use
+          <InfoPopover label="Map in use">
+            <p>
+              Which of the ECU’s six fuel maps (0 to 5) it is using. A tune
+              resistor in the wiring harness selects it; unmodified North
+              American vehicles always use map 5.
+            </p>
+          </InfoPopover>
+        </dt>
         <dd>{id}</dd>
-        <dt>Adjustment factor</dt>
+        <dt>
+          Adjustment factor
+          <InfoPopover label="Adjustment factor">
+            <p>
+              A value stored after the map data that the ECU applies with this
+              map when working out fuelling. It differs from map to map.
+            </p>
+          </InfoPopover>
+        </dt>
         <dd>{hex(map.adjustmentFactor, 4)}</dd>
-        <dt>Row scaler</dt>
+        <dt>
+          Row scaler
+          <InfoPopover label="Row scaler">
+            <p>
+              The value the ECU uses to scale this map’s values by row, that is,
+              by engine load.
+            </p>
+          </InfoPopover>
+        </dt>
         <dd>{hex(map.rowScaler, 2)}</dd>
       </dl>
 
