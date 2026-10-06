@@ -72,7 +72,7 @@ test.describe('Choosing readings', () => {
     await page.getByRole('button', { name: /Choose readings/ }).click();
     await page
       .getByRole('dialog', { name: 'Readings to take' })
-      .getByRole('button', { name: 'All' })
+      .getByRole('radio', { name: 'All' })
       .click();
     await page.keyboard.press('Escape');
     await expect(liveTerms(page)).toHaveCount(20);

@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { MixerHorizontalIcon } from '@radix-ui/react-icons';
-import { Popover, VisuallyHidden } from 'radix-ui';
+import { Popover, ToggleGroup, VisuallyHidden } from 'radix-ui';
 import { useId } from 'react';
-import { METRIC_GROUPS, METRICS, metricsInGroup } from '../metrics';
+import {
+  METRIC_GROUPS,
+  METRICS,
+  metricsInGroup,
+  type MetricKey,
+} from '../metrics';
 import {
   ALWAYS_READ,
   offExcept,
@@ -13,6 +18,19 @@ import { useReadings } from '../readings/useReadings';
 import { MetricCheckbox } from './MetricCheckbox';
 import graphs from './GraphsView.module.css';
 import styles from './ReadingsPicker.module.css';
+
+/** The quick choices: "All" and the presets, each with its `off` list. */
+const CHOICES: readonly { name: string; off: readonly MetricKey[] }[] = [
+  { name: 'All', off: [] },
+  ...READING_PRESETS.map((preset) => ({
+    name: preset.name,
+    off: offExcept(preset.keys),
+  })),
+];
+
+function sameKeys(a: readonly MetricKey[], b: readonly MetricKey[]): boolean {
+  return a.length === b.length && a.every((key) => b.includes(key));
+}
 
 /**
  * A button that opens the list of readings to take from the ECU. The
@@ -49,28 +67,26 @@ export function ReadingsPicker() {
             The fewer readings you choose, the more often each is read. The
             choice applies to the tiles, the graphs and recordings.
           </p>
-          <div className={styles['presets']}>
-            <button
-              type="button"
-              disabled={off.length === 0}
-              onClick={() => {
-                setOff([]);
-              }}
-            >
-              All
-            </button>
-            {READING_PRESETS.map((preset) => (
-              <button
-                key={preset.name}
-                type="button"
-                onClick={() => {
-                  setOff(offExcept(preset.keys));
-                }}
-              >
-                {preset.name}
-              </button>
+          <ToggleGroup.Root
+            type="single"
+            aria-label="Quick choices"
+            className={styles['presets']}
+            value={CHOICES.find((c) => sameKeys(c.off, off))?.name ?? ''}
+            onValueChange={(name) => {
+              const choice = CHOICES.find((c) => c.name === name);
+
+              // Radix reports '' when the pressed item is pressed again; keep it.
+              if (choice) {
+                setOff([...choice.off]);
+              }
+            }}
+          >
+            {CHOICES.map((choice) => (
+              <ToggleGroup.Item key={choice.name} value={choice.name}>
+                {choice.name}
+              </ToggleGroup.Item>
             ))}
-          </div>
+          </ToggleGroup.Root>
           {METRIC_GROUPS.map((group) => (
             <fieldset key={group.id} className={graphs['pickerGroup']}>
               <legend>{group.title}</legend>

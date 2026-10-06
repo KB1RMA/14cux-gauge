@@ -16,6 +16,13 @@
   font-size: 0.8rem;
 }
 
+/* The quick choice that matches the current one is filled with the accent. */
+.presets button[data-state='on'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
 .note {
   font-size: 0.8rem;
   color: var(--text-muted);

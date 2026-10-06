@@ -134,8 +134,18 @@ describe('GraphsView', () => {
     expect(screen.getByRole('checkbox', { name: 'MIL' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'MIL' })).toBeDisabled();
 
-    await user.click(screen.getByRole('button', { name: 'Idle' }));
+    // No quick choice matches one value.
+    expect(
+      within(
+        screen.getByRole('radiogroup', { name: 'Quick choices' }),
+      ).queryAllByRole('radio', { checked: true }),
+    ).toEqual([]);
 
+    await user.click(screen.getByRole('radio', { name: 'Idle' }));
+
+    // The pressed quick choice is the one in use.
+    expect(screen.getByRole('radio', { name: 'Idle' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'All' })).not.toBeChecked();
     expect(figureNames()).toEqual([
       'Engine speed (rpm)',
       'Target idle (rpm)',
@@ -146,9 +156,9 @@ describe('GraphsView', () => {
       'MIL',
     ]);
 
-    await user.click(screen.getByRole('button', { name: 'All' }));
+    await user.click(screen.getByRole('radio', { name: 'All' }));
 
-    expect(screen.getByRole('button', { name: 'All' })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: 'All' })).toBeChecked();
     expect(screen.getAllByRole('figure')).toHaveLength(20);
   });
 
