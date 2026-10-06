@@ -6,6 +6,7 @@ import {
   METRIC_GROUPS,
   METRICS,
   metricsInGroup,
+  recordedKeys,
   sampleOf,
   type DisplayUnits,
   type MetricKey,
@@ -48,6 +49,15 @@ describe('metrics', () => {
     expect(
       sampleOf(snapshotAt(0, { mainVoltage: null }), 'mainVoltage'),
     ).toBeNull();
+  });
+
+  it('lists the metrics a recording has values for', () => {
+    expect(
+      recordedKeys([
+        { timestamp: 0, coolantTempF: 190, milOn: false },
+        { timestamp: 1, engineRpm: null, milOn: false },
+      ]),
+    ).toEqual(['engineRpm', 'coolantTempF', 'milOn']);
   });
 
   it('treats a metric missing from an older recording as no reading', () => {

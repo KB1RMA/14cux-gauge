@@ -12,22 +12,24 @@ import { TimelineChart } from './TimelineChart';
 import { TimelineOverview } from './TimelineOverview';
 import styles from './GraphsView.module.css';
 
-/** The metric the overview strip draws. */
-const OVERVIEW_METRIC = 'engineRpm';
+/** The metric the overview strip draws, if it was recorded. */
+const OVERVIEW_METRIC: MetricKey = 'engineRpm';
 
 /**
  * A recording's graphs on one timeline: an overview of the whole session
  * that picks the stretch to show, and a graph per chosen metric over that
- * stretch, sharing the playhead and the pointer's crosshair. The choice of
- * graphs is the live view's. Key it by session: the samples must not
+ * stretch, sharing the playhead and the pointer's crosshair. Only the
+ * `recorded` metrics can be shown. Key it by session: the samples must not
  * change.
  */
 export function ReplayGraphs({
   samples,
   replay,
+  recorded = METRIC_KEYS,
 }: {
   samples: readonly LiveSnapshot[];
   replay: Replay;
+  recorded?: readonly MetricKey[];
 }) {
   const [settings, setSettings] = useStoredState(
     GRAPH_SETTINGS_KEY,
@@ -49,7 +51,10 @@ export function ReplayGraphs({
     };
   });
   const column = (key: MetricKey) => columns.get(key) ?? [];
-  const overview = METRICS.find((metric) => metric.key === OVERVIEW_METRIC);
+  const overviewKey = recorded.includes(OVERVIEW_METRIC)
+    ? OVERVIEW_METRIC
+    : recorded[0];
+  const overview = METRICS.find((metric) => metric.key === overviewKey);
 
   return (
     <div className={styles['graphs']}>
@@ -68,13 +73,17 @@ export function ReplayGraphs({
         </p>
         <GraphPicker
           hidden={settings.hidden}
+          available={recorded}
           onChange={(hidden) => {
             setSettings((s) => ({ ...s, hidden }));
           }}
         />
       </div>
       <GraphGroups
-        hidden={settings.hidden}
+        hidden={[
+          ...settings.hidden,
+          ...METRIC_KEYS.filter((key) => !recorded.includes(key)),
+        ]}
         chart={(metric) => (
           <TimelineChart
             key={metric.key}

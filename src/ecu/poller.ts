@@ -14,10 +14,8 @@ import { isTransientLinkError } from './errors';
 /** A reading, or `null` if the ECU returned a value outside its valid range. */
 export type Reading<T> = T | null;
 
-/** One pass over the live values. Units are those the library returns. */
-export interface LiveSnapshot {
-  /** `Date.now()` when the pass finished. */
-  timestamp: number;
+/** Every live value the poller can read. Units are those the library returns. */
+export interface LiveReadings {
   engineRpm: Reading<number>;
   roadSpeedMph: Reading<number>;
   /** Fraction 0–1, corrected for the throttle's closed position. */
@@ -51,19 +49,63 @@ export interface LiveSnapshot {
   targetIdleRpm: Reading<number>;
 }
 
-type SlowKey =
-  | 'coolantTempF'
-  | 'fuelTempF'
-  | 'mainVoltage'
-  | 'lambdaLongOdd'
-  | 'lambdaLongEven'
-  | 'idleMode'
-  | 'targetIdleRpm';
+export type ReadingKey = keyof LiveReadings;
+
+/**
+ * One pass over the live values. Only the readings asked for are present: a
+ * missing key was not read, while `null` is a reading the ECU got wrong.
+ */
+export type LiveSnapshot = {
+  /** `Date.now()` when the pass finished. */
+  timestamp: number;
+} & Partial<LiveReadings>;
 
 /** A fuel map index as one number: the index plus its weighting in 16ths. */
 function mapPosition({ index, weighting }: FuelMapIndex): number {
   return index + weighting / 16;
 }
+
+/** How to read each value, in the order a pass reads them. */
+const READERS: {
+  [K in ReadingKey]: (ecu: Ecu) => Promise<NonNullable<LiveReadings[K]>>;
+} = {
+  engineRpm: (ecu) => ecu.getEngineRPM(),
+  roadSpeedMph: (ecu) => ecu.getRoadSpeed(),
+  throttle: (ecu) => ecu.getThrottlePosition(ThrottlePosType.Corrected),
+  airflow: (ecu) => ecu.getMAFReading(AirflowType.Linearized),
+  lambdaShortOdd: (ecu) => ecu.getLambdaTrimShort(Bank.Odd),
+  lambdaShortEven: (ecu) => ecu.getLambdaTrimShort(Bank.Even),
+  idleBypass: (ecu) => ecu.getIdleBypassMotorPosition(),
+  gear: (ecu) => ecu.getGearSelection(),
+  milOn: (ecu) => ecu.isMILOn(),
+  fuelPumpOn: (ecu) => ecu.getFuelPumpRelayState(),
+  injectorPulseUs: (ecu) => ecu.getInjectorPulseWidth(),
+  fuelMapRow: async (ecu) => mapPosition(await ecu.getFuelMapRowIndex()),
+  fuelMapColumn: async (ecu) => mapPosition(await ecu.getFuelMapColumnIndex()),
+  coolantTempF: (ecu) => ecu.getCoolantTemp(),
+  fuelTempF: (ecu) => ecu.getFuelTemp(),
+  mainVoltage: (ecu) => ecu.getMainVoltage(),
+  lambdaLongOdd: (ecu) => ecu.getLambdaTrimLong(Bank.Odd),
+  lambdaLongEven: (ecu) => ecu.getLambdaTrimLong(Bank.Even),
+  idleMode: (ecu) => ecu.getIdleMode(),
+  targetIdleRpm: (ecu) => ecu.getTargetIdle(),
+};
+
+const READING_ORDER = Object.keys(READERS) as ReadingKey[];
+
+/** Every reading the poller knows. */
+export const ALL_READINGS: ReadonlySet<ReadingKey> = new Set(READING_ORDER);
+
+/** Values that change slowly, read only every `slowEvery` passes. */
+export const SLOW_READINGS: ReadonlySet<ReadingKey> = new Set([
+  'coolantTempF',
+  'fuelTempF',
+  'mainVoltage',
+  'lambdaLongOdd',
+  'lambdaLongEven',
+  'idleMode',
+  'targetIdleRpm',
+]);
 
 export interface PollerStats {
   /** Completed passes per second, averaged over the last few passes. */
@@ -75,6 +117,11 @@ export interface PollerOptions {
   intervalMs?: number;
   /** Read the slow-changing values on every Nth pass. */
   slowEvery?: number;
+  /**
+   * The readings to take, asked before every pass so a change applies to
+   * the next one. Defaults to all of them. Fewer readings make faster passes.
+   */
+  readings?(): ReadonlySet<ReadingKey>;
   /** Consecutive failed passes (timeouts or protocol errors) before giving up. */
   maxConsecutiveErrors?: number;
   onSnapshot(snapshot: LiveSnapshot, stats: PollerStats): void;
@@ -130,54 +177,24 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
     }
   };
 
-  const readSlow = async (): Promise<Pick<LiveSnapshot, SlowKey>> => ({
-    coolantTempF: await read(() => ecu.getCoolantTemp()),
-    fuelTempF: await read(() => ecu.getFuelTemp()),
-    mainVoltage: await read(() => ecu.getMainVoltage()),
-    lambdaLongOdd: await read(() => ecu.getLambdaTrimLong(Bank.Odd)),
-    lambdaLongEven: await read(() => ecu.getLambdaTrimLong(Bank.Even)),
-    idleMode: await read(() => ecu.getIdleMode()),
-    targetIdleRpm: await read(() => ecu.getTargetIdle()),
-  });
-
   const readPass = async (): Promise<LiveSnapshot> => {
-    const fast = {
-      engineRpm: await read(() => ecu.getEngineRPM()),
-      roadSpeedMph: await read(() => ecu.getRoadSpeed()),
-      throttle: await read(() =>
-        ecu.getThrottlePosition(ThrottlePosType.Corrected),
-      ),
-      airflow: await read(() => ecu.getMAFReading(AirflowType.Linearized)),
-      lambdaShortOdd: await read(() => ecu.getLambdaTrimShort(Bank.Odd)),
-      lambdaShortEven: await read(() => ecu.getLambdaTrimShort(Bank.Even)),
-      idleBypass: await read(() => ecu.getIdleBypassMotorPosition()),
-      gear: await read(() => ecu.getGearSelection()),
-      milOn: await read(() => ecu.isMILOn()),
-      fuelPumpOn: await read(() => ecu.getFuelPumpRelayState()),
-      injectorPulseUs: await read(() => ecu.getInjectorPulseWidth()),
-      fuelMapRow: await read(async () =>
-        mapPosition(await ecu.getFuelMapRowIndex()),
-      ),
-      fuelMapColumn: await read(async () =>
-        mapPosition(await ecu.getFuelMapColumnIndex()),
-      ),
-    };
-    const slow =
-      previous === undefined || pass % slowEvery === 0
-        ? await readSlow()
-        : previous;
+    const wanted = options.readings?.() ?? ALL_READINGS;
+    const keys = READING_ORDER.filter((key) => wanted.has(key));
+    const anyFast = keys.some((key) => !SLOW_READINGS.has(key));
+    // Slow values are read every Nth pass, unless nothing faster is wanted.
+    const slowDue = !anyFast || pass % slowEvery === 0;
+    const values: Partial<Record<ReadingKey, unknown>> = {};
 
-    return {
-      timestamp: Date.now(),
-      ...fast,
-      coolantTempF: slow.coolantTempF,
-      fuelTempF: slow.fuelTempF,
-      mainVoltage: slow.mainVoltage,
-      lambdaLongOdd: slow.lambdaLongOdd,
-      lambdaLongEven: slow.lambdaLongEven,
-      idleMode: slow.idleMode,
-      targetIdleRpm: slow.targetIdleRpm,
-    };
+    for (const key of keys) {
+      const kept = previous?.[key];
+
+      values[key] =
+        SLOW_READINGS.has(key) && !slowDue && kept !== undefined
+          ? kept
+          : await read<unknown>(() => READERS[key](ecu));
+    }
+
+    return { timestamp: Date.now(), ...(values as Partial<LiveReadings>) };
   };
 
   const sampleRate = (): number => {

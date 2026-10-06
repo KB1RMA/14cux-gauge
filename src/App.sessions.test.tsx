@@ -14,8 +14,9 @@ import { snapshotAt } from './test-support/snapshots';
 const START = Date.UTC(2026, 9, 5, 14, 0);
 
 /** Lets the demo ECU, polled every 10 ms, take a few samples. */
+/** Waits for a few polling passes; the demo's link takes ~90 ms a pass. */
 async function collectSamples() {
-  await act(() => new Promise((resolve) => setTimeout(resolve, 150)));
+  await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
 }
 
 async function connectDemo(user: UserEvent) {
@@ -481,5 +482,31 @@ describe('Recording and browsing sessions', () => {
       ]);
     });
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  });
+
+  it('records only the chosen readings, and replays only those', async () => {
+    const user = userEvent.setup();
+
+    render(<App pollIntervalMs={{ demo: 10 }} />);
+    await connectDemo(user);
+    await user.click(screen.getByRole('button', { name: /Choose readings/ }));
+    await user.click(screen.getByRole('button', { name: 'Only Coolant' }));
+    await user.keyboard('{Escape}');
+    // Let the pass that was under way when the choice changed finish.
+    await collectSamples();
+    await recordAndStop(user);
+    await user.click(screen.getByRole('button', { name: 'Skip' }));
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
+    await user.click(
+      await screen.findByRole('button', { name: /^Demo ECU, / }),
+    );
+    await screen.findByRole('slider', { name: 'Playback position' });
+
+    expect(screen.getAllByRole('term').map((dt) => dt.textContent)).toEqual(
+      expect.arrayContaining(['Coolant', 'MIL']),
+    );
+    expect(readingFor('Coolant')).toHaveTextContent(/^\d+ °F$/);
+    expect(() => readingFor('Engine speed')).toThrow();
   });
 });

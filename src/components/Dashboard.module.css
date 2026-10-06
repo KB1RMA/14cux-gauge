@@ -69,3 +69,17 @@
   display: grid;
   gap: 1rem;
 }
+
+/* A view's title with its controls beside it, wrapping on narrow screens. */
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.heading .title {
+  margin: 0;
+}

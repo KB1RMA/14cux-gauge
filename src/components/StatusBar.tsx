@@ -5,6 +5,8 @@ import { useRef, useState } from 'react';
 import type { ConnectionState } from '../ecu/connectionState';
 import { useEcu } from '../ecu/useEcu';
 import { useLiveData } from '../ecu/useLiveData';
+import { METRICS } from '../metrics';
+import { useReadings } from '../readings/useReadings';
 import { useRecording } from '../recording/useRecording';
 import { formatDuration, sourceLabel } from '../sessions/format';
 import { FailureDialog } from './FailureDialog';
@@ -44,6 +46,7 @@ function describe(
 export function StatusBar() {
   const { state, disconnect, reconnect } = useEcu();
   const { snapshot, stats } = useLiveData();
+  const { chosen } = useReadings();
   const recording = useRecording();
   const { active } = recording;
   const reconnectRef = useRef<HTMLButtonElement>(null);
@@ -84,6 +87,9 @@ export function StatusBar() {
       ) : null}
       {state.status === 'connected' && stats.sampleRateHz > 0 ? (
         <span className={styles['rate']}>
+          {chosen.length < METRICS.length
+            ? `${String(chosen.length)} of ${String(METRICS.length)} readings · `
+            : null}
           {stats.sampleRateHz.toFixed(1)} samples/s
         </span>
       ) : null}

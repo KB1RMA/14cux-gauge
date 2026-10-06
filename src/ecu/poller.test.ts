@@ -7,7 +7,12 @@ import {
   SimulatedTransport,
   TimeoutError,
 } from '@kb1rma/libcomm14cux-ts';
-import { startPoller, type LiveSnapshot, type PollerStats } from './poller';
+import {
+  startPoller,
+  type LiveSnapshot,
+  type PollerStats,
+  type ReadingKey,
+} from './poller';
 
 function plantWord(memory: Uint8Array, address: number, value: number): void {
   memory[address] = value >> 8;
@@ -166,6 +171,75 @@ describe('startPoller', () => {
     resumed.stop();
 
     expect(sink.snapshots[3]?.coolantTempF).toBe(266);
+  });
+
+  it('reads only the readings asked for, and applies a change on the next pass', async () => {
+    const { transport, ecu } = await plantedEcu();
+    const sink = collect();
+    let wanted: ReadonlySet<ReadingKey> = new Set(['engineRpm', 'milOn']);
+    const poller = startPoller(ecu, {
+      intervalMs: 100,
+      readings: () => wanted,
+      ...sink,
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(sink.snapshots[0]).toEqual({
+      timestamp: expect.any(Number) as number,
+      engineRpm: 750,
+      milOn: true,
+    });
+
+    const sent = transport.written.length;
+
+    wanted = new Set(['roadSpeedMph']);
+    await vi.advanceTimersByTimeAsync(100);
+    poller.stop();
+
+    expect(sink.snapshots[1]).toEqual({
+      timestamp: expect.any(Number) as number,
+      roadSpeedMph: 62,
+    });
+    // One reading costs less link traffic than two.
+    expect(transport.written.length - sent).toBeLessThan(sent);
+  });
+
+  it('reads a slow value on every pass when nothing faster is wanted', async () => {
+    const { transport, ecu } = await plantedEcu();
+    const sink = collect();
+    const poller = startPoller(ecu, {
+      intervalMs: 100,
+      slowEvery: 3,
+      readings: () => new Set(['coolantTempF']),
+      ...sink,
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    transport.memory[MemoryOffset.CoolantTemp] = 0; // 266 °F
+    await vi.advanceTimersByTimeAsync(100);
+    poller.stop();
+
+    expect(sink.snapshots.map((s) => s.coolantTempF)).toEqual([190, 266]);
+  });
+
+  it('reads a slow value straight away when it is newly asked for', async () => {
+    const { ecu } = await plantedEcu();
+    const sink = collect();
+    let wanted: ReadonlySet<ReadingKey> = new Set(['engineRpm']);
+    const poller = startPoller(ecu, {
+      intervalMs: 100,
+      slowEvery: 10,
+      readings: () => wanted,
+      ...sink,
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    wanted = new Set(['engineRpm', 'fuelTempF']);
+    await vi.advanceTimersByTimeAsync(100);
+    poller.stop();
+
+    expect(sink.snapshots.map((s) => s.fuelTempF)).toEqual([undefined, 96]);
   });
 
   it('reports the measured sample rate', async () => {

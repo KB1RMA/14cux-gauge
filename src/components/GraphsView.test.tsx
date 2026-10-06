@@ -2,9 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { HistoryContext } from '../ecu/contexts';
-import { SampleHistory } from '../history/sampleHistory';
-import { METRIC_KEYS } from '../metrics';
+import { EcuProvider } from '../ecu/EcuProvider';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { expectNoAxeViolations } from '../test-support/a11y';
 import { GraphsView } from './GraphsView';
@@ -12,9 +10,9 @@ import { GraphsView } from './GraphsView';
 function renderGraphs() {
   return render(
     <PreferencesProvider>
-      <HistoryContext value={new SampleHistory(METRIC_KEYS, 100)}>
+      <EcuProvider>
         <GraphsView />
-      </HistoryContext>
+      </EcuProvider>
     </PreferencesProvider>,
   );
 }
@@ -32,6 +30,10 @@ function figureNames(): string[] {
 
 function storedGraphs(): unknown {
   return JSON.parse(localStorage.getItem('cuxGauge.graphs') ?? 'null');
+}
+
+function storedReadings(): unknown {
+  return JSON.parse(localStorage.getItem('cuxGauge.readings') ?? 'null');
 }
 
 describe('GraphsView', () => {
@@ -80,25 +82,26 @@ describe('GraphsView', () => {
     expect(screen.getByRole('radio', { name: '5 minutes' })).toBeChecked();
   });
 
-  it('hides and shows graphs from the Choose graphs popover, and remembers the choice', async () => {
+  it('graphs only the chosen readings, and remembers the choice', async () => {
     const user = userEvent.setup();
     const { unmount } = renderGraphs();
-    const trigger = screen.getByRole('button', { name: /Choose graphs/ });
+    const trigger = screen.getByRole('button', { name: /Choose readings/ });
+
+    expect(trigger).toHaveTextContent('20 of 20');
 
     await user.click(trigger);
 
-    const picker = screen.getByRole('dialog', { name: 'Graphs to show' });
+    const picker = screen.getByRole('dialog', { name: 'Readings to take' });
     const engine = within(picker).getByRole('group', { name: 'Engine' });
 
-    expect(
-      within(engine).getByRole('checkbox', { name: 'Engine speed' }),
-    ).toBeChecked();
-
+    expect(picker).toHaveAccessibleDescription(
+      /The fewer readings you choose, the more often each is read/,
+    );
     await user.click(
       within(engine).getByRole('checkbox', { name: 'Engine speed' }),
     );
     // The label toggles its checkbox too.
-    await user.click(within(picker).getByText('Gear'));
+    await user.click(within(picker).getByText('Gear', { selector: 'label' }));
 
     expect(
       within(engine).getByRole('checkbox', { name: 'Engine speed' }),
@@ -116,44 +119,54 @@ describe('GraphsView', () => {
     renderGraphs();
 
     expect(screen.getAllByRole('figure')).toHaveLength(18);
-    expect(storedGraphs()).toEqual({
-      windowSeconds: 60,
-      hidden: ['engineRpm', 'gear'],
-    });
-
-    await user.click(screen.getByRole('button', { name: /Choose graphs/ }));
-    await user.click(screen.getByRole('checkbox', { name: 'Engine speed' }));
-
-    expect(screen.getAllByRole('figure')).toHaveLength(19);
+    expect(storedReadings()).toEqual({ off: ['engineRpm', 'gear'] });
   });
 
-  it('hides every graph, says so, and shows them all again', async () => {
+  it('reads one value with Only, a preset, or all of them', async () => {
     const user = userEvent.setup();
 
     renderGraphs();
-    await user.click(screen.getByRole('button', { name: /Choose graphs/ }));
-    await user.click(screen.getByRole('button', { name: 'Hide all' }));
+    await user.click(screen.getByRole('button', { name: /Choose readings/ }));
+    await user.click(screen.getByRole('button', { name: 'Only Coolant' }));
 
-    expect(screen.getByRole('button', { name: 'Hide all' })).toBeDisabled();
-    expect(screen.queryByRole('figure')).not.toBeInTheDocument();
-    expect(screen.getByText(/No graphs are shown/)).toBeInTheDocument();
+    // The MIL is always read.
+    expect(figureNames()).toEqual(['Coolant (°F)', 'MIL']);
+    expect(screen.getByRole('checkbox', { name: 'MIL' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'MIL' })).toBeDisabled();
 
-    await user.click(screen.getByRole('button', { name: 'Show all' }));
+    await user.click(screen.getByRole('button', { name: 'Idle' }));
 
-    expect(screen.getByRole('button', { name: 'Show all' })).toBeDisabled();
+    expect(figureNames()).toEqual([
+      'Engine speed (rpm)',
+      'Target idle (rpm)',
+      'Coolant (°F)',
+      'Throttle (%)',
+      'Idle bypass (% open)',
+      'Idle control',
+      'MIL',
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'All' }));
+
+    expect(screen.getByRole('button', { name: 'All' })).toBeDisabled();
     expect(screen.getAllByRole('figure')).toHaveLength(20);
   });
 
   it('ignores stored settings it does not recognise', () => {
     localStorage.setItem(
       'cuxGauge.graphs',
-      JSON.stringify({ windowSeconds: 45, hidden: ['nonsense', 'airflow'] }),
+      JSON.stringify({ windowSeconds: 45 }),
+    );
+    localStorage.setItem(
+      'cuxGauge.readings',
+      JSON.stringify({ off: ['nonsense', 'airflow', 'milOn'] }),
     );
 
     renderGraphs();
 
     expect(screen.getByRole('radio', { name: '1 minute' })).toBeChecked();
     expect(screen.getAllByRole('figure')).toHaveLength(19);
+    expect(figureNames()).toContain('MIL');
   });
 
   it('has no detectable accessibility violations, with the picker closed or open', async () => {
@@ -161,7 +174,7 @@ describe('GraphsView', () => {
 
     renderGraphs();
     await expectNoAxeViolations(document.body);
-    await user.click(screen.getByRole('button', { name: /Choose graphs/ }));
+    await user.click(screen.getByRole('button', { name: /Choose readings/ }));
     await expectNoAxeViolations(document.body);
   });
 });

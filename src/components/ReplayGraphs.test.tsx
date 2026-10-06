@@ -3,6 +3,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { LiveSnapshot } from '../ecu/poller';
+import type { MetricKey } from '../metrics';
 import { loadPlot } from '../charts/plotOptions';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { useReplay } from '../replay/useReplay';
@@ -22,19 +23,34 @@ const samples = Array.from({ length: 11 }, (_, i) =>
   }),
 );
 
-function Replay({ recording }: { recording: readonly LiveSnapshot[] }) {
+function Replay({
+  recording,
+  recorded,
+}: {
+  recording: readonly LiveSnapshot[];
+  recorded?: readonly MetricKey[];
+}) {
   const replay = useReplay(recording);
 
   return (
     <PreferencesProvider>
       <ReplayControls replay={replay} />
-      <ReplayGraphs samples={recording} replay={replay} />
+      <ReplayGraphs
+        samples={recording}
+        replay={replay}
+        {...(recorded ? { recorded } : {})}
+      />
     </PreferencesProvider>
   );
 }
 
-function renderReplay(recording: readonly LiveSnapshot[] = samples) {
-  return render(<Replay recording={recording} />);
+function renderReplay(
+  recording: readonly LiveSnapshot[] = samples,
+  recorded?: readonly MetricKey[],
+) {
+  return render(
+    <Replay recording={recording} {...(recorded ? { recorded } : {})} />,
+  );
 }
 
 /** The text shown for one statistic ("Now", "Min", "Max") of a graph. */
@@ -159,7 +175,29 @@ describe('ReplayGraphs', () => {
     expect(stat('Main voltage (V)', 'Now')).toBe('—No valid reading');
   });
 
-  it('shows the graphs chosen for the live view', () => {
+  it('offers only the readings that were recorded', async () => {
+    const user = userEvent.setup();
+    const coolantOnly: LiveSnapshot[] = samples.map(({ timestamp }) => ({
+      timestamp,
+      coolantTempF: 190,
+      milOn: false,
+    }));
+
+    renderReplay(coolantOnly, ['coolantTempF', 'milOn']);
+
+    expect(screen.getAllByRole('figure')).toHaveLength(2);
+    expect(
+      screen.getByRole('figure', { name: 'Coolant (°F)' }),
+    ).toBeInTheDocument();
+
+    const trigger = screen.getByRole('button', { name: /Choose graphs/ });
+
+    expect(trigger).toHaveTextContent('2 of 2');
+    await user.click(trigger);
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+  });
+
+  it('shows the graphs chosen for replay', () => {
     localStorage.setItem(
       'cuxGauge.graphs',
       JSON.stringify({ hidden: ['engineRpm'] }),
@@ -172,7 +210,7 @@ describe('ReplayGraphs', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('hides and shows graphs from Choose graphs, as the live view does', async () => {
+  it('hides and shows graphs from Choose graphs, and remembers the choice', async () => {
     const user = userEvent.setup();
 
     renderReplay();

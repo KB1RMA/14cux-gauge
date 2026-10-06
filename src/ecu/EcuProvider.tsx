@@ -18,7 +18,14 @@ import {
 } from '../diagnostics/diagnosticLog';
 import { pushSnapshot } from '../history/pushSnapshot';
 import { SampleHistory } from '../history/sampleHistory';
-import { METRIC_KEYS } from '../metrics';
+import { METRIC_KEYS, type MetricKey } from '../metrics';
+import { ReadingsContext } from '../readings/context';
+import {
+  chosenReadings,
+  parseReadingSettings,
+  READINGS_KEY,
+} from '../readings/readingSettings';
+import { useStoredState } from '../storage/useStoredState';
 import {
   createEcuConnection,
   type EcuConnection,
@@ -32,7 +39,12 @@ import {
   type LiveData,
 } from './contexts';
 import { describeError, errorReason } from './errors';
-import { startPoller, type LiveSnapshot, type Poller } from './poller';
+import {
+  startPoller,
+  type LiveSnapshot,
+  type Poller,
+  type ReadingKey,
+} from './poller';
 
 const NO_LIVE_DATA: LiveData = {
   snapshot: undefined,
@@ -78,13 +90,33 @@ export function EcuProvider({
   const [snapshotListeners] = useState(
     () => new Set<(snapshot: LiveSnapshot) => void>(),
   );
+  const [readingSettings, setReadingSettings] = useStoredState(
+    READINGS_KEY,
+    parseReadingSettings,
+  );
+  // How many views have asked for each reading (see `request`).
+  const [requested, setRequested] = useState<ReadonlyMap<MetricKey, number>>(
+    () => new Map(),
+  );
+  const chosen = useMemo(
+    () => chosenReadings(readingSettings.off),
+    [readingSettings.off],
+  );
+  const polled = useMemo(
+    (): ReadonlySet<ReadingKey> => new Set([...chosen, ...requested.keys()]),
+    [chosen, requested],
+  );
+  // The poller asks before every pass, so a change applies without
+  // reconnecting.
+  const polledRef = useRef(polled);
   const sessionRef = useRef<Session | undefined>(undefined);
   // Bumped by every connect/disconnect, so a slow async step can tell that it
   // has been superseded.
   const generationRef = useRef(0);
   const serialInterval = pollIntervalMs?.serial ?? 0;
-  // The simulated ECU answers instantly; without a pause it would spin.
-  const demoInterval = pollIntervalMs?.demo ?? 100;
+  // The demo's simulated link takes time per read, like a real one, so it
+  // polls flat out too and reading fewer values is faster.
+  const demoInterval = pollIntervalMs?.demo ?? 0;
 
   const teardown = useCallback(async () => {
     const current = sessionRef.current;
@@ -159,6 +191,7 @@ export function EcuProvider({
       });
       sessionRef.current.poller = startPoller(connection.ecu, {
         intervalMs: source.kind === 'demo' ? demoInterval : serialInterval,
+        readings: () => polledRef.current,
         onSnapshot: (snapshot, stats) => {
           pushSnapshot(history, snapshot);
 
@@ -217,6 +250,48 @@ export function EcuProvider({
     [snapshotListeners],
   );
 
+  useEffect(() => {
+    polledRef.current = polled;
+  }, [polled]);
+
+  const setOff = useCallback(
+    (off: MetricKey[]) => {
+      setReadingSettings({ off });
+    },
+    [setReadingSettings],
+  );
+
+  const request = useCallback((keys: readonly MetricKey[]) => {
+    const change = (by: number) => {
+      setRequested((previous) => {
+        const next = new Map(previous);
+
+        for (const key of keys) {
+          const count = (next.get(key) ?? 0) + by;
+
+          if (count > 0) {
+            next.set(key, count);
+          } else {
+            next.delete(key);
+          }
+        }
+
+        return next;
+      });
+    };
+
+    change(1);
+
+    return () => {
+      change(-1);
+    };
+  }, []);
+
+  const readings = useMemo(
+    () => ({ chosen, off: readingSettings.off, setOff, request }),
+    [chosen, readingSettings.off, setOff, request],
+  );
+
   useEffect(
     () => () => {
       generationRef.current++;
@@ -234,7 +309,9 @@ export function EcuProvider({
     <DiagnosticsContext value={log}>
       <EcuContext value={value}>
         <LiveDataContext value={liveData}>
-          <HistoryContext value={history}>{children}</HistoryContext>
+          <HistoryContext value={history}>
+            <ReadingsContext value={readings}>{children}</ReadingsContext>
+          </HistoryContext>
         </LiveDataContext>
       </EcuContext>
     </DiagnosticsContext>

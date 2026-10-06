@@ -5,9 +5,11 @@ import type { LiveSnapshot } from '../ecu/poller';
 import {
   formatSample,
   METRIC_GROUPS,
+  METRIC_KEYS,
   metricsInGroup,
   sampleOf,
   type Metric,
+  type MetricKey,
 } from '../metrics';
 import { usePreferences } from '../preferences/usePreferences';
 import { Tile } from './Tile';
@@ -49,20 +51,33 @@ function MetricTile({
   );
 }
 
+/** A tile for each metric in `keys` (all by default), in sections by group. */
 export function LiveTiles({
   snapshot,
+  keys = METRIC_KEYS,
 }: {
   snapshot: LiveSnapshot | undefined;
+  keys?: readonly MetricKey[];
 }) {
   return (
     <div className={styles['groups']}>
-      {METRIC_GROUPS.map((group) => (
-        <Group key={group.id} title={group.title}>
-          {metricsInGroup(group.id).map((metric) => (
-            <MetricTile key={metric.key} metric={metric} snapshot={snapshot} />
-          ))}
-        </Group>
-      ))}
+      {METRIC_GROUPS.map((group) => {
+        const metrics = metricsInGroup(group.id).filter((m) =>
+          keys.includes(m.key),
+        );
+
+        return metrics.length === 0 ? null : (
+          <Group key={group.id} title={group.title}>
+            {metrics.map((metric) => (
+              <MetricTile
+                key={metric.key}
+                metric={metric}
+                snapshot={snapshot}
+              />
+            ))}
+          </Group>
+        );
+      })}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import type { Ecu } from '@kb1rma/libcomm14cux-ts';
 import { Tabs } from 'radix-ui';
 import { useEffect, useRef } from 'react';
 import { useLiveData } from '../ecu/useLiveData';
+import { useReadings } from '../readings/useReadings';
 import { useStoredState } from '../storage/useStoredState';
 import { EcuInfo } from './EcuInfo';
 import { FaultCodes } from './FaultCodes';
@@ -11,10 +12,12 @@ import { FuelMapView } from './FuelMapView';
 import { GraphsView } from './GraphsView';
 import { DASHBOARD_VIEW_KEY, parseDashboardView } from './graphSettings';
 import { LiveTiles } from './LiveTiles';
+import { ReadingsPicker } from './ReadingsPicker';
 import styles from './Dashboard.module.css';
 
 export function Dashboard({ ecu }: { ecu: Ecu }) {
   const { snapshot } = useLiveData();
+  const { chosen } = useReadings();
   const [view, setView] = useStoredState(
     DASHBOARD_VIEW_KEY,
     parseDashboardView,
@@ -49,15 +52,18 @@ export function Dashboard({ ecu }: { ecu: Ecu }) {
 
       <Tabs.Content value="overview" className={styles['dashboard']}>
         <section className={styles['live']} aria-labelledby="live-title">
-          <h2
-            id="live-title"
-            ref={headingRef}
-            tabIndex={-1}
-            className={styles['title']}
-          >
-            Live data
-          </h2>
-          <LiveTiles snapshot={snapshot} />
+          <div className={styles['heading']}>
+            <h2
+              id="live-title"
+              ref={headingRef}
+              tabIndex={-1}
+              className={styles['title']}
+            >
+              Live data
+            </h2>
+            <ReadingsPicker />
+          </div>
+          <LiveTiles snapshot={snapshot} keys={chosen} />
         </section>
         <aside className={styles['side']}>
           <FaultCodes ecu={ecu} />
