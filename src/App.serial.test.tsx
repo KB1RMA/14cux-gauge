@@ -91,7 +91,14 @@ describe('App with a serial ECU', () => {
     await user.click(screen.getByRole('checkbox', { name: /Double-speed/ }));
     await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
+    // The failure dialog hides the page behind it until closed.
+    await user.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Connection failed' }),
+      ).getByRole('button', { name: 'Close' }),
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent(
       'Disconnected: The serial port could not be opened',
     );
 
@@ -101,6 +108,9 @@ describe('App with a serial ECU', () => {
       expect(port.opens).toBe(2);
     });
 
+    // A new failure opens the dialog again.
+    await screen.findByRole('dialog', { name: 'Connection failed' });
+    await user.keyboard('{Escape}');
     await user.click(screen.getByRole('button', { name: 'Close' }));
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -128,18 +138,23 @@ describe('App with a serial ECU', () => {
       port.dispatchEvent(new Event('disconnect'));
     });
 
+    // The recording stopped with the link and keeps its default name; the
+    // only dialog is the one explaining the failure.
     expect(
-      await screen.findByRole('button', { name: 'Reconnect' }),
-    ).toHaveFocus();
+      await screen.findByRole('dialog', { name: 'Connection failed' }),
+    ).toHaveTextContent(
+      'Error: NetworkError: The serial port was disconnected.',
+    );
+    await user.keyboard('{Escape}');
+
+    // Closing it lands on the obvious next step.
+    expect(screen.getByRole('button', { name: 'Reconnect' })).toHaveFocus();
     expect(screen.getByRole('status')).toHaveTextContent(
       'Disconnected: The serial port could not be opened or was disconnected.',
     );
     expect(
       screen.getByRole('button', { name: 'Connect to ECU' }),
     ).toBeInTheDocument();
-    // The recording stopped with the link and keeps its default name; no
-    // dialog takes focus from Reconnect.
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await expectNoAxeViolations(document.body);
 
     await user.click(screen.getByRole('button', { name: 'Sessions' }));
@@ -157,19 +172,29 @@ describe('App with a serial ECU', () => {
     port.failOpen = true;
     installSerial(port);
     render(<App />);
-
-    // Offered prominently only once something has gone wrong.
-    expect(
-      screen.queryByRole('region', { name: 'Having trouble?' }),
-    ).not.toBeInTheDocument();
-
     await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
-    await screen.findByRole('button', { name: 'Reconnect' });
 
-    const trouble = screen.getByRole('region', { name: 'Having trouble?' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Connection failed',
+    });
+
+    expect(dialog).toHaveAccessibleDescription(
+      'The serial port could not be opened or was disconnected. Another program may be using it.',
+    );
+    expect(dialog).toHaveTextContent(
+      'Error: NetworkError: Failed to open serial port.',
+    );
+
+    const recent = within(dialog).getByRole('textbox', { name: 'Recent log' });
+
+    expect(recent).toHaveAttribute('readonly');
+    expect((recent as HTMLTextAreaElement).value).toMatch(
+      /ERR Opening serial port failed: NetworkError: Failed to open serial port\.\n.*ERR Connection failed: NetworkError: Failed to open serial port\.$/,
+    );
+    await expectNoAxeViolations(document.body);
 
     await user.click(
-      within(trouble).getByRole('button', { name: 'Download diagnostic log' }),
+      within(dialog).getByRole('button', { name: 'Download diagnostic log' }),
     );
 
     expect(downloads).toHaveLength(1);
@@ -191,7 +216,17 @@ describe('App with a serial ECU', () => {
     expect(text).toContain(
       'ERR Connection failed: NetworkError: Failed to open serial port.',
     );
-    await expectNoAxeViolations(document.body);
+
+    // Once closed, Details brings the dialog back.
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Details' }));
+    await user.click(
+      within(
+        screen.getByRole('dialog', { name: 'Connection failed' }),
+      ).getByRole('button', { name: 'Close' }),
+    );
+
+    expect(screen.getByRole('button', { name: 'Details' })).toHaveFocus();
   });
 
   it('stays put when the user dismisses the port picker', async () => {

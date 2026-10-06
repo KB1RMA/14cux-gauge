@@ -56,9 +56,3 @@
 .error {
   color: var(--danger);
 }
-
-/* Shown only after a failure; the accent border draws the eye to it. */
-.trouble {
-  border-color: var(--danger);
-  border-left-width: 4px;
-}

@@ -11,12 +11,18 @@ export type ConnectionState =
   | { status: 'idle'; afterSession?: true }
   | { status: 'connecting'; source: EcuSource }
   | { status: 'connected'; source: EcuSource }
-  | { status: 'error'; source: EcuSource; message: string };
+  | {
+      status: 'error';
+      source: EcuSource;
+      message: string;
+      /** The raw error name and message behind `message`, for diagnosis. */
+      detail?: string;
+    };
 
 export type ConnectionAction =
   | { type: 'connect'; source: EcuSource }
   | { type: 'connected' }
-  | { type: 'failed'; message: string }
+  | { type: 'failed'; message: string; detail?: string }
   | { type: 'disconnected' };
 
 export function connectionReducer(
@@ -33,7 +39,12 @@ export function connectionReducer(
     case 'failed':
       return state.status === 'idle'
         ? state
-        : { status: 'error', source: state.source, message: action.message };
+        : {
+            status: 'error',
+            source: state.source,
+            message: action.message,
+            ...(action.detail === undefined ? {} : { detail: action.detail }),
+          };
     case 'disconnected':
       return { status: 'idle', afterSession: true };
   }

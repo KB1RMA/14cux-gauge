@@ -73,6 +73,19 @@ export function formatReport(
   return lines.join('\n');
 }
 
+/** The last `count` entries, one per line, for showing on screen. */
+export function formatRecentEntries(
+  snapshot: DiagnosticSnapshot,
+  count: number,
+): string {
+  const all = [...snapshot.head, ...snapshot.tail];
+
+  return all
+    .slice(-count)
+    .map((entry) => formatEntry(entry, snapshot.startedAt))
+    .join('\n');
+}
+
 /** A file name that sorts by time and is safe on every OS, e.g. `14cux-gauge-log-2026-10-06T14-03-07.txt`. */
 export function reportFileName(generatedAt: number): string {
   const stamp = new Date(generatedAt)

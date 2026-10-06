@@ -25,14 +25,14 @@ function describeConnection(state: ConnectionState): string {
 }
 
 /** Saves the serial trace and connection events as a text file to share. */
-export function DownloadLogButton() {
+export function DownloadLogButton({ primary = false }: { primary?: boolean }) {
   const log = useDiagnostics();
   const { state } = useEcu();
 
   return (
     <button
       type="button"
-      className={styles['button']}
+      className={primary ? `primary ${styles['button']}` : styles['button']}
       onClick={() => {
         const generatedAt = Date.now();
 

@@ -89,6 +89,14 @@ test.describe('Serial ECU over Web Serial', () => {
 
     await emulatedSerial.unplug();
 
+    const failure = page.getByRole('dialog', { name: 'Connection failed' });
+
+    await expect(failure).toContainText(
+      'Error: NetworkError: The serial port was disconnected.',
+    );
+    await page.keyboard.press('Escape');
+    await expect(failure).toHaveCount(0);
+
     const reconnect = page.getByRole('button', { name: 'Reconnect' });
 
     await expect(reconnect).toBeFocused();
@@ -116,6 +124,14 @@ test.describe('Serial ECU over Web Serial', () => {
 
     await emulatedSerial.setSilent(true);
 
+    const failure = page.getByRole('dialog', { name: 'Connection failed' });
+
+    await expect(failure).toContainText(
+      'The ECU stopped responding. Check the cable, that the ignition is on, and that the baud rate matches the ECU firmware.',
+    );
+    await expect(failure).toContainText('Error: TimeoutError: ');
+    await failure.getByRole('button', { name: 'Close' }).click();
+
     await expect(page.getByRole('status')).toHaveText(
       'Disconnected: The ECU stopped responding. Check the cable, that the ignition is on, and that the baud rate matches the ECU firmware.',
     );
@@ -131,18 +147,19 @@ test.describe('Serial ECU over Web Serial', () => {
     await page.getByRole('button', { name: 'Connect to ECU' }).click();
     await expect(reading(page, 'Engine speed')).toHaveText('750 rpm');
 
-    const trouble = page.getByRole('region', { name: 'Having trouble?' });
-
-    await expect(trouble).toHaveCount(0);
-
     await emulatedSerial.setSilent(true);
-    await expect(page.getByRole('button', { name: 'Reconnect' })).toBeFocused();
-    await expect(trouble).toBeVisible();
-    await expectNoAxeViolations(page);
 
+    // The failure dialog shows the recent traffic on the spot…
+    const failure = page.getByRole('dialog', { name: 'Connection failed' });
+    const recent = failure.getByRole('textbox', { name: 'Recent log' });
+
+    await expect(recent).toHaveValue(/ERR Connection failed: TimeoutError: /);
+    await expectNoAxeViolations(page, { within: '[role="dialog"]' });
+
+    // …and the whole log downloads from it.
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      trouble.getByRole('button', { name: 'Download diagnostic log' }).click(),
+      failure.getByRole('button', { name: 'Download diagnostic log' }).click(),
     ]);
 
     expect(download.suggestedFilename()).toMatch(
@@ -161,6 +178,13 @@ test.describe('Serial ECU over Web Serial', () => {
       /ERR Polling pass failed \(1 in a row\), retrying: TimeoutError: /,
     );
     expect(log).toMatch(/ERR Connection failed: TimeoutError: /);
+
+    // Once closed, Details on the connection bar brings the dialog back.
+    await failure.getByRole('button', { name: 'Close' }).click();
+    await expect(page.getByRole('button', { name: 'Reconnect' })).toBeFocused();
+    await expectNoAxeViolations(page);
+    await page.getByRole('button', { name: 'Details' }).click();
+    await expect(recent).toHaveValue(/ERR Connection failed: TimeoutError: /);
   });
 
   test('stays on the connect screen when the port picker is dismissed', async ({

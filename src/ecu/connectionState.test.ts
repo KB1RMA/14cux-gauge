@@ -21,6 +21,23 @@ describe('connectionReducer', () => {
     expect(state).toEqual({ status: 'idle', afterSession: true });
   });
 
+  it('keeps the raw error detail of a failure', () => {
+    const connecting: ConnectionState = { status: 'connecting', source: demo };
+
+    expect(
+      connectionReducer(connecting, {
+        type: 'failed',
+        message: 'The ECU stopped responding.',
+        detail: 'TimeoutError: No data from ECU for 100 ms',
+      }),
+    ).toEqual({
+      status: 'error',
+      source: demo,
+      message: 'The ECU stopped responding.',
+      detail: 'TimeoutError: No data from ECU for 100 ms',
+    });
+  });
+
   it('ignores late results that no longer apply', () => {
     const idle: ConnectionState = { status: 'idle' };
 

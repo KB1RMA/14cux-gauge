@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { DotFilledIcon, StopIcon } from '@radix-ui/react-icons';
-import { useEffect, useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { ConnectionState } from '../ecu/connectionState';
 import { useEcu } from '../ecu/useEcu';
 import { useLiveData } from '../ecu/useLiveData';
 import { useRecording } from '../recording/useRecording';
 import { formatDuration, sourceLabel } from '../sessions/format';
+import { FailureDialog } from './FailureDialog';
 import styles from './StatusBar.module.css';
 
 type ActiveState = Exclude<ConnectionState, { status: 'idle' }>;
@@ -46,15 +47,14 @@ export function StatusBar() {
   const recording = useRecording();
   const { active } = recording;
   const reconnectRef = useRef<HTMLButtonElement>(null);
+  const detailsRef = useRef<HTMLButtonElement>(null);
   const failed = state.status === 'error';
-
-  // When the link drops, the control that had focus has usually gone with
-  // the dashboard; put the user on the obvious next step.
-  useEffect(() => {
-    if (failed) {
-      reconnectRef.current?.focus();
-    }
-  }, [failed]);
+  // Each failure is a new state object, so the dialog opens once for each
+  // until the user closes it; Details opens it again.
+  const [closedFor, setClosedFor] = useState<ConnectionState | undefined>(
+    undefined,
+  );
+  const [reopened, setReopened] = useState(false);
 
   if (state.status === 'idle') {
     return null;
@@ -107,6 +107,18 @@ export function StatusBar() {
         ) : null}
         {failed ? (
           <button
+            ref={detailsRef}
+            type="button"
+            onClick={() => {
+              setReopened(true);
+              setClosedFor(undefined);
+            }}
+          >
+            Details
+          </button>
+        ) : null}
+        {failed ? (
+          <button
             ref={reconnectRef}
             type="button"
             className="primary"
@@ -127,6 +139,23 @@ export function StatusBar() {
           {failed ? 'Close' : 'Disconnect'}
         </button>
       </span>
+      {state.status === 'error' ? (
+        <FailureDialog
+          open={closedFor !== state}
+          message={state.message}
+          detail={state.detail}
+          onClose={() => {
+            setClosedFor(state);
+          }}
+          onCloseAutoFocus={() => {
+            // Back to Details if that opened it; otherwise the link dropped
+            // and took the focused control with the dashboard, so put the
+            // user on the obvious next step.
+            (reopened ? detailsRef : reconnectRef).current?.focus();
+            setReopened(false);
+          }}
+        />
+      ) : null}
     </section>
   );
 }

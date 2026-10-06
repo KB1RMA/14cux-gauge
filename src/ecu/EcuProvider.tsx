@@ -108,9 +108,11 @@ export function EcuProvider({
         return;
       }
 
-      log.record('error', `Connection failed: ${describeRawError(error)}`);
+      const detail = describeRawError(error);
+
+      log.record('error', `Connection failed: ${detail}`);
       await teardown();
-      dispatch({ type: 'failed', message: describeError(error) });
+      dispatch({ type: 'failed', message: describeError(error), detail });
     },
     [teardown, log],
   );
