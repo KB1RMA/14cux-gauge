@@ -170,12 +170,14 @@ describe('App with a serial ECU', () => {
     expect(
       await screen.findByRole('button', { name: /^Serial ECU, / }),
     ).toBeInTheDocument();
-    expect(counter.count.mock.calls).toEqual([
-      ['connected/serial'],
-      ['recording/started'],
-      ['connection-lost/serial/port-error'],
-      ['recording/saved'],
-    ]);
+    await vi.waitFor(() => {
+      expect(counter.count.mock.calls).toEqual([
+        ['connected/serial'],
+        ['recording/started'],
+        ['connection-lost/serial/port-error'],
+        ['recording/saved'],
+      ]);
+    });
   });
 
   it('saves a diagnostic log that shows why the port would not open', async () => {

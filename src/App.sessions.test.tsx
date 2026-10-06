@@ -471,12 +471,15 @@ describe('Recording and browsing sessions', () => {
     );
     expect(screen.getByRole('button', { name: 'Record' })).toBeEnabled();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(counter.count.mock.calls).toEqual([
-      ['connected/demo'],
-      ['recording/started'],
-      ['recording/failed'],
-      ['recording/saved'],
-    ]);
+    // Counted from effects, which can run after the status has rendered.
+    await vi.waitFor(() => {
+      expect(counter.count.mock.calls).toEqual([
+        ['connected/demo'],
+        ['recording/started'],
+        ['recording/failed'],
+        ['recording/saved'],
+      ]);
+    });
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
   });
 });
