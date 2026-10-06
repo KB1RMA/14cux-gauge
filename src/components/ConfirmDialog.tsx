@@ -10,6 +10,11 @@ export interface ConfirmDialogProps {
   /** What will happen and what could go wrong. */
   children: ReactNode;
   confirmLabel: string;
+  /**
+   * `danger` (the default) for an action that cannot be undone or writes to
+   * the ECU; `primary` for one that only needs the user to know what it does.
+   */
+  tone?: 'danger' | 'primary';
   onConfirm(): void;
   onCancel(): void;
 }
@@ -28,6 +33,7 @@ export function ConfirmDialog({
   title,
   children,
   confirmLabel,
+  tone = 'danger',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -78,7 +84,7 @@ export function ConfirmDialog({
             {/* Not AlertDialog.Action: that would also report a close, which
                 onOpenChange cannot tell apart from Cancel. The parent closes
                 the dialog by clearing `open`. */}
-            <button type="button" className="danger" onClick={onConfirm}>
+            <button type="button" className={tone} onClick={onConfirm}>
               {confirmLabel}
             </button>
           </div>

@@ -62,6 +62,14 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
     }
   }, [finish]);
 
+  const interrupt = useCallback(async () => {
+    try {
+      await finish();
+    } catch (cause) {
+      setError(describeStorageError(cause));
+    }
+  }, [finish]);
+
   const dismissFinished = useCallback(() => {
     setFinished(undefined);
   }, []);
@@ -126,8 +134,18 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
       start,
       stop,
       dismissFinished,
+      interrupt,
     }),
-    [active, canRecord, error, finished, start, stop, dismissFinished],
+    [
+      active,
+      canRecord,
+      error,
+      finished,
+      start,
+      stop,
+      dismissFinished,
+      interrupt,
+    ],
   );
 
   return <RecordingContext value={value}>{children}</RecordingContext>;

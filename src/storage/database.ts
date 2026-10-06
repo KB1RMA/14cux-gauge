@@ -1,0 +1,133 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 14cux-gauge contributors
+import type { SessionSummary } from './sessionStore';
+
+/**
+ * The browser database that holds recorded sessions and saved ROM images,
+ * and the small helpers the stores over it share.
+ *
+ * Three object stores: `sessions` holds one summary per recording, `chunks`
+ * holds the samples in batches, one record per `append` (chunk keys
+ * auto-increment, so reading a session's chunks through the `sessionId`
+ * index returns them in the order they were appended), and `roms` holds
+ * one record per saved ROM image.
+ */
+
+export const DB_NAME = 'cuxGauge';
+const DB_VERSION = 3;
+export const SESSIONS = 'sessions';
+export const CHUNKS = 'chunks';
+export const BY_SESSION = 'sessionId';
+export const ROMS = 'roms';
+
+export function request<T>(req: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => {
+      resolve(req.result);
+    };
+
+    req.onerror = () => {
+      reject(req.error ?? new Error('IndexedDB request failed'));
+    };
+  });
+}
+
+/**
+ * Settles when `tx` commits or fails. A caller that gives up early (such as
+ * after aborting for an unknown session) need not await it.
+ */
+export function completed(tx: IDBTransaction): Promise<void> {
+  const done = new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => {
+      resolve();
+    };
+
+    // The failing request carries the cause; `tx.error` is only set once
+    // the transaction has aborted.
+    tx.onerror = (event) => {
+      const request = event.target as IDBRequest | null;
+
+      reject(
+        request?.error ?? tx.error ?? new Error('IndexedDB transaction failed'),
+      );
+    };
+
+    tx.onabort = () => {
+      reject(tx.error ?? new Error('IndexedDB transaction aborted'));
+    };
+  });
+
+  void done.catch(() => undefined);
+
+  return done;
+}
+
+/** Takes the schema from `oldVersion` to the current one. */
+function upgrade(
+  db: IDBDatabase,
+  tx: IDBTransaction,
+  oldVersion: number,
+): void {
+  // Each step takes the schema from one version to the next.
+  if (oldVersion < 1) {
+    db.createObjectStore(SESSIONS, { keyPath: 'id' });
+    db.createObjectStore(CHUNKS, { autoIncrement: true }).createIndex(
+      BY_SESSION,
+      BY_SESSION,
+    );
+  }
+
+  if (oldVersion < 2) {
+    // Session format 2 adds notes.
+    const cursor = tx.objectStore(SESSIONS).openCursor();
+
+    cursor.onsuccess = () => {
+      const current = cursor.result;
+
+      if (current) {
+        current.update({
+          ...(current.value as Omit<SessionSummary, 'notes' | 'formatVersion'>),
+          notes: '',
+          formatVersion: 2,
+        });
+        current.continue();
+      }
+    };
+  }
+
+  if (oldVersion < 3) {
+    // ROM images.
+    db.createObjectStore(ROMS, { keyPath: 'id' });
+  }
+}
+
+export interface DatabaseOptions {
+  /** The IndexedDB factory; defaults to the browser's `indexedDB`. */
+  factory?: IDBFactory;
+  /** Database name; tests use their own. */
+  name?: string;
+}
+
+/** Opens the database, creating or upgrading it if needed. */
+export async function openDatabase({
+  factory = indexedDB,
+  name = DB_NAME,
+}: DatabaseOptions = {}): Promise<IDBDatabase> {
+  const req = factory.open(name, DB_VERSION);
+
+  req.onupgradeneeded = (event) => {
+    // Set while an upgrade is running; the steps share its transaction.
+    if (req.transaction) {
+      upgrade(req.result, req.transaction, event.oldVersion);
+    }
+  };
+
+  const db = await request(req);
+
+  // Another tab upgrading the schema must not be blocked by this one.
+  db.onversionchange = () => {
+    db.close();
+  };
+
+  return db;
+}

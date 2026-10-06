@@ -84,6 +84,7 @@ export function EcuProvider({
   const [log] = useState(() => diagnostics ?? createDefaultLog());
   const [state, dispatch] = useReducer(connectionReducer, { status: 'idle' });
   const [ecu, setEcu] = useState<Ecu | undefined>(undefined);
+  const [pollingPaused, setPollingPaused] = useState(false);
   const [liveData, setLiveData] = useState<LiveData>(NO_LIVE_DATA);
   const [history] = useState(
     () => new SampleHistory(METRIC_KEYS, HISTORY_CAPACITY),
@@ -135,6 +136,7 @@ export function EcuProvider({
 
     sessionRef.current = undefined;
     setEcu(undefined);
+    setPollingPaused(false);
     setLiveData(NO_LIVE_DATA);
 
     if (current) {
@@ -276,6 +278,31 @@ export function EcuProvider({
     }
   }, [teardown, log]);
 
+  const pausePolling = useCallback(async () => {
+    const current = sessionRef.current;
+    const poller = current?.poller;
+
+    if (!current || !poller) {
+      return () => undefined;
+    }
+
+    setPollingPaused(true);
+    await poller.pause();
+
+    // The pass that was finishing may have published a snapshot.
+    setLiveData(NO_LIVE_DATA);
+    // An invalid sample marks the pause in the history, so graphs break the
+    // line there rather than join the readings either side of it.
+    pushSnapshot(history, { timestamp: Date.now() });
+
+    return () => {
+      if (sessionRef.current === current) {
+        setPollingPaused(false);
+        poller.resume();
+      }
+    };
+  }, [history]);
+
   const reconnect = useCallback(async () => {
     if (state.status !== 'idle') {
       await connect(state.source);
@@ -344,8 +371,26 @@ export function EcuProvider({
   );
 
   const value = useMemo(
-    () => ({ state, ecu, connect, disconnect, reconnect, onSnapshot }),
-    [state, ecu, connect, disconnect, reconnect, onSnapshot],
+    () => ({
+      state,
+      ecu,
+      connect,
+      disconnect,
+      reconnect,
+      pollingPaused,
+      pausePolling,
+      onSnapshot,
+    }),
+    [
+      state,
+      ecu,
+      connect,
+      disconnect,
+      reconnect,
+      pollingPaused,
+      pausePolling,
+      onSnapshot,
+    ],
   );
 
   return (

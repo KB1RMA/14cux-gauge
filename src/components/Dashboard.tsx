@@ -12,6 +12,7 @@ import { FuelMapView } from './FuelMapView';
 import { GraphsView } from './GraphsView';
 import { DASHBOARD_VIEW_KEY, parseDashboardView } from './graphSettings';
 import { LiveTiles } from './LiveTiles';
+import { RomImages } from './RomImages';
 import { ReadingsPicker } from './ReadingsPicker';
 import styles from './Dashboard.module.css';
 
@@ -68,6 +69,7 @@ export function Dashboard({ ecu }: { ecu: Ecu }) {
         <aside className={styles['side']}>
           <FaultCodes ecu={ecu} />
           <EcuInfo ecu={ecu} />
+          <RomImages />
         </aside>
       </Tabs.Content>
 

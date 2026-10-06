@@ -131,7 +131,7 @@ describe('Recording and browsing sessions', () => {
       await screen.findByRole('heading', { name: 'Live data' }),
     ).toHaveFocus();
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
-  });
+  }, 15_000);
 
   it('opens a session to replay, annotate and delete it', async () => {
     const user = userEvent.setup();

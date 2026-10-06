@@ -25,12 +25,17 @@ function sourceName(state: ActiveState): string {
 function describe(
   state: ActiveState,
   recording: boolean,
+  paused: boolean,
   recordingError: string | undefined,
 ): string {
   switch (state.status) {
     case 'connecting':
       return `Connecting to ${sourceName(state)}…`;
     case 'connected':
+      if (paused) {
+        return `${sourceName(state)} · Polling paused while the ROM is read`;
+      }
+
       if (recording) {
         return `${sourceName(state)} · Polling · Recording`;
       }
@@ -44,7 +49,7 @@ function describe(
 }
 
 export function StatusBar() {
-  const { state, disconnect, reconnect } = useEcu();
+  const { state, disconnect, reconnect, pollingPaused } = useEcu();
   const { snapshot, stats } = useLiveData();
   const { chosen } = useReadings();
   const recording = useRecording();
@@ -73,7 +78,7 @@ export function StatusBar() {
       {/* Only the connection state is a live region; the sample rate below
           changes several times a second and must not be announced. */}
       <output className={styles['text']}>
-        {describe(state, active !== undefined, recording.error)}
+        {describe(state, active !== undefined, pollingPaused, recording.error)}
       </output>
       {/* Not announced: it changes every second. */}
       {active ? (

@@ -269,7 +269,7 @@ describe('IndexedDbSessionStore failures', () => {
   it('refuses to open a database from a newer version of the app', async () => {
     const factory = new IDBFactory();
 
-    (await rawOpen(factory, 3)).close();
+    (await rawOpen(factory, 4)).close();
 
     await expect(IndexedDbSessionStore.open({ factory })).rejects.toThrow(
       expect.objectContaining({ name: 'VersionError' }) as Error,
@@ -281,9 +281,9 @@ describe('IndexedDbSessionStore failures', () => {
     const store = await IndexedDbSessionStore.open({ factory });
 
     // Would block forever if the open store did not close itself.
-    const newer = await rawOpen(factory, 3);
+    const newer = await rawOpen(factory, 4);
 
-    expect(newer.version).toBe(3);
+    expect(newer.version).toBe(4);
     newer.close();
     store.close();
   });
