@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { expectNoAxeViolations, readingFor } from './test-support/a11y';
@@ -42,9 +42,14 @@ describe('App in demo mode', () => {
 
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
 
-    expect(
-      await screen.findByRole('heading', { name: 'Connect to an ECU' }),
-    ).toHaveFocus();
+    const connectHeading = await screen.findByRole('heading', {
+      name: 'Connect to an ECU',
+    });
+
+    // Focus moves once the last read has finished and the port is closed.
+    await vi.waitFor(() => {
+      expect(connectHeading).toHaveFocus();
+    });
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
@@ -119,6 +124,52 @@ describe('App in demo mode', () => {
     expect(
       await screen.findByRole('heading', { name: 'Live graphs' }),
     ).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  });
+
+  it('reads only the chosen readings, but the fuel map still follows the engine', async () => {
+    const user = userEvent.setup();
+
+    render(<App pollIntervalMs={{ demo: 10 }} />);
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+    await screen.findByRole('heading', { name: 'Live data' });
+    await user.click(screen.getByRole('button', { name: /Choose readings/ }));
+    await user.click(screen.getByRole('button', { name: 'Only Coolant' }));
+    await user.keyboard('{Escape}');
+
+    expect(screen.getAllByRole('term').map((dt) => dt.textContent)).toEqual(
+      expect.arrayContaining(['Coolant', 'MIL']),
+    );
+    expect(screen.queryByText('Engine speed')).not.toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(
+        screen.getByText(/^2 of 20 readings · [\d.]+ samples\/s$/),
+      ).toBeInTheDocument();
+    });
+
+    // The fuel map asks for its position while it is shown.
+    await user.click(screen.getByRole('tab', { name: 'Fuel map' }));
+    await vi.waitFor(() => {
+      expect(screen.getByText(/^In use now: row 1, /)).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  });
+
+  it('stays connected when reconnected while the last connection is closing', async () => {
+    const user = userEvent.setup();
+
+    render(<App pollIntervalMs={{ demo: 10 }} />);
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+    await screen.findByRole('heading', { name: 'Live data' });
+
+    // The connect screen appears before the old connection has closed.
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+    await user.click(await screen.findByRole('button', { name: 'Demo mode' }));
+    await screen.findByRole('heading', { name: 'Live data' });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 300)));
+
+    expect(screen.getByRole('status')).toHaveTextContent('Demo ECU · Polling');
+    expect(readingFor('Engine speed')).toHaveTextContent(/^\d+ rpm$/);
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
   });
 });

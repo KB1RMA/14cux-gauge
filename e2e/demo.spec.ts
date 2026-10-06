@@ -70,6 +70,10 @@ test.describe('Demo mode', () => {
     await page.goto('./');
     await page.getByRole('button', { name: 'Demo mode' }).click();
     await page.getByRole('button', { name: 'Read fault codes' }).click();
+    // Clear is unavailable until the read has finished.
+    await expect(
+      page.getByRole('list', { name: 'Stored fault codes' }),
+    ).toBeVisible();
     // Opened from the keyboard: Safari does not focus a clicked button, so a
     // mouse click would leave no opener to return focus to.
     await page.getByRole('button', { name: 'Clear fault codes' }).focus();

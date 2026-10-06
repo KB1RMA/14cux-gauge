@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { ToggleGroup } from 'radix-ui';
+import { METRIC_KEYS } from '../metrics';
+import { useReadings } from '../readings/useReadings';
 import { useStoredState } from '../storage/useStoredState';
 import { GraphGroups } from './GraphGroups';
-import { GraphPicker } from './GraphPicker';
+import { ReadingsPicker } from './ReadingsPicker';
 import {
   GRAPH_SETTINGS_KEY,
   parseGraphSettings,
@@ -49,12 +51,14 @@ function WindowPicker({
   );
 }
 
-/** Live graphs of the chosen metrics over the chosen time window. */
+/** Live graphs of the chosen readings over the chosen time window. */
 export function GraphsView() {
   const [settings, setSettings] = useStoredState(
     GRAPH_SETTINGS_KEY,
     parseGraphSettings,
   );
+  const { chosen } = useReadings();
+  const notChosen = METRIC_KEYS.filter((key) => !chosen.includes(key));
 
   return (
     <div className={styles['graphs']}>
@@ -65,16 +69,11 @@ export function GraphsView() {
             setSettings((s) => ({ ...s, windowSeconds }));
           }}
         />
-        <GraphPicker
-          hidden={settings.hidden}
-          onChange={(hidden) => {
-            setSettings((s) => ({ ...s, hidden }));
-          }}
-        />
+        <ReadingsPicker />
       </div>
 
       <GraphGroups
-        hidden={settings.hidden}
+        hidden={notChosen}
         chart={(metric) => (
           <TimeSeriesChart
             key={metric.key}

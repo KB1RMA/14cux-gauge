@@ -72,7 +72,7 @@ export function createWebSerialEcu(
 
 export function createDemoEcu(): EcuConnection {
   const engine = createDemoEngine();
-  const ecu = new Ecu(engine.transport);
+  const ecu = new Ecu(engine.link);
 
   return {
     ecu,

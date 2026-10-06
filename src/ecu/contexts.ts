@@ -19,7 +19,8 @@ export interface EcuContextValue {
   /**
    * Calls `listener` with every snapshot the poller takes, from any
    * connection, until the returned function is called. Unlike the live data
-   * context, no snapshot is skipped between renders.
+   * context, no snapshot is skipped between renders, and each holds only
+   * the chosen readings, not those a view asked for (see `request`).
    */
   onSnapshot(listener: (snapshot: LiveSnapshot) => void): () => void;
 }

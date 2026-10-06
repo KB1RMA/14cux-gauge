@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { CheckIcon, MixerHorizontalIcon } from '@radix-ui/react-icons';
-import { Checkbox, Popover } from 'radix-ui';
+import { MixerHorizontalIcon } from '@radix-ui/react-icons';
+import { Popover } from 'radix-ui';
 import { useId } from 'react';
 import {
   METRIC_GROUPS,
@@ -10,18 +10,25 @@ import {
   metricsInGroup,
   type MetricKey,
 } from '../metrics';
+import { MetricCheckbox } from './MetricCheckbox';
 import styles from './GraphsView.module.css';
 
-/** A button that opens a list of the graphs to show or hide. */
+/**
+ * A button that opens a list of the graphs to show or hide, from those
+ * `available` (all of them by default).
+ */
 export function GraphPicker({
   hidden,
   onChange,
+  available = METRIC_KEYS,
 }: {
   hidden: readonly MetricKey[];
   onChange(hidden: MetricKey[]): void;
+  available?: readonly MetricKey[];
 }) {
   const titleId = useId();
-  const shown = METRICS.length - hidden.length;
+  const offered = METRICS.filter((m) => available.includes(m.key));
+  const shown = offered.filter((m) => !hidden.includes(m.key)).length;
 
   return (
     <Popover.Root>
@@ -29,7 +36,7 @@ export function GraphPicker({
         <MixerHorizontalIcon aria-hidden="true" />
         Choose graphs
         <span className={styles['count']}>
-          {shown} of {METRICS.length}
+          {shown} of {offered.length}
         </span>
       </Popover.Trigger>
       <Popover.Portal>
@@ -46,7 +53,7 @@ export function GraphPicker({
           <div className={styles['pickerActions']}>
             <button
               type="button"
-              disabled={hidden.length === 0}
+              disabled={shown === offered.length}
               onClick={() => {
                 onChange([]);
               }}
@@ -63,57 +70,33 @@ export function GraphPicker({
               Hide all
             </button>
           </div>
-          {METRIC_GROUPS.map((group) => (
-            <fieldset key={group.id} className={styles['pickerGroup']}>
-              <legend>{group.title}</legend>
-              {metricsInGroup(group.id).map((metric) => (
-                <MetricCheckbox
-                  key={metric.key}
-                  label={metric.label}
-                  checked={!hidden.includes(metric.key)}
-                  onCheckedChange={(checked) => {
-                    onChange(
-                      checked
-                        ? hidden.filter((k) => k !== metric.key)
-                        : [...hidden, metric.key],
-                    );
-                  }}
-                />
-              ))}
-            </fieldset>
-          ))}
+          {METRIC_GROUPS.map((group) => {
+            const metrics = metricsInGroup(group.id).filter((m) =>
+              available.includes(m.key),
+            );
+
+            return metrics.length === 0 ? null : (
+              <fieldset key={group.id} className={styles['pickerGroup']}>
+                <legend>{group.title}</legend>
+                {metrics.map((metric) => (
+                  <MetricCheckbox
+                    key={metric.key}
+                    label={metric.label}
+                    checked={!hidden.includes(metric.key)}
+                    onCheckedChange={(checked) => {
+                      onChange(
+                        checked
+                          ? hidden.filter((k) => k !== metric.key)
+                          : [...hidden, metric.key],
+                      );
+                    }}
+                  />
+                ))}
+              </fieldset>
+            );
+          })}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
-  );
-}
-
-function MetricCheckbox({
-  label,
-  checked,
-  onCheckedChange,
-}: {
-  label: string;
-  checked: boolean;
-  onCheckedChange(checked: boolean): void;
-}) {
-  const id = useId();
-
-  return (
-    <div className={styles['option']}>
-      <Checkbox.Root
-        id={id}
-        className={styles['checkbox']}
-        checked={checked}
-        onCheckedChange={(state) => {
-          onCheckedChange(state === true);
-        }}
-      >
-        <Checkbox.Indicator>
-          <CheckIcon aria-hidden="true" />
-        </Checkbox.Indicator>
-      </Checkbox.Root>
-      <label htmlFor={id}>{label}</label>
-    </div>
   );
 }

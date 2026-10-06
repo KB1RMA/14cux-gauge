@@ -28,9 +28,9 @@ test.describe('Live graphs', () => {
     await page.getByRole('radio', { name: '5 minutes' }).click();
     await expect(page.getByRole('radio', { name: '5 minutes' })).toBeChecked();
 
-    await page.getByRole('button', { name: /Choose graphs/ }).click();
+    await page.getByRole('button', { name: /Choose readings/ }).click();
 
-    const picker = page.getByRole('dialog', { name: 'Graphs to show' });
+    const picker = page.getByRole('dialog', { name: 'Readings to take' });
 
     await expectNoAxeViolations(page);
     await picker.getByRole('checkbox', { name: 'Fuel temp' }).click();

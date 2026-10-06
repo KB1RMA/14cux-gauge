@@ -3,6 +3,7 @@
 import { Tabs } from 'radix-ui';
 import { useState } from 'react';
 import type { LiveSnapshot } from '../ecu/poller';
+import { recordedKeys } from '../metrics';
 import { useReplay } from '../replay/useReplay';
 import { LiveTiles } from './LiveTiles';
 import { ReplayControls } from './ReplayControls';
@@ -21,6 +22,8 @@ export function SessionReplay({
 }) {
   const replay = useReplay(samples);
   const [view, setView] = useState('readings');
+  // Only the readings that were taken while recording.
+  const [keys] = useState(() => recordedKeys(samples));
 
   return (
     <div className={styles['replay']}>
@@ -39,10 +42,10 @@ export function SessionReplay({
           </Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="readings">
-          <LiveTiles snapshot={replay.snapshot} />
+          <LiveTiles snapshot={replay.snapshot} keys={keys} />
         </Tabs.Content>
         <Tabs.Content value="graphs">
-          <ReplayGraphs samples={samples} replay={replay} />
+          <ReplayGraphs samples={samples} replay={replay} recorded={keys} />
         </Tabs.Content>
       </Tabs.Root>
     </div>

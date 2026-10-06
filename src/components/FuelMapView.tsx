@@ -11,6 +11,7 @@ import { memo, useEffect, useId, useState, type CSSProperties } from 'react';
 import { describeError } from '../ecu/errors';
 import type { LiveSnapshot } from '../ecu/poller';
 import { hex, hexDigits } from '../hex';
+import { useReadings } from '../readings/useReadings';
 import panel from './Panel.module.css';
 import styles from './FuelMapView.module.css';
 
@@ -50,6 +51,10 @@ export function FuelMapView({
   // error.
   const [outcome, setOutcome] = useState<Outcome | undefined>(undefined);
   const captionId = useId();
+  const { request } = useReadings();
+
+  // Read the position in the map while it is shown, even if not chosen.
+  useEffect(() => request(['fuelMapRow', 'fuelMapColumn']), [request]);
 
   useEffect(() => {
     let current = true;

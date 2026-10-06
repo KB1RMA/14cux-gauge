@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import type { Gear } from '@kb1rma/libcomm14cux-ts';
-import type { LiveSnapshot } from './ecu/poller';
+import type { LiveSnapshot, ReadingKey } from './ecu/poller';
 import {
   fahrenheitToCelsius,
   formatGear,
@@ -23,7 +23,7 @@ import {
  * user's display units. `toDisplay` converts a sample for showing.
  */
 
-export type MetricKey = Exclude<keyof LiveSnapshot, 'timestamp'>;
+export type MetricKey = ReadingKey;
 
 export interface DisplayUnits {
   temperatureUnit: TemperatureUnit;
@@ -246,10 +246,18 @@ export function sampleOf(
   snapshot: LiveSnapshot,
   key: MetricKey,
 ): number | null {
-  // Recordings made before a metric existed have no value for it.
-  const value = snapshot[key] as LiveSnapshot[MetricKey] | undefined;
+  // A reading that was not taken (not chosen, or recorded before the metric
+  // existed) has no value.
+  const value = snapshot[key];
 
   return typeof value === 'boolean' ? Number(value) : (value ?? null);
+}
+
+/** The metrics any of `snapshots` has a value for, in display order. */
+export function recordedKeys(snapshots: readonly LiveSnapshot[]): MetricKey[] {
+  return METRIC_KEYS.filter((key) =>
+    snapshots.some((snapshot) => snapshot[key] !== undefined),
+  );
 }
 
 /** Formats a sample for display, with the user's units. */

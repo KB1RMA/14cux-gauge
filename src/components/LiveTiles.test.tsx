@@ -73,6 +73,22 @@ describe('LiveTiles', () => {
     expect(screen.getByRole('region', { name: 'Engine' })).toBeInTheDocument();
   });
 
+  it('shows only the readings asked for, without empty groups', () => {
+    render(
+      <PreferencesProvider>
+        <LiveTiles snapshot={SNAPSHOT} keys={['coolantTempF', 'milOn']} />
+      </PreferencesProvider>,
+    );
+
+    expect(screen.getAllByRole('term').map((dt) => dt.textContent)).toEqual([
+      'Coolant',
+      'MIL',
+    ]);
+    expect(
+      screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent),
+    ).toEqual(['Engine', 'States']);
+  });
+
   it('shows a dash for an invalid reading, and says so to screen readers', () => {
     renderTiles(SNAPSHOT);
 

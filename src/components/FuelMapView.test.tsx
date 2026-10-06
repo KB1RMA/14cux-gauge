@@ -3,6 +3,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { Ecu, MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { buildSyntheticRom } from '../demo/syntheticRom';
+import { EcuProvider } from '../ecu/EcuProvider';
 import { expectNoAxeViolations, readingFor } from '../test-support/a11y';
 import { snapshotAt } from '../test-support/snapshots';
 import { FuelMapView } from './FuelMapView';
@@ -21,11 +22,16 @@ async function ecuOnMap5() {
   return { transport, ecu };
 }
 
+/** Renders inside `EcuProvider`, which the view asks for its readings. */
+function renderView(view: React.ReactElement) {
+  return render(<EcuProvider>{view}</EcuProvider>);
+}
+
 describe('FuelMapView', () => {
   it('shows the map in use, its factors and its values by row and rpm', async () => {
     const { ecu } = await ecuOnMap5();
 
-    render(<FuelMapView ecu={ecu} snapshot={undefined} />);
+    renderView(<FuelMapView ecu={ecu} snapshot={undefined} />);
 
     expect(screen.getByText('Reading the fuel map…')).toBeInTheDocument();
 
@@ -77,7 +83,7 @@ describe('FuelMapView', () => {
   it('outlines the cell the ECU is using and says which it is', async () => {
     const { ecu } = await ecuOnMap5();
 
-    render(
+    renderView(
       <FuelMapView
         ecu={ecu}
         snapshot={snapshotAt(0, { fuelMapRow: 1.5, fuelMapColumn: 6.75 })}
@@ -97,7 +103,7 @@ describe('FuelMapView', () => {
   it('names the scrolling region after the table caption', async () => {
     const { ecu } = await ecuOnMap5();
 
-    render(<FuelMapView ecu={ecu} snapshot={undefined} />);
+    renderView(<FuelMapView ecu={ecu} snapshot={undefined} />);
 
     expect(
       await screen.findByRole('region', { name: /^Fuel map 5 values, in hex/ }),
@@ -112,14 +118,14 @@ describe('FuelMapView', () => {
     const ecu = new Ecu(transport);
 
     await ecu.connect();
-    render(<FuelMapView ecu={ecu} snapshot={undefined} />);
+    renderView(<FuelMapView ecu={ecu} snapshot={undefined} />);
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
   it('has no detectable accessibility violations', async () => {
     const { ecu } = await ecuOnMap5();
-    const { container } = render(
+    const { container } = renderView(
       <FuelMapView
         ecu={ecu}
         snapshot={snapshotAt(0, { fuelMapRow: 0, fuelMapColumn: 4 })}

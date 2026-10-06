@@ -13,7 +13,9 @@ import {
   Gear,
   MemoryOffset,
   SimulatedTransport,
+  type Transport,
 } from '@kb1rma/libcomm14cux-ts';
+import { LatencyTransport, type LatencyOptions } from './latencyTransport';
 import {
   buildSyntheticRom,
   DEMO_RPM_TABLE,
@@ -25,11 +27,24 @@ export interface DemoEngineOptions {
   tickMs?: number;
   /** Store a demo fault code (purge valve leak) at start-up. Defaults to true. */
   withFault?: boolean;
+  /** How long `link` takes to answer each read. */
+  latency?: LatencyOptions;
 }
 
+/**
+ * Roughly a 7812-baud link with a 1 ms FTDI latency timer: each byte takes
+ * about 1.3 ms on the wire.
+ */
+export const DEMO_LATENCY: LatencyOptions = { perReadMs: 1, perByteMs: 1.3 };
+
 export interface DemoEngine {
-  /** The simulated ECU, ready to hand to `new Ecu(...)`. */
+  /** The simulated ECU, answering instantly; its memory can be inspected. */
   readonly transport: SimulatedTransport;
+  /**
+   * The same ECU behind a simulated serial link, so reads take time. This is
+   * what the app connects to.
+   */
+  readonly link: Transport;
   /** Stops the timer. The memory keeps its last values. */
   stop(): void;
 }
@@ -317,6 +332,7 @@ export function createDemoEngine(options: DemoEngineOptions = {}): DemoEngine {
 
   return {
     transport,
+    link: new LatencyTransport(transport, options.latency ?? DEMO_LATENCY),
     stop: () => {
       clearInterval(timer);
     },

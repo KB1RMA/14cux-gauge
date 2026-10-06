@@ -17,8 +17,9 @@ export type WindowSeconds = (typeof WINDOW_OPTIONS)[number]['seconds'];
 export interface GraphSettings {
   windowSeconds: WindowSeconds;
   /**
-   * Graphs the user has turned off. Stored this way round so a metric added
-   * in a later version shows up by default.
+   * Graphs the user has turned off in session replay. (Live graphs show the
+   * chosen readings instead.) Stored this way round so a metric added in a
+   * later version shows up by default.
    */
   hidden: MetricKey[];
 }
