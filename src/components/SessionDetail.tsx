@@ -4,7 +4,7 @@ import { ArrowLeftIcon } from '@radix-ui/react-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useRecording } from '../recording/useRecording';
 import { Link, useNavigate } from 'react-router';
-import { SESSIONS_PATH, type ReplayTab } from '../routing/paths';
+import { SESSIONS_PATH, sessionPath, type ReplayTab } from '../routing/paths';
 import { useSessionList } from '../sessions/useSessionList';
 import { useSessionSamples } from '../sessions/useSessionSamples';
 import { useSessions } from '../sessions/useSessions';
@@ -212,8 +212,17 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
           setDeleteFailed(false);
           store?.remove(target.id).then(
             () => {
-              // Back would only lead to the session that is now gone.
-              void navigate(SESSIONS_PATH, { replace: true });
+              // The user may have moved on while it was deleting; only leave
+              // the session if it is still showing.
+              const showing = [
+                sessionPath(target.id),
+                sessionPath(target.id, 'graphs'),
+              ].some((path) => window.location.hash === `#${path}`);
+
+              if (showing) {
+                // Back would only lead to the session that is now gone.
+                void navigate(SESSIONS_PATH, { replace: true });
+              }
             },
             () => {
               setDeleteFailed(true);

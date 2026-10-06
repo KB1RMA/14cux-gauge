@@ -428,6 +428,56 @@ describe('Recording and browsing sessions', () => {
     ).toBeInTheDocument();
   });
 
+  it('stays where the user went while a session is being deleted', async () => {
+    const user = userEvent.setup();
+
+    let finishRemove = () => {};
+
+    class SlowStore extends MemorySessionStore {
+      override remove(id: string): Promise<void> {
+        return new Promise((resolve) => {
+          finishRemove = () => {
+            resolve(super.remove(id));
+          };
+        });
+      }
+    }
+
+    const store = new SlowStore();
+
+    await store.create({
+      name: 'Slow to go',
+      source: 'demo',
+      startedAt: START,
+    });
+    render(
+      <App
+        openSessionStore={() => Promise.resolve({ store, persistent: true })}
+      />,
+    );
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: 'Slow to go' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Delete session' }),
+    );
+    await user.click(
+      within(
+        screen.getByRole('alertdialog', { name: 'Delete this session?' }),
+      ).getByRole('button', { name: 'Delete session' }),
+    );
+    await user.click(sessionsNav().getByRole('link', { name: 'Live' }));
+
+    expect(window.location.hash).toBe('#/live');
+
+    await act(async () => {
+      finishRemove();
+      await Promise.resolve();
+    });
+
+    expect(window.location.hash).toBe('#/live');
+    expect(await store.list()).toEqual([]);
+  });
+
   it('stops recording and says so when the browser cannot save', async () => {
     const user = userEvent.setup();
 
