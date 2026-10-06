@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { useLayoutEffect, useMemo, type ReactNode } from 'react';
+import { browserAsksNotToTrack } from '../analytics/goatCounter';
 import { asRecord, oneOf } from '../storage/settings';
 import { useStoredState } from '../storage/useStoredState';
 import type { SpeedUnit, TemperatureUnit } from '../units';
@@ -9,6 +10,7 @@ import {
   type PalettePreference,
   type Preferences,
   type ThemePreference,
+  type UsageCountsPreference,
 } from './context';
 
 const STORAGE_KEY = 'preferences';
@@ -28,6 +30,13 @@ function parsePreferences(stored: unknown): Preferences {
     speedUnit: oneOf(p['speedUnit'], ['mph', 'kmh'], 'mph'),
     theme: oneOf(p['theme'], ['system', 'light', 'dark'], 'system'),
     palette: oneOf(p['palette'], PALETTES, 'coniston'),
+    // Off by default if the browser asks sites not to track; a choice made
+    // in Preferences overrides that.
+    usageCounts: oneOf(
+      p['usageCounts'],
+      ['on', 'off'],
+      browserAsksNotToTrack() ? 'off' : 'on',
+    ),
   };
 }
 
@@ -82,6 +91,9 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       },
       setPalette: (palette: PalettePreference) => {
         setPreferences((p) => ({ ...p, palette }));
+      },
+      setUsageCounts: (usageCounts: UsageCountsPreference) => {
+        setPreferences((p) => ({ ...p, usageCounts }));
       },
     }),
     [preferences, setPreferences],

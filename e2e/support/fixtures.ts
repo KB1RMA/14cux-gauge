@@ -21,9 +21,18 @@ export interface EmulatedSerial {
   unplug(): Promise<void>;
 }
 
+/** GoatCounter's script and counter hosts. */
+export const USAGE_COUNTER_HOSTS =
+  /^https:\/\/(gc\.zgo\.at|[^/]+\.goatcounter\.com)\//;
+
 interface Fixtures {
   /** Fails the test if the page logs an error or throws. Always on. */
   pageErrors: undefined;
+  /**
+   * Keeps test runs out of the project's usage counts, should a build ever
+   * try to count from the test server. Always on.
+   */
+  noUsageCounts: undefined;
   /**
    * Installs the emulated serial port before the app loads. Request this
    * fixture before the first `page.goto`.
@@ -46,6 +55,14 @@ export const test = base.extend<Fixtures>({
       });
       await use(undefined);
       expect(errors, 'errors logged by the page').toEqual([]);
+    },
+    { auto: true },
+  ],
+
+  noUsageCounts: [
+    async ({ page }, use) => {
+      await page.route(USAGE_COUNTER_HOSTS, (route) => route.abort());
+      await use(undefined);
     },
     { auto: true },
   ],

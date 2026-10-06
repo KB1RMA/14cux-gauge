@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { useState } from 'react';
+import { goatCounter, type UsageCounter } from './analytics/goatCounter';
+import { useUsageCounts } from './analytics/useUsageCounts';
 import { AppNotices } from './components/AppNotices';
 import { ConnectScreen } from './components/ConnectScreen';
 import { Dashboard } from './components/Dashboard';
@@ -28,8 +30,18 @@ const VIEWS: readonly { id: View; label: string }[] = [
   { id: 'sessions', label: 'Sessions' },
 ];
 
-function Main({ view }: { view: View }) {
+const DEFAULT_USAGE_COUNTER = goatCounter();
+
+function Main({
+  view,
+  usageCounter,
+}: {
+  view: View;
+  usageCounter: UsageCounter | undefined;
+}) {
   const { state, ecu } = useEcu();
+
+  useUsageCounts(usageCounter);
   let content;
 
   if (view === 'sessions') {
@@ -54,10 +66,13 @@ export function App({
   pollIntervalMs,
   openSessionStore,
   appStatus,
+  usageCounter = DEFAULT_USAGE_COUNTER,
 }: Pick<EcuProviderProps, 'pollIntervalMs'> & {
   openSessionStore?: SessionsProviderProps['open'];
   /** Overrides the offline and update checks; they are off outside a production build. */
   appStatus?: AppStatusStoreOptions;
+  /** Counts usage anonymously; only set on the published site by default. */
+  usageCounter?: UsageCounter | undefined;
 }) {
   const [view, setView] = useState<View>('live');
 
@@ -87,11 +102,13 @@ export function App({
                       </button>
                     ))}
                   </nav>
-                  <PreferencesMenu />
+                  <PreferencesMenu
+                    offerUsageCounts={usageCounter !== undefined}
+                  />
                 </header>
                 <AppNotices />
-                <Main view={view} />
-                <Footer />
+                <Main view={view} usageCounter={usageCounter} />
+                <Footer countsUsage={usageCounter !== undefined} />
               </div>
             </RecordingProvider>
           </SessionsProvider>

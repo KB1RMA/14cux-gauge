@@ -9,7 +9,16 @@ export const SOURCE_URL = 'https://github.com/KB1RMA/14cux-gauge';
 export const LICENSE_URL = 'https://www.gnu.org/licenses/gpl-3.0.html';
 const LIBRARY_URL = 'https://github.com/KB1RMA/comm14cux-ts';
 
-export function Footer({ build = BUILD_INFO }: { build?: BuildInfo }) {
+const GOATCOUNTER_URL = 'https://www.goatcounter.com';
+
+export function Footer({
+  build = BUILD_INFO,
+  countsUsage = false,
+}: {
+  build?: BuildInfo;
+  /** Whether this copy of the app counts usage, so the footer says so. */
+  countsUsage?: boolean;
+}) {
   return (
     <footer className={styles['footer']}>
       <p>
@@ -46,6 +55,14 @@ export function Footer({ build = BUILD_INFO }: { build?: BuildInfo }) {
         )}
         .
       </p>
+      {countsUsage && (
+        <p>
+          Visits and basic usage are counted anonymously with{' '}
+          <ExternalLink href={GOATCOUNTER_URL}>GoatCounter</ExternalLink>,
+          without cookies. Readings never leave your browser. You can turn
+          counting off in Preferences.
+        </p>
+      )}
       <p>
         <DownloadLogButton />
       </p>

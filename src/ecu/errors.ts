@@ -21,6 +21,59 @@ export function isPortPickerCancelled(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'NotFoundError';
 }
 
+/**
+ * A coarse, fixed category for an error, carrying nothing from its message;
+ * safe to count in anonymous usage statistics.
+ */
+export type ErrorReason =
+  | 'timeout'
+  | 'protocol'
+  | 'closed'
+  | 'cancelled'
+  | 'invalid-reading'
+  | 'no-port'
+  | 'port-in-use'
+  | 'port-error'
+  | 'blocked'
+  | 'other';
+
+export function errorReason(error: unknown): ErrorReason {
+  if (error instanceof TimeoutError) {
+    return 'timeout';
+  }
+
+  if (error instanceof ProtocolError) {
+    return 'protocol';
+  }
+
+  if (error instanceof NotConnectedError) {
+    return 'closed';
+  }
+
+  if (error instanceof ReadCancelledError) {
+    return 'cancelled';
+  }
+
+  if (error instanceof InvalidReadingError) {
+    return 'invalid-reading';
+  }
+
+  if (error instanceof DOMException) {
+    switch (error.name) {
+      case 'NotFoundError':
+        return 'no-port';
+      case 'InvalidStateError':
+        return 'port-in-use';
+      case 'NetworkError':
+        return 'port-error';
+      case 'SecurityError':
+        return 'blocked';
+    }
+  }
+
+  return 'other';
+}
+
 /** Turns any error from the ECU stack or Web Serial into a sentence for the UI. */
 export function describeError(error: unknown): string {
   if (error instanceof TimeoutError) {

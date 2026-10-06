@@ -6,6 +6,7 @@ import { useId } from 'react';
 import type {
   PalettePreference,
   ThemePreference,
+  UsageCountsPreference,
 } from '../preferences/context';
 import { usePreferences } from '../preferences/usePreferences';
 import type { SpeedUnit, TemperatureUnit } from '../units';
@@ -112,8 +113,21 @@ const PALETTE_OPTIONS = [
   { value: 'racing-green', text: 'British Racing Green', swatch: true },
 ] as const satisfies readonly Option<PalettePreference>[];
 
-/** The app bar's settings menu: display units, theme and paint, kept off the dashboard. */
-export function PreferencesMenu() {
+const USAGE_COUNT_OPTIONS = [
+  { value: 'on', text: 'Count my visits anonymously' },
+  { value: 'off', text: 'Don’t count my visits' },
+] as const satisfies readonly Option<UsageCountsPreference>[];
+
+/**
+ * The app bar's settings menu: display units, theme and paint, kept off the
+ * dashboard. `offerUsageCounts` adds the usage-counts choice, which only
+ * matters where the app counts usage (the published site).
+ */
+export function PreferencesMenu({
+  offerUsageCounts = false,
+}: {
+  offerUsageCounts?: boolean;
+}) {
   const {
     temperatureUnit,
     setTemperatureUnit,
@@ -123,6 +137,8 @@ export function PreferencesMenu() {
     setTheme,
     palette,
     setPalette,
+    usageCounts,
+    setUsageCounts,
   } = usePreferences();
 
   return (
@@ -167,6 +183,17 @@ export function PreferencesMenu() {
             value={palette}
             onChange={setPalette}
           />
+          {offerUsageCounts && (
+            <>
+              <DropdownMenu.Separator className={styles['separator']} />
+              <ChoiceGroup
+                label="Usage counts"
+                options={USAGE_COUNT_OPTIONS}
+                value={usageCounts}
+                onChange={setUsageCounts}
+              />
+            </>
+          )}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
