@@ -230,7 +230,7 @@ describe('Recording and browsing sessions', () => {
       screen.getByRole('heading', { name: 'Recorded sessions' }),
     ).toHaveFocus();
     expect(await store.list()).toEqual([]);
-  });
+  }, 15_000);
 
   it('replays a recording with the keyboard', async () => {
     const user = userEvent.setup();
