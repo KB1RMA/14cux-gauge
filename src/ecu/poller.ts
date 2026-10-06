@@ -8,6 +8,7 @@ import {
   type Ecu,
   type FuelMapIndex,
   type Gear,
+  type PurgeValveState,
 } from '@kb1rma/libcomm14cux-ts';
 import { isTransientLinkError } from './errors';
 
@@ -47,6 +48,15 @@ export interface LiveReadings {
   /** Whether the ECU is controlling the idle speed. */
   idleMode: Reading<boolean>;
   targetIdleRpm: Reading<number>;
+  /**
+   * The CO trim potentiometer's voltage. Only a tune without lambda feedback
+   * uses it; the ECU keeps it where a closed loop tune keeps the even bank's
+   * long term trim.
+   */
+  coTrimVoltage: Reading<number>;
+  purgeValve: Reading<PurgeValveState>;
+  acCompressorOn: Reading<boolean>;
+  screenHeaterOn: Reading<boolean>;
 }
 
 export type ReadingKey = keyof LiveReadings;
@@ -89,6 +99,10 @@ const READERS: {
   lambdaLongEven: (ecu) => ecu.getLambdaTrimLong(Bank.Even),
   idleMode: (ecu) => ecu.getIdleMode(),
   targetIdleRpm: (ecu) => ecu.getTargetIdle(),
+  coTrimVoltage: (ecu) => ecu.getCOTrimVoltage(),
+  purgeValve: (ecu) => ecu.getPurgeValveState(),
+  acCompressorOn: (ecu) => ecu.getACCompressorState(),
+  screenHeaterOn: (ecu) => ecu.getScreenHeaterState(),
 };
 
 const READING_ORDER = Object.keys(READERS) as ReadingKey[];
@@ -105,6 +119,10 @@ export const SLOW_READINGS: ReadonlySet<ReadingKey> = new Set([
   'lambdaLongEven',
   'idleMode',
   'targetIdleRpm',
+  'coTrimVoltage',
+  'purgeValve',
+  'acCompressorOn',
+  'screenHeaterOn',
 ]);
 
 /** `snapshot` with only the readings in `keys`. */
