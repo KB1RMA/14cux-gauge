@@ -10,6 +10,12 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { DiagnosticsContext } from '../diagnostics/context';
+import {
+  DiagnosticLog,
+  consoleMirror,
+  describeRawError,
+} from '../diagnostics/diagnosticLog';
 import { pushSnapshot } from '../history/pushSnapshot';
 import { SampleHistory } from '../history/sampleHistory';
 import { METRIC_KEYS } from '../metrics';
@@ -40,6 +46,15 @@ export interface EcuProviderProps {
   children: ReactNode;
   /** Pause between polling passes for each connection kind, in milliseconds. */
   pollIntervalMs?: Partial<Record<EcuSource['kind'], number>>;
+  /** Where serial traffic and connection events are recorded. */
+  diagnostics?: DiagnosticLog;
+}
+
+function createDefaultLog(): DiagnosticLog {
+  // Echo connection events (not bytes) to the console, except in unit tests.
+  return new DiagnosticLog(
+    import.meta.env.MODE === 'test' ? {} : { mirror: consoleMirror },
+  );
 }
 
 interface Session {
@@ -48,7 +63,12 @@ interface Session {
   unwatch?: () => void;
 }
 
-export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
+export function EcuProvider({
+  children,
+  pollIntervalMs,
+  diagnostics,
+}: EcuProviderProps) {
+  const [log] = useState(() => diagnostics ?? createDefaultLog());
   const [state, dispatch] = useReducer(connectionReducer, { status: 'idle' });
   const [ecu, setEcu] = useState<Ecu | undefined>(undefined);
   const [liveData, setLiveData] = useState<LiveData>(NO_LIVE_DATA);
@@ -86,10 +106,13 @@ export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
         return;
       }
 
+      const detail = describeRawError(error);
+
+      log.record('error', `Connection failed: ${detail}`);
       await teardown();
-      dispatch({ type: 'failed', message: describeError(error) });
+      dispatch({ type: 'failed', message: describeError(error), detail });
     },
-    [teardown],
+    [teardown, log],
   );
 
   const connect = useCallback(
@@ -99,8 +122,14 @@ export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
       await teardown();
       history.clear();
       dispatch({ type: 'connect', source });
+      log.record(
+        'event',
+        source.kind === 'demo'
+          ? 'Connecting to the demo ECU'
+          : `Connecting to a serial ECU${source.doubleSpeed ? ' (double-speed firmware)' : ''}`,
+      );
 
-      const connection = createEcuConnection(source);
+      const connection = createEcuConnection(source, log);
 
       sessionRef.current = { connection };
 
@@ -117,6 +146,7 @@ export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
       }
 
       sessionRef.current.unwatch = connection.onLost(() => {
+        log.record('event', 'The browser reported the port disconnected');
         void fail(
           myGeneration,
           new DOMException('The serial port was disconnected.', 'NetworkError'),
@@ -136,18 +166,34 @@ export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
         onError: (error) => {
           void fail(myGeneration, error);
         },
+        onRetry: (error, consecutiveErrors) => {
+          log.record(
+            'error',
+            `Polling pass failed (${String(consecutiveErrors)} in a row), retrying: ${describeRawError(error)}`,
+          );
+        },
       });
       setEcu(connection.ecu);
       dispatch({ type: 'connected' });
+      log.record('event', 'Connected; polling live data');
     },
-    [teardown, fail, history, snapshotListeners, demoInterval, serialInterval],
+    [
+      teardown,
+      fail,
+      history,
+      snapshotListeners,
+      demoInterval,
+      serialInterval,
+      log,
+    ],
   );
 
   const disconnect = useCallback(async () => {
     generationRef.current++;
+    log.record('event', 'Disconnecting at the user’s request');
     await teardown();
     dispatch({ type: 'disconnected' });
-  }, [teardown]);
+  }, [teardown, log]);
 
   const reconnect = useCallback(async () => {
     if (state.status !== 'idle') {
@@ -180,10 +226,12 @@ export function EcuProvider({ children, pollIntervalMs }: EcuProviderProps) {
   );
 
   return (
-    <EcuContext value={value}>
-      <LiveDataContext value={liveData}>
-        <HistoryContext value={history}>{children}</HistoryContext>
-      </LiveDataContext>
-    </EcuContext>
+    <DiagnosticsContext value={log}>
+      <EcuContext value={value}>
+        <LiveDataContext value={liveData}>
+          <HistoryContext value={history}>{children}</HistoryContext>
+        </LiveDataContext>
+      </EcuContext>
+    </DiagnosticsContext>
   );
 }

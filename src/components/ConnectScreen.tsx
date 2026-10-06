@@ -4,6 +4,8 @@ import { CheckIcon } from '@radix-ui/react-icons';
 import { Checkbox, Label } from 'radix-ui';
 import { useEffect, useId, useRef, useState } from 'react';
 import { describeError, isPortPickerCancelled } from '../ecu/errors';
+import { describeRawError } from '../diagnostics/diagnosticLog';
+import { useDiagnostics } from '../diagnostics/useDiagnostics';
 import { useEcu } from '../ecu/useEcu';
 import { useStoredState } from '../storage/useStoredState';
 import { ExternalLink } from './ExternalLink';
@@ -24,6 +26,7 @@ function isWebSerialSupported(): boolean {
 
 export function ConnectScreen() {
   const { state, connect } = useEcu();
+  const log = useDiagnostics();
   const [doubleSpeed, setDoubleSpeed] = useStoredState(
     DOUBLE_SPEED_KEY,
     parseDoubleSpeed,
@@ -48,10 +51,18 @@ export function ConnectScreen() {
 
     let port: SerialPort;
 
+    log.record('event', 'Asking the browser for a serial port');
+
     try {
       port = await navigator.serial.requestPort();
     } catch (error) {
-      if (!isPortPickerCancelled(error)) {
+      if (isPortPickerCancelled(error)) {
+        log.record('event', 'The port picker was dismissed');
+      } else {
+        log.record(
+          'error',
+          `The port picker failed: ${describeRawError(error)}`,
+        );
         setPickerError(describeError(error));
       }
 

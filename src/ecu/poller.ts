@@ -63,6 +63,11 @@ export interface PollerOptions {
    * Not called after {@link Poller.stop}.
    */
   onError(error: unknown): void;
+  /**
+   * Called when a pass fails with a transient error and will be retried,
+   * with how many passes in a row have now failed.
+   */
+  onRetry?(error: unknown, consecutiveErrors: number): void;
 }
 
 export interface Poller {
@@ -196,6 +201,8 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
 
         return;
       }
+
+      options.onRetry?.(error, consecutiveErrors);
     }
 
     // setTimeout rather than setInterval, so passes can never overlap.

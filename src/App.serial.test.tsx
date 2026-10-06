@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { expectNoAxeViolations } from './test-support/a11y';
@@ -42,9 +42,42 @@ function installSerial(port: FakeSerialPort) {
   });
 }
 
+/** Captures what the app hands the browser to download. */
+function captureDownloads() {
+  const files: { name: string; blob: Blob }[] = [];
+  const blobs = new Map<string, Blob>();
+
+  Object.defineProperty(URL, 'createObjectURL', {
+    configurable: true,
+    value: (blob: Blob) => {
+      const url = `blob:test/${String(blobs.size)}`;
+
+      blobs.set(url, blob);
+
+      return url;
+    },
+  });
+  Object.defineProperty(URL, 'revokeObjectURL', {
+    configurable: true,
+    value: () => undefined,
+  });
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+    this: HTMLAnchorElement,
+  ) {
+    const blob = blobs.get(this.href);
+
+    if (blob) {
+      files.push({ name: this.download, blob });
+    }
+  });
+
+  return files;
+}
+
 describe('App with a serial ECU', () => {
   afterEach(() => {
     Reflect.deleteProperty(navigator, 'serial');
+    vi.restoreAllMocks();
   });
 
   it('reports a port that will not open and lets the user try again', async () => {
@@ -58,7 +91,14 @@ describe('App with a serial ECU', () => {
     await user.click(screen.getByRole('checkbox', { name: /Double-speed/ }));
     await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
+    // The failure dialog hides the page behind it until closed.
+    await user.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Connection failed' }),
+      ).getByRole('button', { name: 'Close' }),
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent(
       'Disconnected: The serial port could not be opened',
     );
 
@@ -68,6 +108,9 @@ describe('App with a serial ECU', () => {
       expect(port.opens).toBe(2);
     });
 
+    // A new failure opens the dialog again.
+    await screen.findByRole('dialog', { name: 'Connection failed' });
+    await user.keyboard('{Escape}');
     await user.click(screen.getByRole('button', { name: 'Close' }));
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -95,18 +138,23 @@ describe('App with a serial ECU', () => {
       port.dispatchEvent(new Event('disconnect'));
     });
 
+    // The recording stopped with the link and keeps its default name; the
+    // only dialog is the one explaining the failure.
     expect(
-      await screen.findByRole('button', { name: 'Reconnect' }),
-    ).toHaveFocus();
+      await screen.findByRole('dialog', { name: 'Connection failed' }),
+    ).toHaveTextContent(
+      'Error: NetworkError: The serial port was disconnected.',
+    );
+    await user.keyboard('{Escape}');
+
+    // Closing it lands on the obvious next step.
+    expect(screen.getByRole('button', { name: 'Reconnect' })).toHaveFocus();
     expect(screen.getByRole('status')).toHaveTextContent(
       'Disconnected: The serial port could not be opened or was disconnected.',
     );
     expect(
       screen.getByRole('button', { name: 'Connect to ECU' }),
     ).toBeInTheDocument();
-    // The recording stopped with the link and keeps its default name; no
-    // dialog takes focus from Reconnect.
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await expectNoAxeViolations(document.body);
 
     await user.click(screen.getByRole('button', { name: 'Sessions' }));
@@ -114,6 +162,93 @@ describe('App with a serial ECU', () => {
     expect(
       await screen.findByRole('button', { name: /^Serial ECU, / }),
     ).toBeInTheDocument();
+  });
+
+  it('saves a diagnostic log that shows why the port would not open', async () => {
+    const user = userEvent.setup();
+    const port = new FakeSerialPort();
+    const downloads = captureDownloads();
+
+    port.failOpen = true;
+    installSerial(port);
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Connection failed',
+    });
+
+    expect(dialog).toHaveAccessibleDescription(
+      'The serial port could not be opened or was disconnected. Another program may be using it.',
+    );
+    expect(dialog).toHaveTextContent(
+      'Error: NetworkError: Failed to open serial port.',
+    );
+
+    const recent = within(dialog).getByRole('textbox', { name: 'Recent log' });
+
+    expect(recent).toHaveAttribute('readonly');
+    expect((recent as HTMLTextAreaElement).value).toMatch(
+      /ERR Opening serial port failed: NetworkError: Failed to open serial port\.\n.*ERR Connection failed: NetworkError: Failed to open serial port\.$/,
+    );
+    await expectNoAxeViolations(document.body);
+
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Download diagnostic log' }),
+    );
+
+    expect(downloads).toHaveLength(1);
+    expect(downloads[0]?.name).toMatch(/^14cux-gauge-log-.*\.txt$/);
+
+    const text = (await downloads[0]?.blob.text()) ?? '';
+
+    expect(text).toContain('Web Serial:  available');
+    expect(text).toContain(
+      'Connection:  error (serial): The serial port could not be opened',
+    );
+    expect(text).toContain('Asking the browser for a serial port');
+    expect(text).toContain(
+      'Serial port: USB vendor unknown, product unknown; 7812 baud, 8N1, no flow control',
+    );
+    expect(text).toContain(
+      'ERR Opening serial port failed: NetworkError: Failed to open serial port.',
+    );
+    expect(text).toContain(
+      'ERR Connection failed: NetworkError: Failed to open serial port.',
+    );
+
+    // Once closed, Details brings the dialog back.
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Details' }));
+    await user.click(
+      within(
+        screen.getByRole('dialog', { name: 'Connection failed' }),
+      ).getByRole('button', { name: 'Close' }),
+    );
+
+    expect(screen.getByRole('button', { name: 'Details' })).toHaveFocus();
+  });
+
+  it('logs polling passes that time out and are retried before giving up', async () => {
+    const port = new FakeSerialPort();
+    const user = userEvent.setup();
+
+    // The port opens but the ECU never answers, so every read times out.
+    installSerial(port);
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
+
+    const dialog = await screen.findByRole(
+      'dialog',
+      { name: 'Connection failed' },
+      { timeout: 3_000 },
+    );
+    const recent = within(dialog).getByRole('textbox', { name: 'Recent log' });
+
+    expect(dialog).toHaveTextContent('Error: TimeoutError: ');
+    expect((recent as HTMLTextAreaElement).value).toMatch(
+      /ERR Polling pass failed \(1 in a row\), retrying: TimeoutError: [^\n]*\n(.*\n)*.*ERR Polling pass failed \(2 in a row\), retrying: TimeoutError: /,
+    );
   });
 
   it('stays put when the user dismisses the port picker', async () => {

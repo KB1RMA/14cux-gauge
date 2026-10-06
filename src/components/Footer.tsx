@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { BUILD_INFO, type BuildInfo } from '../buildInfo';
+import { DownloadLogButton } from './DownloadLogButton';
 import { ExternalLink } from './ExternalLink';
 import styles from './Footer.module.css';
 
@@ -44,6 +45,9 @@ export function Footer({ build = BUILD_INFO }: { build?: BuildInfo }) {
           </>
         )}
         .
+      </p>
+      <p>
+        <DownloadLogButton />
       </p>
     </footer>
   );
