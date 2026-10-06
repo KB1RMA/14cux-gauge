@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.1.3...v0.2.0) (2026-10-06)
+
+
+### Features
+
+* choose which readings to take, so fewer readings poll faster ([#37](https://github.com/KB1RMA/14cux-gauge/issues/37)) ([5308817](https://github.com/KB1RMA/14cux-gauge/commit/5308817d321e83a63a6f48e05f8bb4b7afc05baa))
+* show the fuel map in use, idle control, injector pulse and rev limit ([#36](https://github.com/KB1RMA/14cux-gauge/issues/36)) ([66b6342](https://github.com/KB1RMA/14cux-gauge/commit/66b634258d4c240d95a5b35939eee61f74cad066))
+
 ## [0.1.3](https://github.com/KB1RMA/14cux-gauge/compare/v0.1.2...v0.1.3) (2026-10-06)
 
 
