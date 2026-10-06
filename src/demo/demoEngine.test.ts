@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { Ecu, Gear, MemoryOffset, ThrottlePosType } from 'comm14cux-ts';
+import {
+  Ecu,
+  Gear,
+  MemoryOffset,
+  ThrottlePosType,
+} from '@kb1rma/libcomm14cux-ts';
 import { createDemoEngine, type DemoEngineOptions } from './demoEngine';
 
 async function connectDemo(options?: DemoEngineOptions) {

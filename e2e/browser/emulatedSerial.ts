@@ -6,7 +6,7 @@
 // the ECU's byte-level serial protocol. The shipped app's WebSerialTransport
 // therefore talks to it exactly as it would talk to a USB cable.
 
-import { SimulatedTransport } from 'comm14cux-ts';
+import { SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { buildSyntheticRom } from '../../src/demo/syntheticRom';
 
 export type PortChoice = 'grant' | 'cancel';

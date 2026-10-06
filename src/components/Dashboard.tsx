@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { Ecu } from 'comm14cux-ts';
+import type { Ecu } from '@kb1rma/libcomm14cux-ts';
 import { Tabs } from 'radix-ui';
 import { useEffect, useRef } from 'react';
 import { useLiveData } from '../ecu/useLiveData';

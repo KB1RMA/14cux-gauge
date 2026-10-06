@@ -35,10 +35,8 @@ concurrency:
   group: release-${{ github.event.release.tag_name || github.ref_name }}
   cancel-in-progress: false
 
-# comm14cux-ts is not published to npm yet; see validate.yml.
 env:
   APP_DIR: 14cux-gauge
-  LIB_DIR: comm14cux-ts
   TAG: ${{ github.event.release.tag_name || github.ref_name }}
 
 jobs:
@@ -66,23 +64,11 @@ jobs:
       - uses: actions/checkout@v7
         with:
           path: ${{ env.APP_DIR }}
-      - uses: actions/checkout@v7
-        with:
-          repository: KB1RMA/comm14cux-ts
-          path: ${{ env.LIB_DIR }}
       - uses: actions/setup-node@v7
         with:
           node-version-file: ${{ env.APP_DIR }}/.nvmrc
           cache: 'npm'
-          cache-dependency-path: |
-            ${{ env.APP_DIR }}/package-lock.json
-            ${{ env.LIB_DIR }}/package-lock.json
-      - name: Build comm14cux-ts
-        working-directory: ${{ env.LIB_DIR }}
-        run: npm ci && npm run build
-      - name: Record the comm14cux-ts commit
-        id: lib
-        run: echo "commit=$(git -C "../${LIB_DIR}" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          cache-dependency-path: ${{ env.APP_DIR }}/package-lock.json
       - run: npm ci
 
       - name: Test
@@ -113,19 +99,17 @@ jobs:
           > "release/${{ steps.package.outputs.name }}.cdx.json"
 
       # https://github.com/in-toto/attestation/blob/main/spec/predicates/test-result.md
-      # The configuration records the test setup, the lockfile and the exact
-      # comm14cux-ts commit the tests ran against. The publish job adds the
-      # acceptance results once the suite has run.
+      # The configuration records the test setup and the lockfile, which pins
+      # the exact @kb1rma/libcomm14cux-ts release (with its integrity hash) the
+      # tests ran against. The publish job adds the acceptance results once the
+      # suite has run.
       - name: Build unit test result predicate
         env:
-          LIB_COMMIT: ${{ steps.lib.outputs.commit }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
         run: |
           configuration=$(
             sha256sum vite.config.ts playwright.config.ts package-lock.json |
-              jq -R -s 'split("\n") | map(select(length > 0) | split("  ") | {name: .[1], digest: {sha256: .[0]}})' |
-              jq --arg commit "$LIB_COMMIT" \
-                '. + [{name: "comm14cux-ts", uri: "git+https://github.com/KB1RMA/comm14cux-ts", digest: {gitCommit: $commit}}]'
+              jq -R -s 'split("\n") | map(select(length > 0) | split("  ") | {name: .[1], digest: {sha256: .[0]}})'
           )
           jq --arg url "$RUN_URL" --arg root "$PWD/" --argjson configuration "$configuration" '
             def tests($status): [
@@ -160,7 +144,6 @@ jobs:
           retention-days: 30
     outputs:
       name: ${{ steps.package.outputs.name }}
-      lib-commit: ${{ steps.lib.outputs.commit }}
       prerelease: ${{ steps.release.outputs.prerelease }}
 
   acceptance:
@@ -169,7 +152,6 @@ jobs:
     uses: ./.github/workflows/acceptance.yml
     with:
       dist-artifact: dist
-      comm14cux-ts-ref: ${{ needs.build.outputs.lib-commit }}
     secrets: inherit
 
   publish:

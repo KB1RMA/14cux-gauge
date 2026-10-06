@@ -109,7 +109,7 @@ The app must be usable with a keyboard alone and with a screen reader, and meet 
 
 ## Tests
 
-- Tests use comm14cux-ts's **public API** only: import from `'comm14cux-ts'`, never from its `src/` internals or `dist/` files.
+- Tests use comm14cux-ts's **public API** only: import from `'@kb1rma/libcomm14cux-ts'`, never from its `src/` internals or `dist/` files.
 - Drive the ECU through a real `Ecu` over `SimulatedTransport` with bytes planted in `memory` (or its fault-injection flags), or over `WebSerialTransport` with a fake `SerialPort`. Do not mock `Ecu` methods.
 - Write expected values as literals; do not compute them by calling library decoders.
 - Name test files `*.test.ts(x)` next to the code they test. Do not lower the coverage thresholds in `vite.config.ts` to land a change.

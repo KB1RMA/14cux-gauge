@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Gear } from 'comm14cux-ts';
+import { Gear } from '@kb1rma/libcomm14cux-ts';
 import type { LiveSnapshot } from '../ecu/poller';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { expectNoAxeViolations, readingFor } from '../test-support/a11y';
