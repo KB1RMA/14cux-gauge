@@ -2,7 +2,7 @@
 // Derived from libcomm14cux (https://github.com/colinbourassa/libcomm14cux)
 // Copyright (C) Colin Bourassa. Licensed under the GNU GPL v3.
 // ECU memory offsets and serial command bytes; written for 14cux-gauge, 2026.
-import { Ecu, SimulatedTransport, TimeoutError } from 'comm14cux-ts';
+import { Ecu, SimulatedTransport, TimeoutError } from '@kb1rma/libcomm14cux-ts';
 import { DiagnosticLog } from './diagnosticLog';
 import { TracingTransport } from './tracingTransport';
 
