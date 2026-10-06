@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/KB1RMA/14cux-gauge/compare/v0.1.2...v0.1.3) (2026-10-06)
+
+
+### Features
+
+* count visits and basic usage anonymously with GoatCounter ([#24](https://github.com/KB1RMA/14cux-gauge/issues/24)) ([cf379a4](https://github.com/KB1RMA/14cux-gauge/commit/cf379a4ba7d67802c6beb833049214f7bf88de51))
+
 ## [0.1.2](https://github.com/KB1RMA/14cux-gauge/compare/v0.1.1...v0.1.2) (2026-10-06)
 
 
