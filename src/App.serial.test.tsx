@@ -229,6 +229,28 @@ describe('App with a serial ECU', () => {
     expect(screen.getByRole('button', { name: 'Details' })).toHaveFocus();
   });
 
+  it('logs polling passes that time out and are retried before giving up', async () => {
+    const port = new FakeSerialPort();
+    const user = userEvent.setup();
+
+    // The port opens but the ECU never answers, so every read times out.
+    installSerial(port);
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
+
+    const dialog = await screen.findByRole(
+      'dialog',
+      { name: 'Connection failed' },
+      { timeout: 3_000 },
+    );
+    const recent = within(dialog).getByRole('textbox', { name: 'Recent log' });
+
+    expect(dialog).toHaveTextContent('Error: TimeoutError: ');
+    expect((recent as HTMLTextAreaElement).value).toMatch(
+      /ERR Polling pass failed \(1 in a row\), retrying: TimeoutError: [^\n]*\n(.*\n)*.*ERR Polling pass failed \(2 in a row\), retrying: TimeoutError: /,
+    );
+  });
+
   it('stays put when the user dismisses the port picker', async () => {
     const user = userEvent.setup();
 

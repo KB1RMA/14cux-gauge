@@ -11,7 +11,11 @@ import {
   type ReactNode,
 } from 'react';
 import { DiagnosticsContext } from '../diagnostics/context';
-import { DiagnosticLog, describeRawError } from '../diagnostics/diagnosticLog';
+import {
+  DiagnosticLog,
+  consoleMirror,
+  describeRawError,
+} from '../diagnostics/diagnosticLog';
 import { pushSnapshot } from '../history/pushSnapshot';
 import { SampleHistory } from '../history/sampleHistory';
 import { METRIC_KEYS } from '../metrics';
@@ -47,16 +51,10 @@ export interface EcuProviderProps {
 }
 
 function createDefaultLog(): DiagnosticLog {
-  if (import.meta.env.MODE === 'test') {
-    return new DiagnosticLog();
-  }
-
-  // Echo connection events (not bytes) for anyone with the dev tools open.
-  return new DiagnosticLog({
-    mirror: (entry) => {
-      console.info(`[14cux-gauge] ${entry.message}`);
-    },
-  });
+  // Echo connection events (not bytes) to the console, except in unit tests.
+  return new DiagnosticLog(
+    import.meta.env.MODE === 'test' ? {} : { mirror: consoleMirror },
+  );
 }
 
 interface Session {

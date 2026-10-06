@@ -101,6 +101,11 @@ export class DiagnosticLog {
   }
 }
 
+/** Echoes an entry to the browser console, for anyone with the dev tools open. */
+export function consoleMirror(entry: DiagnosticEntry): void {
+  console.info(`[14cux-gauge] ${entry.message}`);
+}
+
 /** Bytes as space-separated upper-case hex, e.g. `5A 7C`. */
 export function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) =>

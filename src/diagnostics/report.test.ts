@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { formatReport, reportFileName } from './report';
+import {
+  downloadText,
+  formatRecentEntries,
+  formatReport,
+  reportFileName,
+} from './report';
 
 const STARTED = Date.UTC(2026, 9, 6, 14, 0, 0);
 
@@ -82,5 +87,70 @@ describe('reportFileName', () => {
     expect(reportFileName(STARTED + 7_000)).toBe(
       '14cux-gauge-log-2026-10-06T14-00-07.txt',
     );
+  });
+});
+
+describe('formatRecentEntries', () => {
+  it('lists only the latest entries, across the head and tail', () => {
+    expect(
+      formatRecentEntries(
+        {
+          startedAt: STARTED,
+          head: [
+            { time: STARTED, kind: 'tx', message: '04' },
+            { time: STARTED + 1, kind: 'rx', message: '04 (1 ms)' },
+          ],
+          dropped: 5,
+          tail: [{ time: STARTED + 2_000, kind: 'error', message: 'Timeout' }],
+        },
+        2,
+      ),
+    ).toBe(['     0.001s RX  04 (1 ms)', '     2.000s ERR Timeout'].join('\n'));
+  });
+});
+
+describe('downloadText', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('saves the text through a temporary link, then releases it', async () => {
+    vi.useFakeTimers();
+
+    const revoked: string[] = [];
+    let saved: Blob | undefined;
+
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: (blob: Blob) => {
+        saved = blob;
+
+        return 'blob:test/1';
+      },
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: (url: string) => revoked.push(url),
+    });
+
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
+
+    downloadText('log.txt', 'hello');
+
+    expect(click).toHaveBeenCalledOnce();
+    expect(click.mock.contexts[0]).toMatchObject({
+      href: 'blob:test/1',
+      download: 'log.txt',
+    });
+    expect(await saved?.text()).toBe('hello');
+    expect(saved?.type).toBe('text/plain;charset=utf-8');
+    expect(revoked).toEqual([]);
+
+    vi.advanceTimersByTime(1_000);
+
+    expect(revoked).toEqual(['blob:test/1']);
   });
 });

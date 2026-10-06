@@ -3,6 +3,7 @@
 import { TimeoutError } from '@kb1rma/libcomm14cux-ts';
 import {
   DiagnosticLog,
+  consoleMirror,
   describeRawError,
   toHex,
   type DiagnosticEntry,
@@ -76,6 +77,17 @@ describe('DiagnosticLog', () => {
       [{ time: 5, kind: 'event', message: 'Opening serial port' }],
       [{ time: 5, kind: 'error', message: 'Write failed' }],
     ]);
+  });
+});
+
+describe('consoleMirror', () => {
+  it('writes the message to the console with the app name', () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    consoleMirror({ time: 0, kind: 'event', message: 'Opening serial port' });
+
+    expect(info).toHaveBeenCalledWith('[14cux-gauge] Opening serial port');
+    info.mockRestore();
   });
 });
 
