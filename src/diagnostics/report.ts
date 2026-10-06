@@ -24,10 +24,9 @@ const LABELS: Record<DiagnosticKind, string> = {
   error: 'ERR',
 };
 
-function formatEntry(entry: DiagnosticEntry, startedAt: number): string {
-  const seconds = ((entry.time - startedAt) / 1000).toFixed(3).padStart(10);
-
-  return `${seconds}s ${LABELS[entry.kind]} ${entry.message}`;
+/** One line: UTC timestamp to the millisecond, kind, message. */
+function formatEntry(entry: DiagnosticEntry): string {
+  return `${new Date(entry.time).toISOString()} ${LABELS[entry.kind]} ${entry.message}`;
 }
 
 function describeBuild(build: BuildInfo): string {
@@ -52,23 +51,20 @@ export function formatReport(
     `Web Serial:  ${context.webSerial ? 'available' : 'not available'}`,
     `Connection:  ${context.connection}`,
     '',
-    'Times are seconds since the log started. TX is sent to the ECU, RX is',
-    'received from it (with how long the read took), ERR is a failure.',
+    'Times are UTC. TX is sent to the ECU, RX is received from it (with how',
+    'long the read took), ERR is a failure.',
     'Bytes are hexadecimal. Demo mode traffic is not recorded.',
     '',
-    ...snapshot.head.map((entry) => formatEntry(entry, snapshot.startedAt)),
+    ...snapshot.head.map(formatEntry),
   ];
 
   if (snapshot.dropped > 0) {
     lines.push(
-      `           … ${String(snapshot.dropped)} entries omitted to save memory …`,
+      `… ${String(snapshot.dropped)} entries omitted to save memory …`,
     );
   }
 
-  lines.push(
-    ...snapshot.tail.map((entry) => formatEntry(entry, snapshot.startedAt)),
-    '',
-  );
+  lines.push(...snapshot.tail.map(formatEntry), '');
 
   return lines.join('\n');
 }
@@ -80,10 +76,7 @@ export function formatRecentEntries(
 ): string {
   const all = [...snapshot.head, ...snapshot.tail];
 
-  return all
-    .slice(-count)
-    .map((entry) => formatEntry(entry, snapshot.startedAt))
-    .join('\n');
+  return all.slice(-count).map(formatEntry).join('\n');
 }
 
 /** A file name that sorts by time and is safe on every OS, e.g. `14cux-gauge-log-2026-10-06T14-03-07.txt`. */

@@ -42,12 +42,12 @@ describe('formatReport', () => {
         'Web Serial:  available',
         'Connection:  error (serial): The ECU stopped responding.',
         '',
-        'Times are seconds since the log started. TX is sent to the ECU, RX is',
-        'received from it (with how long the read took), ERR is a failure.',
+        'Times are UTC. TX is sent to the ECU, RX is received from it (with how',
+        'long the read took), ERR is a failure.',
         'Bytes are hexadecimal. Demo mode traffic is not recorded.',
         '',
-        '     1.500s     Opening port',
-        '     1.502s TX  04',
+        '2026-10-06T14:00:01.500Z     Opening port',
+        '2026-10-06T14:00:01.502Z TX  04',
         '',
       ].join('\n'),
     );
@@ -74,9 +74,9 @@ describe('formatReport', () => {
     expect(text).toContain('Web Serial:  not available');
     expect(text).toContain(
       [
-        '     0.000s TX  04',
-        '           … 42 entries omitted to save memory …',
-        '    60.000s ERR Timeout',
+        '2026-10-06T14:00:00.000Z TX  04',
+        '… 42 entries omitted to save memory …',
+        '2026-10-06T14:01:00.000Z ERR Timeout',
       ].join('\n'),
     );
   });
@@ -105,7 +105,12 @@ describe('formatRecentEntries', () => {
         },
         2,
       ),
-    ).toBe(['     0.001s RX  04 (1 ms)', '     2.000s ERR Timeout'].join('\n'));
+    ).toBe(
+      [
+        '2026-10-06T14:00:00.001Z RX  04 (1 ms)',
+        '2026-10-06T14:00:02.000Z ERR Timeout',
+      ].join('\n'),
+    );
   });
 });
 
