@@ -13,7 +13,7 @@ import { SessionsView } from './components/SessionsView';
 import { StatusBar } from './components/StatusBar';
 import { EcuProvider, type EcuProviderProps } from './ecu/EcuProvider';
 import { useEcu } from './ecu/useEcu';
-import { FuelPumpProvider } from './pump/FuelPumpProvider';
+import { EcuWriteProvider } from './ecuWrite/EcuWriteProvider';
 import { PreferencesProvider } from './preferences/PreferencesProvider';
 import { AppStatusProvider } from './pwa/AppStatusProvider';
 import type { AppStatusStoreOptions } from './pwa/appStatusStore';
@@ -90,7 +90,7 @@ export function App({
       <PreferencesProvider>
         <AppStatusProvider {...(appStatus ? { options: appStatus } : {})}>
           <EcuProvider {...(pollIntervalMs ? { pollIntervalMs } : {})}>
-            <FuelPumpProvider>
+            <EcuWriteProvider>
               <SessionsProvider
                 {...(openSessionStore ? { open: openSessionStore } : {})}
               >
@@ -123,7 +123,7 @@ export function App({
                   </RomsProvider>
                 </RecordingProvider>
               </SessionsProvider>
-            </FuelPumpProvider>
+            </EcuWriteProvider>
           </EcuProvider>
         </AppStatusProvider>
       </PreferencesProvider>

@@ -21,9 +21,13 @@ test.describe('Fuel pump test', () => {
     await page.goto('./');
     await emulatedSerial.poke(PORT1, [PUMP_OFF]);
     await page.getByRole('button', { name: 'Connect to ECU' }).click();
-    await expect(page.getByRole('status')).toHaveText(
-      'Serial ECU (7812 baud) · Polling',
-    );
+
+    // The status bar's; the panel's result is a status too.
+    const status = page
+      .getByRole('region', { name: 'Connection' })
+      .getByRole('status');
+
+    await expect(status).toHaveText('Serial ECU (7812 baud) · Polling');
     await expect(reading(page, 'Fuel pump relay')).toHaveText('Off');
 
     // Cancel writes nothing.
@@ -41,10 +45,10 @@ test.describe('Fuel pump test', () => {
     // Once.
     await page.getByRole('button', { name: 'Run pump (once)' }).click();
     await once.getByRole('button', { name: 'Run fuel pump' }).click();
-    await expect(page.getByRole('status')).toContainText('Fuel pump running');
+    await expect(status).toContainText('Fuel pump running');
     await expect(reading(page, 'Fuel pump relay')).toHaveText('Running');
     expect(await emulatedSerial.peek(FUEL_PUMP_TIMER, 1)).toEqual([0xff]);
-    await expect(page.getByRole('status')).toContainText('Fuel pump stopped');
+    await expect(status).toContainText('Fuel pump stopped.');
 
     // Continuous, stopped by the user.
     await page.getByRole('button', { name: 'Run pump (continuous)' }).click();
@@ -52,13 +56,13 @@ test.describe('Fuel pump test', () => {
       .getByRole('alertdialog', { name: 'Run the fuel pump continuously?' })
       .getByRole('button', { name: 'Run fuel pump' })
       .click();
-    await expect(page.getByRole('status')).toContainText('Fuel pump running');
+    await expect(status).toContainText('Fuel pump running');
     await expect(
       page.getByRole('button', { name: 'Stop fuel pump' }),
     ).toBeFocused();
     await expectNoAxeViolations(page);
     await page.getByRole('button', { name: 'Stop fuel pump' }).click();
-    await expect(page.getByRole('status')).toContainText('Fuel pump stopped');
+    await expect(status).toContainText('Fuel pump stopped.');
     await expect(
       page.getByRole('button', { name: 'Run pump (continuous)' }),
     ).toBeEnabled();

@@ -54,6 +54,9 @@ test.describe('Serial ECU over Web Serial', () => {
       .click();
 
     await expect(page.getByText('No fault codes stored.')).toBeVisible();
+    await expect(
+      page.getByRole('region', { name: 'Connection' }).getByRole('status'),
+    ).toHaveText('Serial ECU (7812 baud) · Polling · Fault codes cleared.');
     expect(await emulatedSerial.peek(FAULT_CODES, FAULT_BLOCK_SIZE)).toEqual([
       0, 0, 0, 0, 0, 0,
     ]);

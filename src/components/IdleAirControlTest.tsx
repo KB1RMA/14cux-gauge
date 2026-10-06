@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { Ecu } from '@kb1rma/libcomm14cux-ts';
 import { RadioGroup } from 'radix-ui';
 import { useId, useState } from 'react';
-import { describeError } from '../ecu/errors';
 import type { LiveSnapshot } from '../ecu/poller';
+import { useEcuWrite } from '../ecuWrite/useEcuWrite';
 import { formatSample, METRICS, sampleOf } from '../metrics';
 import { usePreferences } from '../preferences/usePreferences';
 import { ConfirmDialog } from './ConfirmDialog';
 import styles from './Panel.module.css';
 import testStyles from './IdleAirControlTest.module.css';
+import { WriteBlocked, WriteResult } from './WriteStatus';
 
 type Direction = 'open' | 'close';
 
@@ -36,48 +36,38 @@ function parseSteps(text: string): number | undefined {
  * the ECU, so it sits behind a confirmation. It is never repeated.
  */
 export function IdleAirControlTest({
-  ecu,
   snapshot,
 }: {
-  ecu: Ecu;
   snapshot: LiveSnapshot | undefined;
 }) {
   const units = usePreferences();
+  const writes = useEcuWrite();
   const stepsId = useId();
+  const blockedId = useId();
   const [direction, setDirection] = useState<Direction>('open');
   const [stepsText, setStepsText] = useState('10');
   const [confirming, setConfirming] = useState(false);
-  const [running, setRunning] = useState(false);
-  const [error, setError] = useState<string | undefined>(undefined);
-  const [done, setDone] = useState<string | undefined>(undefined);
+  const running = writes.running === 'idleAirControl';
+  const blocked = writes.running !== undefined && !running;
 
   const steps = parseSteps(stepsText);
   const sample =
     BYPASS && snapshot ? sampleOf(snapshot, BYPASS.key) : undefined;
 
-  const run = async () => {
+  const run = () => {
     setConfirming(false);
 
     if (steps === undefined) {
       return;
     }
 
-    setRunning(true);
-    setError(undefined);
-    setDone(undefined);
-
-    try {
+    // The library writes the direction bit before the step count, so a
+    // failure part-way through can leave the ECU changed.
+    void writes.run('idleAirControl', async (ecu) => {
       await ecu.driveIdleAirControlMotor(direction === 'open' ? 0 : 1, steps);
-      setDone(
-        `Commanded ${steps} ${steps === 1 ? 'step' : 'steps'} ${direction}.`,
-      );
-    } catch (e) {
-      // The library writes the direction bit before the step count, so a
-      // failure part-way through can leave the ECU changed.
-      setError(`The test may have partly run. ${describeError(e)}`);
-    } finally {
-      setRunning(false);
-    }
+
+      return `Commanded ${steps} ${steps === 1 ? 'step' : 'steps'} ${direction}.`;
+    });
   };
 
   return (
@@ -162,18 +152,15 @@ export function IdleAirControlTest({
         </dd>
       </dl>
 
-      {error ? (
-        <p role="alert" className={styles['error']}>
-          {error}
-        </p>
-      ) : null}
-      {done ? <output>{done}</output> : null}
+      <WriteResult id="idleAirControl" />
+      <WriteBlocked id="idleAirControl" noteId={blockedId} />
 
       <div className={styles['actions']}>
         <button
           type="button"
           className="danger"
-          disabled={running || steps === undefined}
+          disabled={writes.running !== undefined || steps === undefined}
+          aria-describedby={blocked ? blockedId : undefined}
           onClick={() => {
             setConfirming(true);
           }}
@@ -186,7 +173,8 @@ export function IdleAirControlTest({
         open={confirming}
         title="Run idle air control test?"
         confirmLabel="Run test"
-        onConfirm={() => void run()}
+        writesToEcu
+        onConfirm={run}
         onCancel={() => {
           setConfirming(false);
         }}
@@ -195,10 +183,6 @@ export function IdleAirControlTest({
           This writes to the ECU&apos;s memory and drives the idle bypass motor{' '}
           {steps} {steps === 1 ? 'step' : 'steps'} {direction}. Engine speed may
           change, and the ECU will re-adjust the motor afterwards.
-        </p>
-        <p>
-          Writing to a running ECU can affect the engine. This software comes
-          with no warranty; continue only if you accept the risk.
         </p>
       </ConfirmDialog>
     </section>

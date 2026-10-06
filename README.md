@@ -59,7 +59,7 @@ The published site counts visits and a few anonymous events with [GoatCounter](h
 
 ## Safety
 
-Clearing fault codes and running the fuel pump write to the ECU's memory. Writing to a running ECU can affect the engine, so the app asks for confirmation first. Stored fault codes cannot be recovered once cleared. This software is provided with absolutely no warranty; see sections 15 and 16 of the licence.
+Clearing fault codes, the idle air control test and the fuel pump test write to the ECU's memory. Writing to a running ECU can affect the engine, so the app asks for confirmation first, and runs only one of these at a time. Stored fault codes cannot be recovered once cleared. This software is provided with absolutely no warranty; see sections 15 and 16 of the licence.
 
 ## Credits and licence
 

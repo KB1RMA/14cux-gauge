@@ -155,6 +155,49 @@ describe('App in demo mode', () => {
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
   });
 
+  it('announces ECU writes in the status bar, and keeps them across views', async () => {
+    const user = userEvent.setup();
+
+    render(<App pollIntervalMs={{ demo: 10 }} />);
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+    await screen.findByRole('heading', { name: 'Live data' });
+
+    const status = within(
+      screen.getByRole('region', { name: 'Connection' }),
+    ).getByRole('status');
+
+    await user.click(screen.getByRole('button', { name: 'Run pump (once)' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', {
+        name: 'Run fuel pump',
+      }),
+    );
+    expect(status).toHaveTextContent('Demo ECU · Polling · Fuel pump running');
+    expect(
+      screen.getByRole('button', { name: 'Clear fault codes' }),
+    ).toBeDisabled();
+
+    // Leaving the view stops the pump test and says so.
+    await user.click(screen.getByRole('tab', { name: 'Graphs' }));
+    expect(status).toHaveTextContent(
+      'Demo ECU · Polling · Fuel pump stopped when you left the view.',
+    );
+
+    await user.click(screen.getByRole('tab', { name: 'Overview' }));
+    await user.click(screen.getByRole('button', { name: 'Clear fault codes' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', {
+        name: 'Clear fault codes',
+      }),
+    );
+    await vi.waitFor(() => {
+      expect(status).toHaveTextContent(
+        'Demo ECU · Polling · Fault codes cleared.',
+      );
+    });
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  });
+
   it('stays connected when reconnected while the last connection is closing', async () => {
     const user = userEvent.setup();
 

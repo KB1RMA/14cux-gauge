@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Ecu, MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { expectNoAxeViolations } from '../test-support/a11y';
+import { WriteHarness } from '../test-support/WriteHarness';
 import { FaultCodes } from './FaultCodes';
 
 async function ecuWithFaults() {
@@ -33,7 +34,11 @@ describe('FaultCodes', () => {
     const user = userEvent.setup();
     const { ecu } = await ecuWithFaults();
 
-    render(<FaultCodes ecu={ecu} />);
+    render(
+      <WriteHarness ecu={ecu}>
+        <FaultCodes ecu={ecu} />
+      </WriteHarness>,
+    );
 
     expect(screen.getByText('Not read yet.')).toBeInTheDocument();
 
@@ -53,7 +58,11 @@ describe('FaultCodes', () => {
     const user = userEvent.setup();
     const { transport, ecu } = await ecuWithFaults();
 
-    render(<FaultCodes ecu={ecu} />);
+    render(
+      <WriteHarness ecu={ecu}>
+        <FaultCodes ecu={ecu} />
+      </WriteHarness>,
+    );
 
     await user.click(screen.getByRole('button', { name: 'Clear fault codes' }));
 
@@ -86,7 +95,11 @@ describe('FaultCodes', () => {
     const user = userEvent.setup();
     const { transport, ecu } = await ecuWithFaults();
 
-    render(<FaultCodes ecu={ecu} />);
+    render(
+      <WriteHarness ecu={ecu}>
+        <FaultCodes ecu={ecu} />
+      </WriteHarness>,
+    );
     await user.click(screen.getByRole('button', { name: 'Clear fault codes' }));
 
     expect(
@@ -105,7 +118,11 @@ describe('FaultCodes', () => {
     const user = userEvent.setup();
     const { ecu } = await ecuWithFaults();
 
-    render(<FaultCodes ecu={ecu} />);
+    render(
+      <WriteHarness ecu={ecu}>
+        <FaultCodes ecu={ecu} />
+      </WriteHarness>,
+    );
 
     const clear = screen.getByRole('button', { name: 'Clear fault codes' });
 
@@ -118,7 +135,11 @@ describe('FaultCodes', () => {
   it('has no detectable accessibility violations with codes listed and the dialog open', async () => {
     const user = userEvent.setup();
     const { ecu } = await ecuWithFaults();
-    const { container } = render(<FaultCodes ecu={ecu} />);
+    const { container } = render(
+      <WriteHarness ecu={ecu}>
+        <FaultCodes ecu={ecu} />
+      </WriteHarness>,
+    );
 
     await user.click(screen.getByRole('button', { name: 'Read fault codes' }));
     await screen.findByRole('list', { name: 'Stored fault codes' });
@@ -132,7 +153,11 @@ describe('FaultCodes', () => {
     const { transport, ecu } = await ecuWithFaults();
 
     transport.silent = true;
-    render(<FaultCodes ecu={ecu} />);
+    render(
+      <WriteHarness ecu={ecu}>
+        <FaultCodes ecu={ecu} />
+      </WriteHarness>,
+    );
     await user.click(screen.getByRole('button', { name: 'Read fault codes' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
