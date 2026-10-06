@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.2.0...v0.3.0) (2026-10-06)
+
+
+### Features
+
+* explain each reading and its typical values ([#41](https://github.com/KB1RMA/14cux-gauge/issues/41)) ([c3d9e18](https://github.com/KB1RMA/14cux-gauge/commit/c3d9e18fe65a947ce25aaff641489630abcc672f)), closes [#32](https://github.com/KB1RMA/14cux-gauge/issues/32)
+* export a recorded session as CSV ([#46](https://github.com/KB1RMA/14cux-gauge/issues/46)) ([0252f3b](https://github.com/KB1RMA/14cux-gauge/commit/0252f3bca19698dae085d8b9979ff957fc51f4ed))
+* give every screen a URL so views can be deep linked ([#47](https://github.com/KB1RMA/14cux-gauge/issues/47)) ([b5ed246](https://github.com/KB1RMA/14cux-gauge/commit/b5ed24672c61acc3d594ce25430c67beaf009978))
+* picture fuel trims on bars centred on zero ([#43](https://github.com/KB1RMA/14cux-gauge/issues/43)) ([b7d44b3](https://github.com/KB1RMA/14cux-gauge/commit/b7d44b37e26c74eae88f967914ece4ed12d1b790)), closes [#30](https://github.com/KB1RMA/14cux-gauge/issues/30)
+* save the ECU ROM image to a file ([#45](https://github.com/KB1RMA/14cux-gauge/issues/45)) ([b756615](https://github.com/KB1RMA/14cux-gauge/commit/b756615170649e7640a0b00875ee2aecb2525a79))
+* show injector duty cycle, worked out from pulse width and RPM ([#44](https://github.com/KB1RMA/14cux-gauge/issues/44)) ([aa63212](https://github.com/KB1RMA/14cux-gauge/commit/aa63212ae7600b8e9f845d5beccc1e98737ca6fe)), closes [#29](https://github.com/KB1RMA/14cux-gauge/issues/29)
+
 ## [0.2.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.1.3...v0.2.0) (2026-10-06)
 
 
