@@ -73,7 +73,7 @@ export function plotOptions(
   metric: Metric,
   { width, windowSeconds }: { width: number; windowSeconds: number },
 ): uPlot.Options {
-  const { step = false, range } = metric.chart;
+  const { step = false, range, atLeast } = metric.chart;
   // Optional in uPlot's types, but part of every build we ship.
   const stepped = plot.paths.stepped;
   const muted = (chart: uPlot) => token(chart, '--text-muted');
@@ -95,8 +95,19 @@ export function plotOptions(
       x: { time: false, auto: false, range: [-windowSeconds, 0] },
       y: range
         ? { auto: false, range: padded(range) }
-        : // Fit the data, with a 10 % margin and round-number ends.
-          { range: (_chart, min, max) => plot.rangeNum(min, max, 0.1, true) },
+        : {
+            range: (_chart, min, max) =>
+              atLeast && min >= atLeast[0] && max <= atLeast[1]
+                ? padded(atLeast)
+                : // Fit the data (and `atLeast`), with a 10 % margin and
+                  // round-number ends.
+                  plot.rangeNum(
+                    Math.min(min, atLeast?.[0] ?? min),
+                    Math.max(max, atLeast?.[1] ?? max),
+                    0.1,
+                    true,
+                  ),
+          },
     },
     axes: [
       {

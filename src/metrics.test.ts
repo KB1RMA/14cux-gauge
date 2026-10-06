@@ -3,10 +3,12 @@
 import { Gear } from '@kb1rma/libcomm14cux-ts';
 import {
   formatSample,
+  injectorDuty,
   METRIC_GROUPS,
   METRICS,
   meterSpan,
   metricsInGroup,
+  readingsFor,
   recordedKeys,
   sampleOf,
   type DisplayUnits,
@@ -34,7 +36,11 @@ describe('metrics', () => {
       (key) => key !== 'timestamp',
     );
 
-    expect(METRICS.map((m) => m.key).sort()).toEqual(snapshotKeys.sort());
+    expect(
+      METRICS.filter((m) => !m.derived)
+        .map((m) => m.key)
+        .sort(),
+    ).toEqual(snapshotKeys.sort());
     expect(
       METRIC_GROUPS.flatMap((g) => metricsInGroup(g.id)).map((m) => m.key),
     ).toEqual(METRICS.map((m) => m.key));
@@ -75,6 +81,89 @@ describe('metrics', () => {
     );
     expect(formatSample(metric('idleMode'), 1, IMPERIAL)).toBe('Active');
     expect(formatSample(metric('idleMode'), 0, IMPERIAL)).toBe('Off');
+  });
+
+  it('works out injector duty: each bank fires once per revolution', () => {
+    // 2.35 ms every 80 ms (one revolution at 750 rpm).
+    expect(injectorDuty(2350, 750)).toBe(0.029375);
+    // 10 ms every 10 ms (6000 rpm): open all the time.
+    expect(injectorDuty(10000, 6000)).toBe(1);
+    expect(injectorDuty(5000, 3000)).toBe(0.25);
+    // Stopped: no injections.
+    expect(injectorDuty(2350, 0)).toBe(0);
+  });
+
+  it('derives injector duty from the pulse and engine speed in a snapshot', () => {
+    const duty = (snapshot: Partial<LiveSnapshot>) =>
+      sampleOf({ timestamp: 0, ...snapshot }, 'injectorDuty');
+
+    expect(duty({ injectorPulseUs: 2350, engineRpm: 750 })).toBe(0.029375);
+    expect(duty({ injectorPulseUs: 12000, engineRpm: 6000 })).toBe(1.2);
+    // Invalid or not taken if either reading is.
+    expect(duty({ injectorPulseUs: null, engineRpm: 750 })).toBeNull();
+    expect(duty({ injectorPulseUs: 2350, engineRpm: null })).toBeNull();
+    expect(duty({ injectorPulseUs: 2350 })).toBeNull();
+    expect(duty({ engineRpm: 750 })).toBeNull();
+  });
+
+  it('formats injector duty as a percentage, and says when it is high', () => {
+    const duty = metric('injectorDuty');
+    const show = (sample: number) => ({
+      text: formatSample(duty, sample, IMPERIAL),
+      tone: duty.tone?.(sample),
+      note: duty.note?.(sample),
+    });
+
+    expect(duty.unit(IMPERIAL)).toBe('%');
+    expect(show(0)).toEqual({ text: '0.0', tone: 'normal', note: undefined });
+    expect(show(0.029375)).toEqual({
+      text: '2.9',
+      tone: 'normal',
+      note: undefined,
+    });
+    expect(show(0.85)).toEqual({
+      text: '85.0',
+      tone: 'normal',
+      note: undefined,
+    });
+    expect(show(0.851)).toEqual({
+      text: '85.1',
+      tone: 'warn',
+      note: 'near limit',
+    });
+    // Rounds to 100.0 for display, but the threshold uses the sample.
+    expect(show(0.9996)).toEqual({
+      text: '100.0',
+      tone: 'warn',
+      note: 'near limit',
+    });
+    expect(show(1)).toEqual({
+      text: '100.0',
+      tone: 'alert',
+      note: 'maxed out',
+    });
+    expect(show(1.2)).toEqual({
+      text: '120.0',
+      tone: 'alert',
+      note: 'maxed out',
+    });
+  });
+
+  it('takes the readings a derived metric needs', () => {
+    expect([...readingsFor(['coolantTempF', 'injectorDuty'])]).toEqual([
+      'coolantTempF',
+      'injectorPulseUs',
+      'engineRpm',
+    ]);
+  });
+
+  it('lists injector duty for a recording with both of its readings', () => {
+    expect(
+      recordedKeys([{ timestamp: 0, engineRpm: 750, injectorPulseUs: null }]),
+    ).toEqual(['engineRpm', 'injectorPulseUs', 'injectorDuty']);
+    expect(recordedKeys([{ timestamp: 0, engineRpm: 750 }])).toEqual([
+      'engineRpm',
+    ]);
   });
 
   it('converts temperatures and speeds to the chosen units', () => {

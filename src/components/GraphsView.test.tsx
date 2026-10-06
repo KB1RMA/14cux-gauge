@@ -40,7 +40,7 @@ describe('GraphsView', () => {
   it('shows a graph for every metric, grouped like the readings', () => {
     renderGraphs();
 
-    expect(screen.getAllByRole('figure')).toHaveLength(20);
+    expect(screen.getAllByRole('figure')).toHaveLength(21);
     expect(
       screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent),
     ).toEqual([
@@ -87,7 +87,7 @@ describe('GraphsView', () => {
     const { unmount } = renderGraphs();
     const trigger = screen.getByRole('button', { name: /Choose readings/ });
 
-    expect(trigger).toHaveTextContent('20 of 20');
+    expect(trigger).toHaveTextContent('21 of 21');
 
     await user.click(trigger);
 
@@ -106,9 +106,9 @@ describe('GraphsView', () => {
     expect(
       within(engine).getByRole('checkbox', { name: 'Engine speed' }),
     ).not.toBeChecked();
-    expect(screen.getAllByRole('figure')).toHaveLength(18);
+    expect(screen.getAllByRole('figure')).toHaveLength(19);
     expect(figureNames()).not.toContain('Engine speed (rpm)');
-    expect(trigger).toHaveTextContent('18 of 20');
+    expect(trigger).toHaveTextContent('19 of 21');
 
     await user.keyboard('{Escape}');
 
@@ -118,7 +118,7 @@ describe('GraphsView', () => {
     unmount();
     renderGraphs();
 
-    expect(screen.getAllByRole('figure')).toHaveLength(18);
+    expect(screen.getAllByRole('figure')).toHaveLength(19);
     expect(storedReadings()).toEqual({ off: ['engineRpm', 'gear'] });
   });
 
@@ -159,7 +159,7 @@ describe('GraphsView', () => {
     await user.click(screen.getByRole('radio', { name: 'All' }));
 
     expect(screen.getByRole('radio', { name: 'All' })).toBeChecked();
-    expect(screen.getAllByRole('figure')).toHaveLength(20);
+    expect(screen.getAllByRole('figure')).toHaveLength(21);
   });
 
   it('ignores stored settings it does not recognise', () => {
@@ -175,7 +175,7 @@ describe('GraphsView', () => {
     renderGraphs();
 
     expect(screen.getByRole('radio', { name: '1 minute' })).toBeChecked();
-    expect(screen.getAllByRole('figure')).toHaveLength(19);
+    expect(screen.getAllByRole('figure')).toHaveLength(20);
     expect(figureNames()).toContain('MIL');
   });
 

@@ -49,6 +49,7 @@ function MetricTile({
       }
       unit={metric.unit(units)}
       tone={sample == null ? 'normal' : (metric.tone?.(sample) ?? 'normal')}
+      note={sample == null ? undefined : metric.note?.(sample)}
       info={<MetricInfo metric={metric} />}
       meter={
         metric.meter ? (

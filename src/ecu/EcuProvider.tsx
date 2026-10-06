@@ -18,7 +18,7 @@ import {
 } from '../diagnostics/diagnosticLog';
 import { pushSnapshot } from '../history/pushSnapshot';
 import { SampleHistory } from '../history/sampleHistory';
-import { METRIC_KEYS, type MetricKey } from '../metrics';
+import { METRIC_KEYS, readingsFor, type MetricKey } from '../metrics';
 import { ReadingsContext } from '../readings/context';
 import {
   ALWAYS_READ,
@@ -45,7 +45,6 @@ import {
   startPoller,
   type LiveSnapshot,
   type Poller,
-  type ReadingKey,
 } from './poller';
 
 const NO_LIVE_DATA: LiveData = {
@@ -109,11 +108,9 @@ export function EcuProvider({
   // (not `ALWAYS_READ`) decide whether slow values can wait.
   const polling = useMemo(
     () => ({
-      polled: new Set<ReadingKey>([...chosen, ...requested.keys()]),
-      chosen: new Set<ReadingKey>(chosen),
-      watched: new Set<ReadingKey>(
-        chosen.filter((key) => !ALWAYS_READ.includes(key)),
-      ),
+      polled: readingsFor([...chosen, ...requested.keys()]),
+      chosen: readingsFor(chosen),
+      watched: readingsFor(chosen.filter((key) => !ALWAYS_READ.includes(key))),
     }),
     [chosen, requested],
   );

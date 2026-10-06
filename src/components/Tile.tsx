@@ -4,15 +4,17 @@ import { VisuallyHidden } from 'radix-ui';
 import type { ReactNode } from 'react';
 import styles from './Tile.module.css';
 
-export type TileTone = 'normal' | 'good' | 'warn';
+export type TileTone = 'normal' | 'good' | 'warn' | 'alert';
 
 export interface TileProps {
   label: string;
   /** Formatted value; `null` is an invalid reading, `undefined` not read yet. */
   value: string | null | undefined;
   unit?: string | undefined;
-  /** Colour emphasis only; the value text must carry the meaning by itself. */
+  /** Colour emphasis only; the value or `note` must carry the meaning. */
   tone?: TileTone;
+  /** A word or two after the value, such as "maxed out". */
+  note?: string | undefined;
   /** An explanation control shown beside the label, such as `MetricInfo`. */
   info?: ReactNode;
   /** A picture of the value under it, such as `Meter`; hidden from assistive tech. */
@@ -25,6 +27,7 @@ export function Tile({
   value,
   unit,
   tone = 'normal',
+  note,
   info,
   meter,
 }: TileProps) {
@@ -46,6 +49,7 @@ export function Tile({
           <>
             {value}
             {unit ? <span className={styles['unit']}> {unit}</span> : null}
+            {note ? <span className={styles['note']}> {note}</span> : null}
           </>
         )}
         {meter}
