@@ -30,7 +30,7 @@ export interface DisplayUnits {
   speedUnit: SpeedUnit;
 }
 
-export type MetricGroup = 'engine' | 'air' | 'fuelling' | 'states';
+export type MetricGroup = 'engine' | 'air' | 'fuelling' | 'fuelMap' | 'states';
 
 export type MetricTone = 'normal' | 'good' | 'warn';
 
@@ -58,6 +58,7 @@ export const METRIC_GROUPS: readonly { id: MetricGroup; title: string }[] = [
   { id: 'engine', title: 'Engine' },
   { id: 'air', title: 'Airflow and throttle' },
   { id: 'fuelling', title: 'Electrics and fuelling' },
+  { id: 'fuelMap', title: 'Fuel map position' },
   { id: 'states', title: 'States' },
 ];
 
@@ -77,6 +78,15 @@ const trim = (label: string): Omit<Metric, 'key'> => ({
   toDisplay: same,
   format: formatSigned,
   chart: {},
+});
+// Positions are stored from 0, and shown from 1 to match the fuel map table.
+const mapPosition = (label: string, size: number): Omit<Metric, 'key'> => ({
+  label,
+  group: 'fuelMap',
+  unit: () => undefined,
+  toDisplay: (sample) => sample + 1,
+  format: fixed(1),
+  chart: { range: [1, size] },
 });
 const onOff = (
   label: string,
@@ -108,6 +118,14 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     unit: ({ speedUnit }) => speedLabel(speedUnit),
     toDisplay: (sample, { speedUnit }) =>
       speedUnit === 'kmh' ? mphToKmh(sample) : sample,
+    format: fixed(0),
+    chart: {},
+  },
+  targetIdleRpm: {
+    label: 'Target idle',
+    group: 'engine',
+    unit: () => 'rpm',
+    toDisplay: same,
     format: fixed(0),
     chart: {},
   },
@@ -159,6 +177,14 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     format: fixed(1),
     chart: {},
   },
+  injectorPulseUs: {
+    label: 'Injector pulse',
+    group: 'fuelling',
+    unit: () => 'ms',
+    toDisplay: (sample) => sample / 1000,
+    format: fixed(2),
+    chart: {},
+  },
   lambdaShortOdd: trim('Short trim, odd'),
   lambdaShortEven: trim('Short trim, even'),
   lambdaLongOdd: trim('Long trim, odd'),
@@ -171,6 +197,9 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     format: (display) => formatGear(display as Gear),
     chart: { step: true, range: [0, 3] },
   },
+  fuelMapRow: mapPosition('Fuel map row', 8),
+  fuelMapColumn: mapPosition('Fuel map column', 16),
+  idleMode: onOff('Idle control', 'Active', 'normal'),
   milOn: onOff('MIL', 'On', 'warn'),
   fuelPumpOn: onOff('Fuel pump relay', 'Running', 'good'),
 };
@@ -178,6 +207,7 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
 /** Display order: by group, then as listed. */
 const ORDER: readonly MetricKey[] = [
   'engineRpm',
+  'targetIdleRpm',
   'roadSpeedMph',
   'coolantTempF',
   'fuelTempF',
@@ -185,10 +215,14 @@ const ORDER: readonly MetricKey[] = [
   'airflow',
   'idleBypass',
   'mainVoltage',
+  'injectorPulseUs',
   'lambdaShortOdd',
   'lambdaShortEven',
   'lambdaLongOdd',
   'lambdaLongEven',
+  'fuelMapRow',
+  'fuelMapColumn',
+  'idleMode',
   'gear',
   'milOn',
   'fuelPumpOn',
@@ -210,9 +244,10 @@ export function sampleOf(
   snapshot: LiveSnapshot,
   key: MetricKey,
 ): number | null {
-  const value = snapshot[key];
+  // Recordings made before a metric existed have no value for it.
+  const value = snapshot[key] as LiveSnapshot[MetricKey] | undefined;
 
-  return typeof value === 'boolean' ? Number(value) : value;
+  return typeof value === 'boolean' ? Number(value) : (value ?? null);
 }
 
 /** Formats a sample for display, with the user's units. */

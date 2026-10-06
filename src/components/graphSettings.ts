@@ -37,10 +37,10 @@ export function parseGraphSettings(stored: unknown): GraphSettings {
   };
 }
 
-export type DashboardView = 'overview' | 'graphs';
+export type DashboardView = 'overview' | 'graphs' | 'fuelMap';
 
 export const DASHBOARD_VIEW_KEY = 'dashboardView';
 
 export function parseDashboardView(stored: unknown): DashboardView {
-  return oneOf(stored, ['overview', 'graphs'], 'overview');
+  return oneOf(stored, ['overview', 'graphs', 'fuelMap'], 'overview');
 }

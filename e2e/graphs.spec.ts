@@ -15,7 +15,7 @@ test.describe('Live graphs', () => {
     await expect(
       page.getByRole('heading', { name: 'Live graphs' }),
     ).toBeVisible();
-    await expect(page.getByRole('figure')).toHaveCount(15);
+    await expect(page.getByRole('figure')).toHaveCount(20);
 
     const rpm = page.getByRole('figure', { name: 'Engine speed (rpm)' });
 
@@ -39,7 +39,7 @@ test.describe('Live graphs', () => {
     ).not.toBeChecked();
     await page.keyboard.press('Escape');
     await expect(picker).toBeHidden();
-    await expect(page.getByRole('figure')).toHaveCount(14);
+    await expect(page.getByRole('figure')).toHaveCount(19);
 
     await page.reload();
     await page.getByRole('button', { name: 'Demo mode' }).click();
@@ -48,7 +48,7 @@ test.describe('Live graphs', () => {
       page.getByRole('heading', { name: 'Live graphs' }),
     ).toBeFocused();
     await expect(page.getByRole('radio', { name: '5 minutes' })).toBeChecked();
-    await expect(page.getByRole('figure')).toHaveCount(14);
+    await expect(page.getByRole('figure')).toHaveCount(19);
     await expect(
       page.getByRole('figure', { name: 'Fuel temp (°F)' }),
     ).toHaveCount(0);

@@ -20,11 +20,16 @@ export function snapshotAt(
     gear: Gear.ParkOrNeutral,
     milOn: false,
     fuelPumpOn: true,
+    injectorPulseUs: 2200,
+    fuelMapRow: 0.5,
+    fuelMapColumn: 1.25,
     coolantTempF: 190,
     fuelTempF: 95,
     mainVoltage: 14.1,
     lambdaLongOdd: 0,
     lambdaLongEven: 0,
+    idleMode: true,
+    targetIdleRpm: 750,
     ...changes,
   };
 }

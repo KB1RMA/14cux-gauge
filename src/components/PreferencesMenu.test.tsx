@@ -21,11 +21,16 @@ const SNAPSHOT: LiveSnapshot = {
   gear: Gear.ParkOrNeutral,
   milOn: false,
   fuelPumpOn: true,
+  injectorPulseUs: 2350,
+  fuelMapRow: 1.5,
+  fuelMapColumn: 2.25,
   coolantTempF: 212,
   fuelTempF: 95,
   mainVoltage: 14.1,
   lambdaLongOdd: 0,
   lambdaLongEven: 0,
+  idleMode: true,
+  targetIdleRpm: 740,
 };
 
 function renderWithTiles() {

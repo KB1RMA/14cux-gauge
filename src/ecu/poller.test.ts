@@ -33,6 +33,11 @@ async function plantedEcu() {
   m[MemoryOffset.IdleBypassPosition] = 90; // half open
   m[MemoryOffset.TransmissionGear] = 0x20; // park/neutral
   m[MemoryOffset.Port1] = 0xbe; // pump running (bit 6 low), MIL lit (bit 0 low)
+  plantWord(m, MemoryOffset.InjectorPulseWidth, 2350); // µs
+  m[MemoryOffset.FuelMapRowIndex] = 0x28; // row 2, 8/16 towards row 3
+  m[MemoryOffset.FuelMapColumnIndex] = 0x74; // column 7, 4/16 towards 8
+  m[MemoryOffset.IdleMode] = 0x01;
+  plantWord(m, MemoryOffset.TargetIdleSpeed, 740);
   // The ROM is left blank, so the main-voltage coefficients read as zero and
   // that one reading is invalid.
 
@@ -99,9 +104,29 @@ describe('startPoller', () => {
       gear: Gear.ParkOrNeutral,
       milOn: true,
       fuelPumpOn: true,
+      injectorPulseUs: 2350,
+      fuelMapRow: 2.5,
+      fuelMapColumn: 7.25,
+      idleMode: true,
+      targetIdleRpm: 740,
     });
     expect(sink.snapshots[0]?.throttle).toBeCloseTo(0.5005, 4);
     expect(sink.errors).toEqual([]);
+  });
+
+  it('blanks a fuel map position the ECU reports out of range', async () => {
+    const { transport, ecu } = await plantedEcu();
+    const sink = collect();
+
+    transport.memory[MemoryOffset.FuelMapRowIndex] = 0x80; // row 8 of 0–7
+
+    const poller = startPoller(ecu, { ...sink });
+
+    await vi.advanceTimersByTimeAsync(0);
+    poller.stop();
+
+    expect(sink.snapshots[0]?.fuelMapRow).toBeNull();
+    expect(sink.snapshots[0]?.fuelMapColumn).toBe(7.25);
   });
 
   it('blanks only the reading that is out of range', async () => {

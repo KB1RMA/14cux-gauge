@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { Ecu, type TuneRevision } from '@kb1rma/libcomm14cux-ts';
+import {
+  Ecu,
+  InvalidReadingError,
+  type TuneRevision,
+} from '@kb1rma/libcomm14cux-ts';
 import { useEffect, useState } from 'react';
 import { describeError } from '../ecu/errors';
+import { hex } from '../hex';
 import styles from './Panel.module.css';
-
-function hex(value: number, digits: number): string {
-  return `0x${value.toString(16).toUpperCase().padStart(digits, '0')}`;
-}
 
 function libraryVersionString(): string {
   const { major, minor, patch } = Ecu.getLibraryVersion();
@@ -15,17 +16,37 @@ function libraryVersionString(): string {
   return `${major}.${minor}.${patch}`;
 }
 
+interface TuneInfo {
+  revision: TuneRevision;
+  /** The rev limit in rpm, or `null` if the tune holds an invalid one. */
+  rpmLimit: number | null;
+}
+
+async function readTune(ecu: Ecu): Promise<TuneInfo> {
+  const revision = await ecu.getTuneRevision();
+  const rpmLimit = await ecu.getRPMLimit().catch((e: unknown) => {
+    if (e instanceof InvalidReadingError) {
+      return null;
+    }
+
+    throw e;
+  });
+
+  return { revision, rpmLimit };
+}
+
 export function EcuInfo({ ecu }: { ecu: Ecu }) {
-  const [tune, setTune] = useState<TuneRevision | undefined>(undefined);
+  const [info, setInfo] = useState<TuneInfo | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
+  const tune = info?.revision;
 
   useEffect(() => {
     let current = true;
 
-    ecu.getTuneRevision().then(
-      (revision) => {
+    readTune(ecu).then(
+      (result) => {
         if (current) {
-          setTune(revision);
+          setInfo(result);
         }
       },
       (e: unknown) => {
@@ -50,6 +71,14 @@ export function EcuInfo({ ecu }: { ecu: Ecu }) {
         <dd>{tune ? hex(tune.tuneIdent, 4) : '…'}</dd>
         <dt>Checksum fixer</dt>
         <dd>{tune ? hex(tune.checksumFixer, 2) : '…'}</dd>
+        <dt>Rev limit</dt>
+        <dd>
+          {info === undefined
+            ? '…'
+            : info.rpmLimit === null
+              ? 'Not valid'
+              : `${info.rpmLimit} rpm`}
+        </dd>
         <dt>comm14cux-ts</dt>
         <dd>{libraryVersionString()}</dd>
       </dl>

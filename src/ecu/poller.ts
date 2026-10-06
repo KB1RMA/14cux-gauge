@@ -6,6 +6,7 @@ import {
   InvalidReadingError,
   ThrottlePosType,
   type Ecu,
+  type FuelMapIndex,
   type Gear,
 } from '@kb1rma/libcomm14cux-ts';
 import { isTransientLinkError } from './errors';
@@ -30,12 +31,24 @@ export interface LiveSnapshot {
   gear: Reading<Gear>;
   milOn: Reading<boolean>;
   fuelPumpOn: Reading<boolean>;
+  /** Injector pulse width in microseconds. */
+  injectorPulseUs: Reading<number>;
+  /**
+   * The fuel map cell the ECU is using, counted from 0, with the
+   * interpolation weighting towards the next row or column as the fraction:
+   * 2.5 is halfway between rows 2 and 3.
+   */
+  fuelMapRow: Reading<number>;
+  fuelMapColumn: Reading<number>;
   // Slow-changing values, read every `slowEvery` passes.
   coolantTempF: Reading<number>;
   fuelTempF: Reading<number>;
   mainVoltage: Reading<number>;
   lambdaLongOdd: Reading<number>;
   lambdaLongEven: Reading<number>;
+  /** Whether the ECU is controlling the idle speed. */
+  idleMode: Reading<boolean>;
+  targetIdleRpm: Reading<number>;
 }
 
 type SlowKey =
@@ -43,7 +56,14 @@ type SlowKey =
   | 'fuelTempF'
   | 'mainVoltage'
   | 'lambdaLongOdd'
-  | 'lambdaLongEven';
+  | 'lambdaLongEven'
+  | 'idleMode'
+  | 'targetIdleRpm';
+
+/** A fuel map index as one number: the index plus its weighting in 16ths. */
+function mapPosition({ index, weighting }: FuelMapIndex): number {
+  return index + weighting / 16;
+}
 
 export interface PollerStats {
   /** Completed passes per second, averaged over the last few passes. */
@@ -116,6 +136,8 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
     mainVoltage: await read(() => ecu.getMainVoltage()),
     lambdaLongOdd: await read(() => ecu.getLambdaTrimLong(Bank.Odd)),
     lambdaLongEven: await read(() => ecu.getLambdaTrimLong(Bank.Even)),
+    idleMode: await read(() => ecu.getIdleMode()),
+    targetIdleRpm: await read(() => ecu.getTargetIdle()),
   });
 
   const readPass = async (): Promise<LiveSnapshot> => {
@@ -132,6 +154,13 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
       gear: await read(() => ecu.getGearSelection()),
       milOn: await read(() => ecu.isMILOn()),
       fuelPumpOn: await read(() => ecu.getFuelPumpRelayState()),
+      injectorPulseUs: await read(() => ecu.getInjectorPulseWidth()),
+      fuelMapRow: await read(async () =>
+        mapPosition(await ecu.getFuelMapRowIndex()),
+      ),
+      fuelMapColumn: await read(async () =>
+        mapPosition(await ecu.getFuelMapColumnIndex()),
+      ),
     };
     const slow =
       previous === undefined || pass % slowEvery === 0
@@ -146,6 +175,8 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
       mainVoltage: slow.mainVoltage,
       lambdaLongOdd: slow.lambdaLongOdd,
       lambdaLongEven: slow.lambdaLongEven,
+      idleMode: slow.idleMode,
+      targetIdleRpm: slow.targetIdleRpm,
     };
   };
 

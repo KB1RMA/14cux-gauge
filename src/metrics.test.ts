@@ -10,6 +10,7 @@ import {
   type DisplayUnits,
   type MetricKey,
 } from './metrics';
+import type { LiveSnapshot } from './ecu/poller';
 import { snapshotAt } from './test-support/snapshots';
 
 const IMPERIAL: DisplayUnits = { temperatureUnit: 'F', speedUnit: 'mph' };
@@ -47,6 +48,22 @@ describe('metrics', () => {
     expect(
       sampleOf(snapshotAt(0, { mainVoltage: null }), 'mainVoltage'),
     ).toBeNull();
+  });
+
+  it('treats a metric missing from an older recording as no reading', () => {
+    const { injectorPulseUs: _dropped, ...older } = snapshotAt(0);
+
+    expect(sampleOf(older as LiveSnapshot, 'injectorPulseUs')).toBeNull();
+  });
+
+  it('shows fuel map positions from 1 and pulse widths in milliseconds', () => {
+    expect(formatSample(metric('fuelMapRow'), 0, IMPERIAL)).toBe('1.0');
+    expect(formatSample(metric('fuelMapColumn'), 6.75, IMPERIAL)).toBe('7.8');
+    expect(formatSample(metric('injectorPulseUs'), 2350, IMPERIAL)).toBe(
+      '2.35',
+    );
+    expect(formatSample(metric('idleMode'), 1, IMPERIAL)).toBe('Active');
+    expect(formatSample(metric('idleMode'), 0, IMPERIAL)).toBe('Off');
   });
 
   it('converts temperatures and speeds to the chosen units', () => {

@@ -38,13 +38,14 @@ describe('GraphsView', () => {
   it('shows a graph for every metric, grouped like the readings', () => {
     renderGraphs();
 
-    expect(screen.getAllByRole('figure')).toHaveLength(15);
+    expect(screen.getAllByRole('figure')).toHaveLength(20);
     expect(
       screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent),
     ).toEqual([
       'Engine',
       'Airflow and throttle',
       'Electrics and fuelling',
+      'Fuel map position',
       'States',
     ]);
     expect(
@@ -102,9 +103,9 @@ describe('GraphsView', () => {
     expect(
       within(engine).getByRole('checkbox', { name: 'Engine speed' }),
     ).not.toBeChecked();
-    expect(screen.getAllByRole('figure')).toHaveLength(13);
+    expect(screen.getAllByRole('figure')).toHaveLength(18);
     expect(figureNames()).not.toContain('Engine speed (rpm)');
-    expect(trigger).toHaveTextContent('13 of 15');
+    expect(trigger).toHaveTextContent('18 of 20');
 
     await user.keyboard('{Escape}');
 
@@ -114,7 +115,7 @@ describe('GraphsView', () => {
     unmount();
     renderGraphs();
 
-    expect(screen.getAllByRole('figure')).toHaveLength(13);
+    expect(screen.getAllByRole('figure')).toHaveLength(18);
     expect(storedGraphs()).toEqual({
       windowSeconds: 60,
       hidden: ['engineRpm', 'gear'],
@@ -123,7 +124,7 @@ describe('GraphsView', () => {
     await user.click(screen.getByRole('button', { name: /Choose graphs/ }));
     await user.click(screen.getByRole('checkbox', { name: 'Engine speed' }));
 
-    expect(screen.getAllByRole('figure')).toHaveLength(14);
+    expect(screen.getAllByRole('figure')).toHaveLength(19);
   });
 
   it('hides every graph, says so, and shows them all again', async () => {
@@ -140,7 +141,7 @@ describe('GraphsView', () => {
     await user.click(screen.getByRole('button', { name: 'Show all' }));
 
     expect(screen.getByRole('button', { name: 'Show all' })).toBeDisabled();
-    expect(screen.getAllByRole('figure')).toHaveLength(15);
+    expect(screen.getAllByRole('figure')).toHaveLength(20);
   });
 
   it('ignores stored settings it does not recognise', () => {
@@ -152,7 +153,7 @@ describe('GraphsView', () => {
     renderGraphs();
 
     expect(screen.getByRole('radio', { name: '1 minute' })).toBeChecked();
-    expect(screen.getAllByRole('figure')).toHaveLength(14);
+    expect(screen.getAllByRole('figure')).toHaveLength(19);
   });
 
   it('has no detectable accessibility violations, with the picker closed or open', async () => {
