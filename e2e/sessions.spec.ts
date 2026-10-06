@@ -59,7 +59,7 @@ test.describe('Recorded sessions', () => {
 
     // IndexedDB keeps it for the next visit.
     await page.reload();
-    await nav(page).getByRole('button', { name: 'Sessions' }).click();
+    await nav(page).getByRole('link', { name: 'Sessions' }).click();
     await expect(
       page.getByRole('heading', { name: 'Recorded sessions' }),
     ).toBeFocused();
@@ -67,7 +67,7 @@ test.describe('Recorded sessions', () => {
     await expect(reading(page, 'Length')).toHaveText(/^0:0[2-3]$/);
     await expectNoAxeViolations(page);
 
-    await page.getByRole('button', { name: 'Warm idle', exact: true }).click();
+    await page.getByRole('link', { name: 'Warm idle', exact: true }).click();
     await expect(
       page.getByRole('heading', { level: 2, name: 'Warm idle' }),
     ).toBeFocused();
@@ -144,8 +144,8 @@ test.describe('Recorded sessions', () => {
     const dialog = await recordDemo(page);
 
     await dialog.getByRole('button', { name: 'Skip' }).click();
-    await nav(page).getByRole('button', { name: 'Sessions' }).click();
-    await page.getByRole('button', { name: /^Demo ECU, / }).click();
+    await nav(page).getByRole('link', { name: 'Sessions' }).click();
+    await page.getByRole('link', { name: /^Demo ECU, / }).click();
     await page.getByRole('tab', { name: 'Graphs' }).click();
 
     const showAll = page.getByRole('button', { name: 'Show all' });
@@ -211,7 +211,7 @@ test.describe('Recorded sessions', () => {
       await expect(page.getByText('0:02 recorded')).toBeHidden();
 
       await page.getByRole('button', { name: 'Record', exact: true }).click();
-      await nav(page).getByRole('button', { name: 'Sessions' }).click();
+      await nav(page).getByRole('link', { name: 'Sessions' }).click();
       // The recording in progress, and the finished one.
       await expect(page.getByRole('listitem')).toHaveCount(2);
       await expect(
@@ -220,7 +220,7 @@ test.describe('Recorded sessions', () => {
       await expectNoAxeViolations(page);
 
       await page
-        .getByRole('button', { name: /^Demo ECU, / })
+        .getByRole('link', { name: /^Demo ECU, / })
         .last()
         .click();
       await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();

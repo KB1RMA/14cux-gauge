@@ -40,13 +40,15 @@
 }
 
 .navItem {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
   color: var(--text-muted);
-  background: transparent;
-  border-color: transparent;
   font-weight: 600;
+  text-decoration: none;
 }
 
-.navItem:hover:not(:disabled) {
+.navItem:hover {
   color: var(--text);
   background: var(--surface-raised);
   border-color: var(--control-border);

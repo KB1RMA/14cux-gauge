@@ -6,6 +6,8 @@ import { downloadText } from '../diagnostics/report';
 import { usePreferences } from '../preferences/usePreferences';
 import { useRecording } from '../recording/useRecording';
 import { sessionCsv, sessionCsvFileName } from '../sessions/exportCsv';
+import { Link, useNavigate } from 'react-router';
+import { SESSIONS_PATH, sessionPath, type ReplayTab } from '../routing/paths';
 import { useSessionList } from '../sessions/useSessionList';
 import { useSessionSamples } from '../sessions/useSessionSamples';
 import { useSessions } from '../sessions/useSessions';
@@ -71,13 +73,8 @@ function DetailsForm({ session }: { session: SessionSummary }) {
 }
 
 /** One recorded session: replay it, rename it, keep notes, or delete it. */
-export function SessionDetail({
-  id,
-  onClose,
-}: {
-  id: string;
-  onClose(): void;
-}) {
+export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
+  const navigate = useNavigate();
   const { store } = useSessions();
   const { active } = useRecording();
   const list = useSessionList();
@@ -100,10 +97,10 @@ export function SessionDetail({
   }, [found]);
 
   const back = (
-    <button type="button" className={styles['back']} onClick={onClose}>
+    <Link to={SESSIONS_PATH} className={styles['back']}>
       <ArrowLeftIcon aria-hidden="true" />
       All sessions
-    </button>
+    </Link>
   );
 
   if (list.status !== 'loaded') {
@@ -164,7 +161,12 @@ export function SessionDetail({
             <p>No samples were recorded in this session.</p>
           ) : null}
           {samples.status === 'loaded' && samples.samples.length > 0 ? (
-            <SessionReplay key={id} samples={samples.samples} />
+            <SessionReplay
+              key={id}
+              id={id}
+              tab={tab}
+              samples={samples.samples}
+            />
           ) : null}
         </section>
 
@@ -239,9 +241,24 @@ export function SessionDetail({
         onConfirm={(target) => {
           setDeleting(false);
           setDeleteFailed(false);
-          store?.remove(target.id).then(onClose, () => {
-            setDeleteFailed(true);
-          });
+          store?.remove(target.id).then(
+            () => {
+              // The user may have moved on while it was deleting; only leave
+              // the session if it is still showing.
+              const showing = [
+                sessionPath(target.id),
+                sessionPath(target.id, 'graphs'),
+              ].some((path) => window.location.hash === `#${path}`);
+
+              if (showing) {
+                // Back would only lead to the session that is now gone.
+                void navigate(SESSIONS_PATH, { replace: true });
+              }
+            },
+            () => {
+              setDeleteFailed(true);
+            },
+          );
         }}
       />
     </section>

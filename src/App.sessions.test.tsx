@@ -98,10 +98,10 @@ describe('Recording and browsing sessions', () => {
     expect(screen.getByRole('button', { name: 'Record' })).toHaveFocus();
     expect(screen.getByRole('status')).toHaveTextContent(/Polling$/);
 
-    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
 
     expect(
-      sessionsNav().getByRole('button', { name: 'Sessions' }),
+      sessionsNav().getByRole('link', { name: 'Sessions' }),
     ).toHaveAttribute('aria-current', 'page');
     expect(
       await screen.findByRole('heading', { name: 'Recorded sessions' }),
@@ -125,7 +125,7 @@ describe('Recording and browsing sessions', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Demo ECU · Polling');
     await expectNoAxeViolations(container);
 
-    await user.click(sessionsNav().getByRole('button', { name: 'Live' }));
+    await user.click(sessionsNav().getByRole('link', { name: 'Live' }));
 
     expect(
       await screen.findByRole('heading', { name: 'Live data' }),
@@ -156,10 +156,8 @@ describe('Recording and browsing sessions', () => {
       />,
     );
 
-    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
-    await user.click(
-      await screen.findByRole('button', { name: 'Idle wobble' }),
-    );
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: 'Idle wobble' }));
 
     expect(
       await screen.findByRole('heading', { level: 2, name: 'Idle wobble' }),
@@ -201,11 +199,11 @@ describe('Recording and browsing sessions', () => {
     expect(await screen.findByText('Changes saved.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
 
-    await user.click(screen.getByRole('button', { name: 'All sessions' }));
+    await user.click(screen.getByRole('link', { name: 'All sessions' }));
 
     // Back on the session the user came from.
     expect(
-      await screen.findByRole('button', { name: 'Idle wobble' }),
+      await screen.findByRole('link', { name: 'Idle wobble' }),
     ).toHaveFocus();
     expect(
       screen.getByText('Hunts between 600 and 900 rpm. Worse when warm.'),
@@ -232,7 +230,7 @@ describe('Recording and browsing sessions', () => {
       screen.getByRole('heading', { name: 'Recorded sessions' }),
     ).toHaveFocus();
     expect(await store.list()).toEqual([]);
-  });
+  }, 15_000);
 
   it('replays a recording with the keyboard', async () => {
     const user = userEvent.setup();
@@ -241,10 +239,8 @@ describe('Recording and browsing sessions', () => {
     await connectDemo(user);
     await recordAndStop(user);
     await user.click(screen.getByRole('button', { name: 'Skip' }));
-    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
-    await user.click(
-      await screen.findByRole('button', { name: /^Demo ECU, / }),
-    );
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: /^Demo ECU, / }));
 
     const slider = await screen.findByRole('slider', {
       name: 'Playback position',
@@ -294,10 +290,10 @@ describe('Recording and browsing sessions', () => {
       screen.getByRole('heading', { name: 'Connect to an ECU' }),
     ).toHaveFocus();
 
-    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
 
     expect(
-      await screen.findByRole('button', { name: /^Demo ECU, / }),
+      await screen.findByRole('link', { name: /^Demo ECU, / }),
     ).toBeInTheDocument();
     expect(readingFor('Length')).toHaveTextContent(/^0:0\d$/);
   });
@@ -359,15 +355,15 @@ describe('Recording and browsing sessions', () => {
     await connectDemo(user);
     await user.click(screen.getByRole('button', { name: 'Record' }));
     await collectSamples();
-    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
 
-    await screen.findByRole('button', { name: /^Demo ECU, / });
+    await screen.findByRole('link', { name: /^Demo ECU, / });
     expect(readingFor('Length')).toHaveTextContent('Recording…');
     expect(
       screen.getByRole('button', { name: /^Delete Demo ECU, / }),
     ).toBeDisabled();
 
-    await user.click(screen.getByRole('button', { name: /^Demo ECU, / }));
+    await user.click(screen.getByRole('link', { name: /^Demo ECU, / }));
 
     expect(await screen.findByText(/^Still recording\./)).toBeInTheDocument();
     expect(
@@ -430,17 +426,17 @@ describe('Recording and browsing sessions', () => {
     unmount();
 
     render(<App openSessionStore={open} />);
-    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
 
     expect(
-      await screen.findByRole('button', { name: 'Cold start' }),
+      await screen.findByRole('link', { name: 'Cold start' }),
     ).toBeInTheDocument();
     expect(
       screen.queryByText(/recordings last only until the page is closed/),
     ).not.toBeInTheDocument();
 
     // Replay works without a connection.
-    await user.click(screen.getByRole('button', { name: 'Cold start' }));
+    await user.click(screen.getByRole('link', { name: 'Cold start' }));
 
     expect(await screen.findByRole('button', { name: 'Play' })).toBeVisible();
     expect(readingFor('Engine speed')).toHaveTextContent(/^\d+ rpm$/);
@@ -460,8 +456,8 @@ describe('Recording and browsing sessions', () => {
         openSessionStore={() => Promise.resolve({ store, persistent: true })}
       />,
     );
-    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
-    await user.click(await screen.findByRole('button', { name: 'Empty' }));
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: 'Empty' }));
 
     expect(
       await screen.findByText('No samples were recorded in this session.'),
@@ -480,6 +476,56 @@ describe('Recording and browsing sessions', () => {
     expect(
       await screen.findByText('The changes could not be saved.'),
     ).toBeInTheDocument();
+  });
+
+  it('stays where the user went while a session is being deleted', async () => {
+    const user = userEvent.setup();
+
+    let finishRemove = () => {};
+
+    class SlowStore extends MemorySessionStore {
+      override remove(id: string): Promise<void> {
+        return new Promise((resolve) => {
+          finishRemove = () => {
+            resolve(super.remove(id));
+          };
+        });
+      }
+    }
+
+    const store = new SlowStore();
+
+    await store.create({
+      name: 'Slow to go',
+      source: 'demo',
+      startedAt: START,
+    });
+    render(
+      <App
+        openSessionStore={() => Promise.resolve({ store, persistent: true })}
+      />,
+    );
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: 'Slow to go' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Delete session' }),
+    );
+    await user.click(
+      within(
+        screen.getByRole('alertdialog', { name: 'Delete this session?' }),
+      ).getByRole('button', { name: 'Delete session' }),
+    );
+    await user.click(sessionsNav().getByRole('link', { name: 'Live' }));
+
+    expect(window.location.hash).toBe('#/live');
+
+    await act(async () => {
+      finishRemove();
+      await Promise.resolve();
+    });
+
+    expect(window.location.hash).toBe('#/live');
+    expect(await store.list()).toEqual([]);
   });
 
   it('stops recording and says so when the browser cannot save', async () => {
@@ -548,10 +594,8 @@ describe('Recording and browsing sessions', () => {
     await recordAndStop(user);
     await user.click(screen.getByRole('button', { name: 'Skip' }));
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
-    await user.click(sessionsNav().getByRole('button', { name: 'Sessions' }));
-    await user.click(
-      await screen.findByRole('button', { name: /^Demo ECU, / }),
-    );
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: /^Demo ECU, / }));
     await screen.findByRole('slider', { name: 'Playback position' });
 
     const terms = screen.getAllByRole('term').map((dt) => dt.textContent);

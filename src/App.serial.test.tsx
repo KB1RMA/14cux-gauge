@@ -165,10 +165,10 @@ describe('App with a serial ECU', () => {
     ).toBeInTheDocument();
     await expectNoAxeViolations(document.body);
 
-    await user.click(screen.getByRole('button', { name: 'Sessions' }));
+    await user.click(screen.getByRole('link', { name: 'Sessions' }));
 
     expect(
-      await screen.findByRole('button', { name: /^Serial ECU, / }),
+      await screen.findByRole('link', { name: /^Serial ECU, / }),
     ).toBeInTheDocument();
     await vi.waitFor(() => {
       expect(counter.count.mock.calls).toEqual([
