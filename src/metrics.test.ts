@@ -5,6 +5,7 @@ import {
   formatSample,
   METRIC_GROUPS,
   METRICS,
+  meterSpan,
   metricsInGroup,
   recordedKeys,
   sampleOf,
@@ -141,5 +142,44 @@ describe('metrics', () => {
     expect(metric('fuelMapRow').chart).toEqual({ range: [1, 9] });
     expect(metric('fuelMapColumn').chart).toEqual({ range: [1, 17] });
     expect(metric('engineRpm').chart).toEqual({});
+  });
+
+  it('draws fuel trims as centred meters and idle bypass as a filling one', () => {
+    const centred = { range: [-256, 255], centred: true } as const;
+
+    for (const key of [
+      'lambdaShortOdd',
+      'lambdaShortEven',
+      'lambdaLongOdd',
+      'lambdaLongEven',
+    ] as const) {
+      expect(metric(key).meter).toEqual(centred);
+    }
+
+    expect(metric('idleBypass').meter).toEqual({ range: [0, 100] });
+    expect(metric('engineRpm').meter).toBeUndefined();
+  });
+
+  it('spans a centred meter from the zero line to the value', () => {
+    const centred = { range: [-256, 255], centred: true } as const;
+
+    expect(meterSpan(centred, 0)).toEqual([0.5, 0.5]);
+    expect(meterSpan(centred, 255)).toEqual([0.5, 1]);
+    expect(meterSpan(centred, -256)).toEqual([0, 0.5]);
+    expect(meterSpan(centred, -128)).toEqual([0.25, 0.5]);
+    expect(meterSpan(centred, 51)).toEqual([0.5, 0.6]);
+    // Past the range, the bar stops at the edge.
+    expect(meterSpan(centred, 300)).toEqual([0.5, 1]);
+    expect(meterSpan(centred, -300)).toEqual([0, 0.5]);
+  });
+
+  it('fills a plain meter from the low end', () => {
+    const plain = { range: [0, 100] } as const;
+
+    expect(meterSpan(plain, 0)).toEqual([0, 0]);
+    expect(meterSpan(plain, 25)).toEqual([0, 0.25]);
+    expect(meterSpan(plain, 100)).toEqual([0, 1]);
+    expect(meterSpan(plain, 120)).toEqual([0, 1]);
+    expect(meterSpan(plain, -5)).toEqual([0, 0]);
   });
 });
