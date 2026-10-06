@@ -38,6 +38,10 @@ Web Serial works in Chromium-based desktop browsers (Chrome, Edge, Opera) and Fi
 
 The page must be served over HTTPS or from `localhost`. On Linux, your user needs access to the serial device (usually membership of the `dialout` group).
 
+## Privacy
+
+The published site counts visits and a few anonymous events with [GoatCounter](https://www.goatcounter.com): connecting to a serial ECU or demo mode, a connection failing or being lost (with a coarse reason such as `timeout` or `port-in-use`), and a recording being started, saved or failing to save. Each event is a name from a fixed list in `src/analytics/events.ts`. Nothing else is sent, so readings, fault codes, serial traffic, error messages, session names and notes never leave your browser. It uses no cookies and collects nothing personal. Counting is off by default if your browser sends Do Not Track or Global Privacy Control, and you can turn it on or off under Usage counts in Preferences. Development builds and copies served from anywhere else count nothing. The counting code is in `src/analytics/`.
+
 ## Safety
 
 Clearing fault codes writes to the ECU's memory. Writing to a running ECU can affect the engine, so the app asks for confirmation first. Stored fault codes cannot be recovered once cleared. This software is provided with absolutely no warranty; see sections 15 and 16 of the licence.

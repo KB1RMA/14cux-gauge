@@ -179,6 +179,7 @@ describe('PreferencesMenu', () => {
       speedUnit: 'kmh',
       theme: 'dark',
       palette: 'arles',
+      usageCounts: 'on',
     });
 
     first.unmount();
@@ -277,6 +278,37 @@ describe('PreferencesMenu', () => {
     expect(
       screen.getByRole('menuitemradio', { name: 'Coniston Green' }),
     ).toBeChecked();
+  });
+
+  it('offers the usage-counts choice where the app counts usage', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <PreferencesProvider>
+        <PreferencesMenu offerUsageCounts />
+      </PreferencesProvider>,
+    );
+    await user.click(trigger());
+
+    const menu = screen.getByRole('menu', { name: 'Preferences' });
+    const group = within(menu).getByRole('group', { name: 'Usage counts' });
+
+    expect(
+      within(group).getByRole('menuitemradio', {
+        name: 'Count my visits anonymously',
+      }),
+    ).toBeChecked();
+
+    await user.click(
+      within(group).getByRole('menuitemradio', {
+        name: 'Don’t count my visits',
+      }),
+    );
+
+    expect(
+      JSON.parse(localStorage.getItem('cuxGauge.preferences') ?? 'null'),
+    ).toMatchObject({ usageCounts: 'off' });
+    await expectNoAxeViolations(menu);
   });
 
   it('has no detectable accessibility violations, closed or open', async () => {

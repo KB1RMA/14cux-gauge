@@ -10,11 +10,15 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 export type PalettePreference =
   'coniston' | 'arles' | 'alpine-beluga' | 'racing-green';
 
+/** Whether the app may count visits and connections anonymously. */
+export type UsageCountsPreference = 'on' | 'off';
+
 export interface Preferences {
   temperatureUnit: TemperatureUnit;
   speedUnit: SpeedUnit;
   theme: ThemePreference;
   palette: PalettePreference;
+  usageCounts: UsageCountsPreference;
 }
 
 export interface PreferencesContextValue extends Preferences {
@@ -22,6 +26,7 @@ export interface PreferencesContextValue extends Preferences {
   setSpeedUnit(unit: SpeedUnit): void;
   setTheme(theme: ThemePreference): void;
   setPalette(palette: PalettePreference): void;
+  setUsageCounts(usageCounts: UsageCountsPreference): void;
 }
 
 export const PreferencesContext = createContext<

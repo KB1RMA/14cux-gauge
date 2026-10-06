@@ -31,7 +31,7 @@ import {
   LiveDataContext,
   type LiveData,
 } from './contexts';
-import { describeError } from './errors';
+import { describeError, errorReason } from './errors';
 import { startPoller, type LiveSnapshot, type Poller } from './poller';
 
 const NO_LIVE_DATA: LiveData = {
@@ -110,7 +110,12 @@ export function EcuProvider({
 
       log.record('error', `Connection failed: ${detail}`);
       await teardown();
-      dispatch({ type: 'failed', message: describeError(error), detail });
+      dispatch({
+        type: 'failed',
+        message: describeError(error),
+        detail,
+        reason: errorReason(error),
+      });
     },
     [teardown, log],
   );

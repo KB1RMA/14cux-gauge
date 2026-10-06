@@ -8,6 +8,7 @@ import type { LiveSnapshot } from './ecu/poller';
 import { openSessionStore } from './storage/openSessionStore';
 import { MemorySessionStore } from './storage/sessionStore';
 import { expectNoAxeViolations, readingFor } from './test-support/a11y';
+import { fakeUsageCounter } from './test-support/usageCounter';
 import { snapshotAt } from './test-support/snapshots';
 
 const START = Date.UTC(2026, 9, 5, 14, 0);
@@ -445,12 +446,15 @@ describe('Recording and browsing sessions', () => {
       }
     }
 
+    const counter = fakeUsageCounter();
+
     render(
       <App
         pollIntervalMs={{ demo: 10 }}
         openSessionStore={() =>
           Promise.resolve({ store: new FullStore(), persistent: true })
         }
+        usageCounter={counter}
       />,
     );
     await connectDemo(user);
@@ -467,6 +471,15 @@ describe('Recording and browsing sessions', () => {
     );
     expect(screen.getByRole('button', { name: 'Record' })).toBeEnabled();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // Counted from effects, which can run after the status has rendered.
+    await vi.waitFor(() => {
+      expect(counter.count.mock.calls).toEqual([
+        ['connected/demo'],
+        ['recording/started'],
+        ['recording/failed'],
+        ['recording/saved'],
+      ]);
+    });
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
   });
 });

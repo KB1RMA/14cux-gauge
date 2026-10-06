@@ -4,6 +4,7 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { expectNoAxeViolations } from './test-support/a11y';
+import { fakeUsageCounter } from './test-support/usageCounter';
 
 /**
  * A stand-in for a Web Serial port: opens (or refuses to), never sends data,
@@ -84,9 +85,11 @@ describe('App with a serial ECU', () => {
     const user = userEvent.setup();
     const port = new FakeSerialPort();
 
+    const counter = fakeUsageCounter();
+
     port.failOpen = true;
     installSerial(port);
-    render(<App />);
+    render(<App usageCounter={counter} />);
 
     await user.click(screen.getByRole('checkbox', { name: /Double-speed/ }));
     await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
@@ -114,14 +117,19 @@ describe('App with a serial ECU', () => {
     await user.click(screen.getByRole('button', { name: 'Close' }));
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(counter.count.mock.calls).toEqual([
+      ['connect-failed/serial/port-error'],
+      ['connect-failed/serial/port-error'],
+    ]);
   });
 
   it('stops and offers to reconnect when the port is unplugged', async () => {
     const user = userEvent.setup();
     const port = new FakeSerialPort();
+    const counter = fakeUsageCounter();
 
     installSerial(port);
-    render(<App />);
+    render(<App usageCounter={counter} />);
     await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent(
@@ -162,6 +170,14 @@ describe('App with a serial ECU', () => {
     expect(
       await screen.findByRole('button', { name: /^Serial ECU, / }),
     ).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(counter.count.mock.calls).toEqual([
+        ['connected/serial'],
+        ['recording/started'],
+        ['connection-lost/serial/port-error'],
+        ['recording/saved'],
+      ]);
+    });
   });
 
   it('saves a diagnostic log that shows why the port would not open', async () => {
@@ -169,9 +185,11 @@ describe('App with a serial ECU', () => {
     const port = new FakeSerialPort();
     const downloads = captureDownloads();
 
+    const counter = fakeUsageCounter();
+
     port.failOpen = true;
     installSerial(port);
-    render(<App />);
+    render(<App usageCounter={counter} />);
     await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
 
     const dialog = await screen.findByRole('dialog', {
