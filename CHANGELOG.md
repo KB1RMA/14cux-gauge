@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.5.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.4.0...v0.5.0) (2026-10-07)
+
+
+### Features
+
+* lay the live graphs out in a grid or stacked at full width ([58b11be](https://github.com/KB1RMA/14cux-gauge/commit/58b11be909beb4d8509ea2c776d9b2f99861f5f6))
+* notify ECU write starts and outcomes from the bottom of the app ([6457104](https://github.com/KB1RMA/14cux-gauge/commit/6457104a508a4d279fe729f02ff865f04d1726dc))
+* show the live graphs over the whole session since connecting, keeping every spike and dip on long sessions ([58b11be](https://github.com/KB1RMA/14cux-gauge/commit/58b11be909beb4d8509ea2c776d9b2f99861f5f6))
+
+
+### Bug Fixes
+
+* load the development server with an ad blocker turned on ([58b11be](https://github.com/KB1RMA/14cux-gauge/commit/58b11be909beb4d8509ea2c776d9b2f99861f5f6))
+* print each live graph at the full page width, without splitting one across two pages ([58b11be](https://github.com/KB1RMA/14cux-gauge/commit/58b11be909beb4d8509ea2c776d9b2f99861f5f6))
+* say when a continuous fuel pump test stops because the connection to the ECU closed ([6457104](https://github.com/KB1RMA/14cux-gauge/commit/6457104a508a4d279fe729f02ff865f04d1726dc))
+
 ## [0.4.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.3.0...v0.4.0) (2026-10-06)
 
 
