@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { expectNoAxeViolations } from './test-support/a11y';
@@ -61,7 +61,7 @@ describe('App usage counts', () => {
       'Private notes',
     );
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(dialog).not.toBeInTheDocument();
     });
 

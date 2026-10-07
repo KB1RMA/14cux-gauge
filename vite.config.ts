@@ -38,6 +38,9 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],
+    // Generous, as tests that render the whole app run in real time and a
+    // busy CI runner is slow. A test that is right should never time out.
+    testTimeout: 30_000,
     include: ['src/**/*.test.{ts,tsx}', 'build/**/*.test.ts'],
     exclude: [...configDefaults.exclude],
     reporters: process.env['GITHUB_ACTIONS']

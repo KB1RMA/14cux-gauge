@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 
@@ -53,7 +53,7 @@ describe('Addresses', () => {
     expect(window.location.hash).toBe('#/sessions');
 
     await goBack();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(window.location.hash).toBe('#/live/fuel-map');
     });
     expect(

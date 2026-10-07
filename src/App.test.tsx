@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { expectNoAxeViolations, readingFor } from './test-support/a11y';
@@ -20,7 +20,7 @@ describe('App in demo mode', () => {
     const heading = await screen.findByRole('heading', { name: 'Live data' });
 
     expect(heading).toHaveFocus();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(readingFor('Engine speed')).toHaveTextContent(/\d+ rpm/);
     });
     expect(screen.getByRole('status')).toHaveTextContent('Demo ECU · Polling');
@@ -35,7 +35,7 @@ describe('App in demo mode', () => {
     });
 
     expect(within(faults).getByText(/Purge valve leak/)).toBeInTheDocument();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(readingFor('MIL')).toHaveTextContent('On');
     });
     await expectNoAxeViolations(container);
@@ -51,7 +51,7 @@ describe('App in demo mode', () => {
     });
 
     // Focus moves once the last read has finished and the port is closed.
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(connectHeading).toHaveFocus();
     });
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -65,7 +65,7 @@ describe('App in demo mode', () => {
 
     const region = await screen.findByRole('region', { name: 'Connection' });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(region).toHaveTextContent(/samples\/s/);
     });
     expect(screen.getByRole('status')).not.toHaveTextContent(/samples/);
@@ -101,7 +101,7 @@ describe('App in demo mode', () => {
     const rpm = screen.getByRole('figure', { name: 'Engine speed (rpm)' });
 
     // The demo's samples reach the graph's text summary.
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(
         within(rpm)
           .getAllByRole('definition')
@@ -145,7 +145,7 @@ describe('App in demo mode', () => {
       expect.arrayContaining(['Coolant', 'MIL']),
     );
     expect(screen.queryByText('Engine speed')).not.toBeInTheDocument();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(
         screen.getByText(/^2 of 25 readings · [\d.]+ samples\/s$/),
       ).toBeInTheDocument();
@@ -153,7 +153,7 @@ describe('App in demo mode', () => {
 
     // The fuel map asks for its position while it is shown.
     await user.click(screen.getByRole('tab', { name: 'Fuel map' }));
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(screen.getByText(/^In use now: row 1, /)).toBeInTheDocument();
     });
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
@@ -190,14 +190,11 @@ describe('App in demo mode', () => {
     expect(notification('Fuel pump test')).toHaveTextContent(
       'Fuel pump running',
     );
-    await vi.waitFor(
-      () => {
-        expect(notification('Fuel pump test')).toHaveTextContent(
-          'Fuel pump stopped.',
-        );
-      },
-      { timeout: 3000 },
-    );
+    await waitFor(() => {
+      expect(notification('Fuel pump test')).toHaveTextContent(
+        'Fuel pump stopped.',
+      );
+    });
     // The rest of the page has its own axe tests.
     await expectNoAxeViolations(notificationsRegion());
 
@@ -208,7 +205,7 @@ describe('App in demo mode', () => {
         name: 'Clear fault codes',
       }),
     );
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(notification('Clear fault codes')).toHaveTextContent(
         'Fault codes cleared.',
       );
@@ -219,9 +216,7 @@ describe('App in demo mode', () => {
     );
     expect(status).toHaveTextContent(/^Demo ECU · Polling$/);
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
-    // The whole app, and a real two-second pump run, take a while on a busy
-    // runner.
-  }, 15_000);
+  });
 
   it('stays connected when reconnected while the last connection is closing', async () => {
     const user = userEvent.setup();

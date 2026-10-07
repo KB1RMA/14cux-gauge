@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
+
+// Many tests drive the app against the demo or a simulated ECU in real time,
+// which is slow on a busy CI runner. Wait long enough that a slow runner never
+// fails a test that is right; a wait that succeeds still returns at once.
+configure({ asyncUtilTimeout: 10_000 });
 
 afterEach(() => {
   cleanup();

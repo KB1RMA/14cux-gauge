@@ -125,12 +125,9 @@ describe('ECU writes', () => {
     expect(clear).toHaveAccessibleDescription(BLOCKED);
     expect(iac).toBeDisabled();
 
-    await waitFor(
-      () => {
-        expect(announcement()).toBe('Fuel pump stopped.');
-      },
-      { timeout: 3000 },
-    );
+    await waitFor(() => {
+      expect(announcement()).toBe('Fuel pump stopped.');
+    });
     expect(clear).toBeEnabled();
     expect(clear).not.toHaveAccessibleDescription();
     expect(iac).toBeEnabled();

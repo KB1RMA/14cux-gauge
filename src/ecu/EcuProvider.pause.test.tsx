@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { act, render } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 import { useHistory } from '../history/useHistory';
 import type { SampleHistory } from '../history/sampleHistory';
 import type { MetricKey } from '../metrics';
@@ -40,7 +40,7 @@ describe('pausing polling', () => {
     await act(async () => {
       await ecu?.connect({ kind: 'demo' });
     });
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(history?.window('engineRpm').values.length).toBeGreaterThan(2);
     });
 
@@ -57,7 +57,7 @@ describe('pausing polling', () => {
 
     await act(async () => {
       resume?.();
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(history?.window('engineRpm').values.at(-1)).not.toBeNull();
       });
     });
