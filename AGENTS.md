@@ -159,3 +159,20 @@ The app must be usable with a keyboard alone and with a screen reader, and meet 
 - Drive a serial ECU only through the `emulatedSerial` fixture: comm14cux-ts's `SimulatedTransport` behind a fake `navigator.serial`, with bytes planted in its memory. Do not stub app modules or intercept `Ecu` calls.
 - `eslint-plugin-playwright`'s recommended rules run as errors, with `no-raw-locators` on. Find elements by role and accessible name, as in the unit tests; a CSS or XPath locator needs a one-line disable saying why no role fits. Run `expectNoAxeViolations` for every new view or state; pass `within` while a Radix menu or dialog is open.
 - Do not raise `retries` (CI retries once only to capture a trace), skip a browser or loosen `failOnFlakyTests` to land a change. A release deploys only when the suite passes in Chromium, Firefox and WebKit.
+
+## Pull requests and the changelog
+
+Pull requests are squash-merged, so each one's title becomes its commit message on `main`. release-please works out `CHANGELOG.md` and the next version from those messages.
+
+- Write the title as a Conventional Commit (`pr-title.yml` checks it). Choose the type by what users get: a refactor that fixes a bug is a `fix:`, not a `refactor:`. `docs`, `style`, `chore`, `refactor`, `test`, `build` and `ci` are left out of the changelog and do not make a release.
+- When a pull request contains more than one feature or bug fix, end its description with an explicit changelog block, one Conventional Commit per entry. release-please uses these lines instead of the title, so each becomes its own changelog entry:
+
+  ```
+  BEGIN_COMMIT_OVERRIDE
+  feat: export a recorded session as CSV
+  fix: keep each ECU write's result when you leave the view
+  END_COMMIT_OVERRIDE
+  ```
+
+- Write entries for users: what changed for them, not how the code changed. Link the issue a change closes, as in `(#52)`.
+- Never edit `CHANGELOG.md` by hand; release-please owns it. If a merged pull request's entries are wrong or missing, fix the block in its description and rerun the latest Release Please workflow run.
