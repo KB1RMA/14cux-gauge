@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useEcu } from '../ecu/useEcu';
+import { useEcuWrite } from '../ecuWrite/useEcuWrite';
 import { defaultSessionName, describeStorageError } from '../sessions/format';
 import { useSessions } from '../sessions/useSessions';
 import type { SessionSummary } from '../storage/sessionStore';
@@ -21,12 +22,13 @@ interface Active {
 }
 
 /**
- * Records the live snapshots into a session while the user asks it to.
- * Recording stops by itself when the connection ends, keeping what was
- * recorded, or if a write fails.
+ * Records the live snapshots, and the writes to the ECU, into a session
+ * while the user asks it to. Recording stops by itself when the connection
+ * ends, keeping what was recorded, or if saving fails.
  */
 export function RecordingProvider({ children }: { children: ReactNode }) {
   const { state, onSnapshot } = useEcu();
+  const { watch } = useEcuWrite();
   const { store } = useSessions();
   const [active, setActive] = useState<SessionSummary | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -101,11 +103,19 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
         },
       );
 
+      const stopSamples = onSnapshot((snapshot) => {
+        recorder.push(snapshot);
+      });
+      const stopWrites = watch((entry) => {
+        recorder.recordWrite(entry);
+      });
+
       activeRef.current = {
         recorder,
-        unsubscribe: onSnapshot((snapshot) => {
-          recorder.push(snapshot);
-        }),
+        unsubscribe: () => {
+          stopSamples();
+          stopWrites();
+        },
       };
       setActive(recorder.session);
     } catch (cause) {
@@ -113,7 +123,7 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
     } finally {
       startingRef.current = false;
     }
-  }, [canRecord, source, store, onSnapshot, stopQuietly]);
+  }, [canRecord, source, store, onSnapshot, watch, stopQuietly]);
 
   // Keep what was recorded when the connection ends, including when it
   // ended while recording was starting.

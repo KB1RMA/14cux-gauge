@@ -183,3 +183,68 @@
     justify-self: start;
   }
 }
+
+/* Writes to the ECU made while recording. */
+.writeLog {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.writeLog .subtitle {
+  margin: 0;
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+.writes {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.writes th,
+.writes td {
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+
+.writes thead th {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.writes tbody th {
+  font-weight: 600;
+}
+
+/* The status word leads each result; the colour is only a cue. */
+.writes tr[data-status='failed'] strong,
+.writes tr[data-status='partial'] strong {
+  color: var(--danger);
+}
+
+.writes tr[data-status='open'] strong {
+  color: var(--warn);
+}
+
+.writes .time {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.writes button {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.here {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: normal;
+  color: var(--accent);
+}

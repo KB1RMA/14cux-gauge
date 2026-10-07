@@ -8,6 +8,7 @@ import type { LiveSnapshot } from './ecu/poller';
 import { openSessionStore } from './storage/openSessionStore';
 import { MemorySessionStore } from './storage/sessionStore';
 import { expectNoAxeViolations, readingFor } from './test-support/a11y';
+import { notification } from './test-support/notifications';
 import { fakeUsageCounter } from './test-support/usageCounter';
 import { snapshotAt } from './test-support/snapshots';
 
@@ -26,7 +27,11 @@ async function connectDemo(user: UserEvent) {
 async function recordAndStop(user: UserEvent) {
   await user.click(screen.getByRole('button', { name: 'Record' }));
   await collectSamples();
-  await user.click(screen.getByRole('button', { name: 'Stop recording' }));
+  // Recording starts once the store has created the session, which
+  // IndexedDB may take a while to do on a busy machine.
+  await user.click(
+    await screen.findByRole('button', { name: 'Stop recording' }),
+  );
 
   return screen.findByRole('dialog', { name: 'Save recording' });
 }
@@ -94,8 +99,11 @@ describe('Recording and browsing sessions', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
     await savedAndClosed(dialog);
 
-    // The same button, now offering to record again.
-    expect(screen.getByRole('button', { name: 'Record' })).toHaveFocus();
+    // The same button, now offering to record again. Radix moves focus a
+    // tick after the dialog has gone.
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Record' })).toHaveFocus();
+    });
     expect(screen.getByRole('status')).toHaveTextContent(/Polling$/);
 
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
@@ -232,6 +240,118 @@ describe('Recording and browsing sessions', () => {
     expect(await store.list()).toEqual([]);
   });
 
+  it('lists and marks the writes to the ECU made while recording', async () => {
+    const user = userEvent.setup();
+    const store = new MemorySessionStore();
+    const { id } = await store.create({
+      name: 'Pump check',
+      source: 'serial',
+      startedAt: START,
+    });
+
+    await store.append(id, [
+      snapshotAt(START, { engineRpm: 0, fuelPumpOn: false }),
+      snapshotAt(START + 1000, { engineRpm: 0, fuelPumpOn: false }),
+      snapshotAt(START + 2000, { engineRpm: 0, fuelPumpOn: true }),
+      snapshotAt(START + 3000, { engineRpm: 0, fuelPumpOn: true }),
+    ]);
+    await store.putWrite(id, {
+      id: 'clear',
+      write: 'clearFaultCodes',
+      startedAt: START + 400,
+      endedAt: START + 700,
+      outcome: {
+        status: 'partial',
+        message: 'Clearing may be incomplete. The ECU stopped responding.',
+      },
+    });
+    await store.putWrite(id, {
+      id: 'pump',
+      write: 'fuelPump',
+      startedAt: START + 1800,
+      endedAt: null,
+      outcome: { status: 'running' },
+    });
+    await store.finish(id, START + 3000);
+
+    const { container } = render(
+      <App
+        openSessionStore={() => Promise.resolve({ store, persistent: true })}
+      />,
+    );
+
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: 'Pump check' }));
+
+    const log = within(
+      await screen.findByRole('region', { name: 'Writes to the ECU' }),
+    );
+    const rows = log.getAllByRole('row').slice(1);
+
+    expect(rows.map((row) => row.textContent)).toEqual([
+      '0:00.4Clear fault codesPartly done. Clearing may be incomplete. The ECU stopped responding.0.3 sGo to',
+      '0:01.8Fuel pump testNo end recorded. Still running when the recording stopped.Not recordedGo to',
+    ]);
+    await expectNoAxeViolations(container);
+
+    await user.click(
+      log.getByRole('button', { name: 'Go to Fuel pump test, 0:01.8' }),
+    );
+
+    expect(
+      screen.getByRole('slider', { name: 'Playback position' }),
+    ).toHaveAttribute('aria-valuetext', '1 second of 3 seconds');
+    expect(readingFor('Fuel pump relay')).toHaveTextContent('Off');
+    expect(
+      log.getByRole('rowheader', { name: 'Fuel pump test At the playhead' }),
+    ).toBeInTheDocument();
+    expect(
+      log.getByRole('rowheader', { name: 'Clear fault codes' }),
+    ).toBeInTheDocument();
+  }, 15_000);
+
+  it('records writes to the ECU made while recording', async () => {
+    const user = userEvent.setup();
+
+    render(<App pollIntervalMs={{ demo: 10 }} />);
+    await connectDemo(user);
+    await user.click(screen.getByRole('button', { name: 'Record' }));
+    await collectSamples();
+    await user.click(screen.getByRole('button', { name: 'Clear fault codes' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', {
+        name: 'Clear fault codes',
+      }),
+    );
+    await vi.waitFor(() => {
+      expect(notification('Clear fault codes')).toHaveTextContent(
+        'Fault codes cleared.',
+      );
+    });
+    await collectSamples();
+    await user.click(screen.getByRole('button', { name: 'Stop recording' }));
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Save recording',
+    });
+
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await savedAndClosed(dialog);
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: /^Demo ECU, / }));
+
+    const log = within(
+      await screen.findByRole('region', { name: 'Writes to the ECU' }),
+    );
+
+    expect(
+      log.getByRole('rowheader', { name: 'Clear fault codes' }),
+    ).toBeInTheDocument();
+    expect(log.getByText('Fault codes cleared.')).toBeInTheDocument();
+    expect(log.getByText('Done.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  }, 15_000);
+
   it('replays a recording with the keyboard', async () => {
     const user = userEvent.setup();
 
@@ -286,9 +406,12 @@ describe('Recording and browsing sessions', () => {
 
     expect(dialog).not.toBeInTheDocument();
     // The status bar went with the connection; start at the connect screen.
-    expect(
-      screen.getByRole('heading', { name: 'Connect to an ECU' }),
-    ).toHaveFocus();
+    // Radix moves focus a tick after the dialog has gone.
+    await vi.waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Connect to an ECU' }),
+      ).toHaveFocus();
+    });
 
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
 

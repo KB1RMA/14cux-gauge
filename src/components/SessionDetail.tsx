@@ -11,7 +11,7 @@ import { SESSIONS_PATH, sessionPath, type ReplayTab } from '../routing/paths';
 import { useSessionList } from '../sessions/useSessionList';
 import { useSessionSamples } from '../sessions/useSessionSamples';
 import { useSessions } from '../sessions/useSessions';
-import type { SessionSummary } from '../storage/sessionStore';
+import { keepsWrites, type SessionSummary } from '../storage/sessionStore';
 import { DeleteSessionDialog } from './DeleteSessionDialog';
 import { SessionFields } from './SessionFields';
 import { SessionMeta } from './SessionMeta';
@@ -166,6 +166,8 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
               id={id}
               tab={tab}
               samples={samples.samples}
+              writes={samples.writes}
+              keepsWrites={keepsWrites(session)}
             />
           ) : null}
         </section>

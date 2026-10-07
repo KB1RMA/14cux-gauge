@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import type { LiveSnapshot } from '../ecu/poller';
+import type { WriteLogEntry } from '../ecuWrite/writes';
 import {
   BY_SESSION,
   CHUNKS,
@@ -8,10 +9,13 @@ import {
   openDatabase,
   request,
   SESSIONS,
+  WRITES,
   type DatabaseOptions,
 } from './database';
 import {
   applyChanges,
+  byStart,
+  copyWrite,
   emptySummary,
   newestFirst,
   UnknownSessionError,
@@ -25,6 +29,8 @@ interface ChunkRecord {
   sessionId: string;
   samples: LiveSnapshot[];
 }
+
+type WriteRecord = WriteLogEntry & { sessionId: string };
 
 export type OpenOptions = DatabaseOptions;
 
@@ -126,14 +132,43 @@ export class IndexedDbSessionStore implements SessionStore {
     return chunks.flatMap((chunk) => chunk.samples);
   }
 
-  async remove(id: string): Promise<void> {
-    const tx = this.db.transaction([SESSIONS, CHUNKS], 'readwrite');
+  async putWrite(id: string, write: WriteLogEntry): Promise<void> {
+    const tx = this.db.transaction([SESSIONS, WRITES], 'readwrite');
     const done = completed(tx);
-    const chunks = tx.objectStore(CHUNKS);
-    const keys = await request(chunks.index(BY_SESSION).getAllKeys(id));
 
-    for (const key of keys) {
-      chunks.delete(key);
+    await this.summaryIn(tx.objectStore(SESSIONS), id, tx);
+
+    const record: WriteRecord = { ...copyWrite(write), sessionId: id };
+
+    tx.objectStore(WRITES).put(record);
+    await done;
+  }
+
+  async readWrites(id: string): Promise<WriteLogEntry[]> {
+    const tx = this.db.transaction([SESSIONS, WRITES], 'readonly');
+
+    await this.summaryIn(tx.objectStore(SESSIONS), id, tx);
+
+    const records = await request<WriteRecord[]>(
+      tx.objectStore(WRITES).index(BY_SESSION).getAll(id),
+    );
+
+    return records
+      .map(({ sessionId: _sessionId, ...write }) => write)
+      .sort(byStart);
+  }
+
+  async remove(id: string): Promise<void> {
+    const tx = this.db.transaction([SESSIONS, CHUNKS, WRITES], 'readwrite');
+    const done = completed(tx);
+
+    for (const name of [CHUNKS, WRITES]) {
+      const records = tx.objectStore(name);
+      const keys = await request(records.index(BY_SESSION).getAllKeys(id));
+
+      for (const key of keys) {
+        records.delete(key);
+      }
     }
 
     tx.objectStore(SESSIONS).delete(id);

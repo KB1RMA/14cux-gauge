@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import type { LiveSnapshot } from '../ecu/poller';
+import type { WriteLogEntry } from '../ecuWrite/writes';
 import type {
   NewSession,
   SessionChanges,
@@ -14,8 +15,9 @@ import type {
  * `useSyncExternalStore`: the version changes after every create, finish,
  * update or remove that succeeds.
  *
- * Appends are not reported. They happen every second while recording, and
- * a session's samples are read when it is opened rather than watched.
+ * Appends and writes are not reported. They happen while recording, and a
+ * session's samples and writes are read when it is opened rather than
+ * watched.
  */
 export class ObservableSessionStore implements SessionStore {
   private readonly listeners = new Set<() => void>();
@@ -49,6 +51,14 @@ export class ObservableSessionStore implements SessionStore {
 
   readSamples(id: string): Promise<LiveSnapshot[]> {
     return this.inner.readSamples(id);
+  }
+
+  putWrite(id: string, write: WriteLogEntry): Promise<void> {
+    return this.inner.putWrite(id, write);
+  }
+
+  readWrites(id: string): Promise<WriteLogEntry[]> {
+    return this.inner.readWrites(id);
   }
 
   async remove(id: string): Promise<void> {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { IDBFactory } from 'fake-indexeddb';
+import type { WriteLogEntry } from '../ecuWrite/writes';
 import { snapshotAt } from '../test-support/snapshots';
 import { IndexedDbSessionStore } from './indexedDbSessionStore';
 import { openSessionStore } from './openSessionStore';
@@ -17,6 +18,29 @@ const backends: [string, () => Promise<SessionStore>][] = [
     () => IndexedDbSessionStore.open({ factory: new IDBFactory() }),
   ],
 ];
+
+const PUMP_RUNNING: WriteLogEntry = {
+  id: 'pump-1',
+  write: 'fuelPump',
+  startedAt: 2000,
+  endedAt: null,
+  outcome: { status: 'running' },
+};
+const PUMP_STOPPED: WriteLogEntry = {
+  ...PUMP_RUNNING,
+  endedAt: 4100,
+  outcome: { status: 'done', message: 'Fuel pump stopped.' },
+};
+const CLEARED: WriteLogEntry = {
+  id: 'clear-1',
+  write: 'clearFaultCodes',
+  startedAt: 1500,
+  endedAt: 1600,
+  outcome: {
+    status: 'partial',
+    message: 'Clearing may be incomplete. The ECU stopped responding.',
+  },
+};
 
 describe.each(backends)('%s', (_name, open) => {
   let store: SessionStore;
@@ -44,7 +68,7 @@ describe.each(backends)('%s', (_name, open) => {
       endedAt: null,
       sampleCount: 0,
       notes: '',
-      formatVersion: 2,
+      formatVersion: 3,
     });
     expect(await store.get(session.id)).toEqual(session);
     expect(await store.readSamples(session.id)).toEqual([]);
@@ -148,6 +172,53 @@ describe.each(backends)('%s', (_name, open) => {
     expect(await store.readSamples(keep.id)).toHaveLength(1);
   });
 
+  it('keeps writes to the ECU with a session, updated as they end, in start order', async () => {
+    const { id } = await store.create({
+      name: 'Pump test',
+      source: 'serial',
+      startedAt: 1000,
+    });
+    const other = await store.create({
+      name: 'Other',
+      source: 'serial',
+      startedAt: 0,
+    });
+
+    expect(await store.readWrites(id)).toEqual([]);
+
+    await store.putWrite(id, PUMP_RUNNING);
+    await store.putWrite(id, CLEARED);
+
+    expect(await store.readWrites(id)).toEqual([CLEARED, PUMP_RUNNING]);
+
+    await store.putWrite(id, PUMP_STOPPED);
+
+    expect(await store.readWrites(id)).toEqual([CLEARED, PUMP_STOPPED]);
+    expect(await store.readWrites(other.id)).toEqual([]);
+
+    await store.remove(id);
+    await expect(store.readWrites(id)).rejects.toThrow(UnknownSessionError);
+    await expect(store.putWrite(id, CLEARED)).rejects.toThrow(
+      UnknownSessionError,
+    );
+  });
+
+  it('does not share a stored write with the caller', async () => {
+    const { id } = await store.create({
+      name: 'Copy',
+      source: 'demo',
+      startedAt: 0,
+    });
+    const write = { ...CLEARED, outcome: { ...CLEARED.outcome } };
+
+    await store.putWrite(id, write);
+    write.endedAt = 9999;
+
+    const [stored] = await store.readWrites(id);
+
+    expect(stored?.endedAt).toBe(1600);
+  });
+
   it('rejects writes and reads for an unknown session', async () => {
     await expect(store.append('missing', [snapshotAt(0)])).rejects.toThrow(
       UnknownSessionError,
@@ -247,6 +318,8 @@ describe('IndexedDbSessionStore upgrades', () => {
       },
     ]);
     expect(await store.readSamples('v1-session')).toEqual([snapshotAt(10)]);
+    // Recorded before writes were kept: none, and still in format 2.
+    expect(await store.readWrites('v1-session')).toEqual([]);
     store.close();
   });
 });
@@ -269,7 +342,7 @@ describe('IndexedDbSessionStore failures', () => {
   it('refuses to open a database from a newer version of the app', async () => {
     const factory = new IDBFactory();
 
-    (await rawOpen(factory, 4)).close();
+    (await rawOpen(factory, 5)).close();
 
     await expect(IndexedDbSessionStore.open({ factory })).rejects.toThrow(
       expect.objectContaining({ name: 'VersionError' }) as Error,
@@ -281,9 +354,9 @@ describe('IndexedDbSessionStore failures', () => {
     const store = await IndexedDbSessionStore.open({ factory });
 
     // Would block forever if the open store did not close itself.
-    const newer = await rawOpen(factory, 4);
+    const newer = await rawOpen(factory, 5);
 
-    expect(newer.version).toBe(4);
+    expect(newer.version).toBe(5);
     newer.close();
     store.close();
   });

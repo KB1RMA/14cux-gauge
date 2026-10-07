@@ -2,7 +2,12 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import type { Ecu } from '@kb1rma/libcomm14cux-ts';
 import { createContext } from 'react';
-import type { FinishedOutcome, WriteId, WriteOutcome } from './writes';
+import type {
+  FinishedOutcome,
+  WriteId,
+  WriteLogEntry,
+  WriteOutcome,
+} from './writes';
 
 /** A write that has started; it holds the ECU until `finish` is called. */
 export interface WriteHandle {
@@ -31,6 +36,12 @@ export interface EcuWriteValue {
    * `false` if it failed or could not start.
    */
   run(id: WriteId, task: (ecu: Ecu) => Promise<string>): Promise<boolean>;
+  /**
+   * Calls `watcher` as each write starts and again as it ends, on any
+   * connection, first with the write running on the current connection, if
+   * there is one. Returns a function that stops watching.
+   */
+  watch(watcher: (entry: WriteLogEntry) => void): () => void;
 }
 
 export const EcuWriteContext = createContext<EcuWriteValue | undefined>(

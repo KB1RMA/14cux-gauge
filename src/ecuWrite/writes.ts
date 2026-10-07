@@ -17,6 +17,21 @@ export type WriteOutcome =
 
 export type FinishedOutcome = Exclude<WriteOutcome, { status: 'running' }>;
 
+/**
+ * One write from start to end, as a recording keeps it. Times are
+ * `Date.now()`, the clock sample timestamps use, so the write lines up with
+ * the readings it changed.
+ */
+export interface WriteLogEntry {
+  /** Unique to this write. */
+  id: string;
+  write: WriteId;
+  startedAt: number;
+  /** `null` while it runs, and in a recording that stopped first. */
+  endedAt: number | null;
+  outcome: WriteOutcome;
+}
+
 interface WriteText {
   /** Names the write where another control is waiting for it. */
   name: string;
