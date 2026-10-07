@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { NotConnectedError } from '@kb1rma/libcomm14cux-ts';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useEcu } from '../ecu/useEcu';
 import type { WriteHandle } from './context';
 import { useEcuWrite } from './useEcuWrite';
@@ -52,8 +59,16 @@ export function useFuelPumpRun(): {
   const [pumpRun, setPumpRun] = useState<PumpRun | undefined>(undefined);
   // What a continuous run ending from outside its own loop reports.
   const stopMessageRef = useRef(LEFT_VIEW);
+  // The connection as of this commit. A layout effect updates it before the
+  // run's cleanup below runs, so the cleanup can tell a closed connection
+  // from leaving the view.
+  const ecuRef = useRef(ecu);
   // A run belongs to its connection: a new or lost one stops it.
   const live = pumpRun && pumpRun.handle.ecu === ecu ? pumpRun : undefined;
+
+  useLayoutEffect(() => {
+    ecuRef.current = ecu;
+  }, [ecu]);
 
   useEffect(() => {
     if (!live) {
@@ -153,13 +168,23 @@ export function useFuelPumpRun(): {
     void run();
 
     return () => {
-      // Stop, leaving the view or a lost connection. Does nothing if the run
-      // already ended itself. A single run is never cut short, so it reports
-      // only that it stopped.
-      release({
-        status: 'done',
-        message: continuous ? stopMessageRef.current : STOPPED,
-      });
+      // Stop, leaving the view or a closed connection. Does nothing if the
+      // run already ended itself. A single run is never cut short, so it
+      // reports only that it stopped. A continuous run whose connection
+      // closed did not end as asked, so it is an error.
+      if (!continuous) {
+        release({ status: 'done', message: STOPPED });
+      } else if (ecuRef.current === handle.ecu) {
+        release({ status: 'done', message: stopMessageRef.current });
+      } else {
+        release(
+          failureOutcome(
+            'fuelPump',
+            new NotConnectedError('Not connected to ECU'),
+            true,
+          ),
+        );
+      }
     };
   }, [live]);
 

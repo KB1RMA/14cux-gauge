@@ -4,6 +4,7 @@ import { Ecu, MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expectNoAxeViolations } from '../test-support/a11y';
+import { notification } from '../test-support/notifications';
 import { WriteHarness } from '../test-support/WriteHarness';
 import { FuelPumpTest } from './FuelPumpTest';
 
@@ -137,6 +138,9 @@ describe('FuelPumpTest', () => {
     expect(pumpWritten(transport)).toBe(true);
     expect(running()).toBe('fuelPump');
     expect(announcement()).toBe('Fuel pump running');
+    expect(notification('Fuel pump test')).toHaveTextContent(
+      'Fuel pump running',
+    );
     expect(
       screen.getByRole('button', { name: 'Run pump (once)' }),
     ).toBeDisabled();
@@ -148,11 +152,14 @@ describe('FuelPumpTest', () => {
     expect(pumpWritten(transport)).toBe(false);
     expect(running()).toBe('none');
     expect(announcement()).toBe('Fuel pump stopped.');
+    expect(notification('Fuel pump test')).toHaveTextContent(
+      'Fuel pump stopped.',
+    );
     expect(
-      within(screen.getByRole('region', { name: 'Fuel pump test' })).getByRole(
-        'status',
+      within(screen.getByRole('region', { name: 'Fuel pump test' })).getByText(
+        'Fuel pump stopped.',
       ),
-    ).toHaveTextContent('Fuel pump stopped.');
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Run pump (once)' }),
     ).toBeEnabled();
@@ -230,6 +237,11 @@ describe('FuelPumpTest', () => {
     expect(pumpWritten(transport)).toBe(false);
     expect(running()).toBe('none');
     expect(announcement()).toBe('none');
+    // The notification outlives the connection, and says it closed rather
+    // than that the user left the view.
+    expect(notification('Fuel pump test')).toHaveTextContent(
+      'The fuel pump test stopped and may have partly run. The connection to the ECU was closed.',
+    );
   });
 
   it('stops when the user leaves the view', async () => {
@@ -245,6 +257,9 @@ describe('FuelPumpTest', () => {
 
     expect(pumpWritten(transport)).toBe(false);
     expect(announcement()).toBe('Fuel pump stopped when you left the view.');
+    expect(notification('Fuel pump test')).toHaveTextContent(
+      'Fuel pump stopped when you left the view.',
+    );
   });
 
   it('stops and says why when the ECU stops answering', async () => {
@@ -259,8 +274,15 @@ describe('FuelPumpTest', () => {
     await advance(10_000);
 
     expect(running()).toBe('none');
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      /^The fuel pump test stopped and may have partly run\. The ECU stopped responding\./,
+    expect(
+      within(screen.getByRole('region', { name: 'Fuel pump test' })).getByText(
+        /^The fuel pump test stopped and may have partly run\. The ECU stopped responding\./,
+      ),
+    ).toBeInTheDocument();
+    // An error stays until it is dismissed.
+    await advance(60_000);
+    expect(notification('Fuel pump test')).toHaveTextContent(
+      /The fuel pump test stopped and may have partly run\./,
     );
   });
 });

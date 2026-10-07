@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { Gear } from '@kb1rma/libcomm14cux-ts';
 import { HistoryContext } from '../ecu/contexts';
 import { SampleHistory } from '../history/sampleHistory';
@@ -190,7 +190,7 @@ describe('TimeSeriesChart drawing', () => {
 
     const { container, unmount } = renderChart('engineRpm', history);
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(container.querySelector('canvas')).not.toBeNull();
     });
 
@@ -222,7 +222,7 @@ describe('TimeSeriesChart drawing', () => {
 
     const { container } = renderChart('engineRpm');
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(observers).toHaveLength(1);
     });
 
@@ -287,7 +287,7 @@ describe('TimeSeriesChart drawing', () => {
 
     const { container } = renderChart('milOn', history);
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(container.querySelector('canvas')).not.toBeNull();
     });
   });

@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { expectNoAxeViolations, readingFor } from './test-support/a11y';
+import {
+  notification,
+  notificationsRegion,
+} from './test-support/notifications';
 
 describe('App in demo mode', () => {
   it('connects to the demo ECU, polls live data, and disconnects', async () => {
@@ -16,7 +20,7 @@ describe('App in demo mode', () => {
     const heading = await screen.findByRole('heading', { name: 'Live data' });
 
     expect(heading).toHaveFocus();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(readingFor('Engine speed')).toHaveTextContent(/\d+ rpm/);
     });
     expect(screen.getByRole('status')).toHaveTextContent('Demo ECU · Polling');
@@ -31,7 +35,7 @@ describe('App in demo mode', () => {
     });
 
     expect(within(faults).getByText(/Purge valve leak/)).toBeInTheDocument();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(readingFor('MIL')).toHaveTextContent('On');
     });
     await expectNoAxeViolations(container);
@@ -47,7 +51,7 @@ describe('App in demo mode', () => {
     });
 
     // Focus moves once the last read has finished and the port is closed.
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(connectHeading).toHaveFocus();
     });
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -61,7 +65,7 @@ describe('App in demo mode', () => {
 
     const region = await screen.findByRole('region', { name: 'Connection' });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(region).toHaveTextContent(/samples\/s/);
     });
     expect(screen.getByRole('status')).not.toHaveTextContent(/samples/);
@@ -97,7 +101,7 @@ describe('App in demo mode', () => {
     const rpm = screen.getByRole('figure', { name: 'Engine speed (rpm)' });
 
     // The demo's samples reach the graph's text summary.
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(
         within(rpm)
           .getAllByRole('definition')
@@ -141,7 +145,7 @@ describe('App in demo mode', () => {
       expect.arrayContaining(['Coolant', 'MIL']),
     );
     expect(screen.queryByText('Engine speed')).not.toBeInTheDocument();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(
         screen.getByText(/^2 of 25 readings · [\d.]+ samples\/s$/),
       ).toBeInTheDocument();
@@ -149,13 +153,13 @@ describe('App in demo mode', () => {
 
     // The fuel map asks for its position while it is shown.
     await user.click(screen.getByRole('tab', { name: 'Fuel map' }));
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(screen.getByText(/^In use now: row 1, /)).toBeInTheDocument();
     });
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
   });
 
-  it('announces ECU writes in the status bar, and keeps them across views', async () => {
+  it('notifies ECU writes over every view, apart from the status bar', async () => {
     const user = userEvent.setup();
 
     render(<App pollIntervalMs={{ demo: 10 }} />);
@@ -172,7 +176,10 @@ describe('App in demo mode', () => {
         name: 'Run fuel pump',
       }),
     );
-    expect(status).toHaveTextContent('Demo ECU · Polling · Fuel pump running');
+    expect(notification('Fuel pump test')).toHaveTextContent(
+      'Fuel pump running',
+    );
+    expect(status).toHaveTextContent(/^Demo ECU · Polling$/);
     expect(
       screen.getByRole('button', { name: 'Clear fault codes' }),
     ).toBeDisabled();
@@ -180,15 +187,16 @@ describe('App in demo mode', () => {
     // A single run is not cut short by leaving the view, and is reported
     // only once the pump has stopped.
     await user.click(screen.getByRole('tab', { name: 'Graphs' }));
-    expect(status).toHaveTextContent('Demo ECU · Polling · Fuel pump running');
-    await vi.waitFor(
-      () => {
-        expect(status).toHaveTextContent(
-          'Demo ECU · Polling · Fuel pump stopped.',
-        );
-      },
-      { timeout: 3000 },
+    expect(notification('Fuel pump test')).toHaveTextContent(
+      'Fuel pump running',
     );
+    await waitFor(() => {
+      expect(notification('Fuel pump test')).toHaveTextContent(
+        'Fuel pump stopped.',
+      );
+    });
+    // The rest of the page has its own axe tests.
+    await expectNoAxeViolations(notificationsRegion());
 
     await user.click(screen.getByRole('tab', { name: 'Overview' }));
     await user.click(screen.getByRole('button', { name: 'Clear fault codes' }));
@@ -197,11 +205,16 @@ describe('App in demo mode', () => {
         name: 'Clear fault codes',
       }),
     );
-    await vi.waitFor(() => {
-      expect(status).toHaveTextContent(
-        'Demo ECU · Polling · Fault codes cleared.',
+    await waitFor(() => {
+      expect(notification('Clear fault codes')).toHaveTextContent(
+        'Fault codes cleared.',
       );
     });
+    // Each write has its own notification.
+    expect(notification('Fuel pump test')).toHaveTextContent(
+      'Fuel pump stopped.',
+    );
+    expect(status).toHaveTextContent(/^Demo ECU · Polling$/);
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
   });
 

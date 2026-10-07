@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { IDBFactory } from 'fake-indexeddb';
 import { App } from './App';
@@ -37,7 +37,7 @@ async function recordAndStop(user: UserEvent) {
  * hides the rest of the page from queries by role.
  */
 async function savedAndClosed(dialog: HTMLElement) {
-  await vi.waitFor(() => {
+  await waitFor(() => {
     expect(dialog).not.toBeInTheDocument();
   });
 }
@@ -131,7 +131,7 @@ describe('Recording and browsing sessions', () => {
       await screen.findByRole('heading', { name: 'Live data' }),
     ).toHaveFocus();
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
-  }, 15_000);
+  });
 
   it('opens a session to replay, annotate and delete it', async () => {
     const user = userEvent.setup();
@@ -230,7 +230,7 @@ describe('Recording and browsing sessions', () => {
       screen.getByRole('heading', { name: 'Recorded sessions' }),
     ).toHaveFocus();
     expect(await store.list()).toEqual([]);
-  }, 15_000);
+  });
 
   it('replays a recording with the keyboard', async () => {
     const user = userEvent.setup();
@@ -329,7 +329,7 @@ describe('Recording and browsing sessions', () => {
 
     const exportButton = screen.getByRole('button', { name: 'Export CSV' });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(exportButton).toBeEnabled();
     });
     await user.click(exportButton);
@@ -382,7 +382,7 @@ describe('Recording and browsing sessions', () => {
       ).getByRole('button', { name: 'Skip' }),
     );
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(readingFor('Length')).toHaveTextContent(/^0:0\d$/);
     });
     expect(screen.queryByText(/^Still recording\./)).not.toBeInTheDocument();
@@ -555,18 +555,15 @@ describe('Recording and browsing sessions', () => {
     await user.click(screen.getByRole('button', { name: 'Record' }));
 
     // The recorder writes once a second.
-    await vi.waitFor(
-      () => {
-        expect(screen.getByRole('status')).toHaveTextContent(
-          'Demo ECU · Polling · Recording stopped: The browser has no room for more samples. Delete old sessions to make space.',
-        );
-      },
-      { timeout: 3000 },
-    );
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Demo ECU · Polling · Recording stopped: The browser has no room for more samples. Delete old sessions to make space.',
+      );
+    });
     expect(screen.getByRole('button', { name: 'Record' })).toBeEnabled();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     // Counted from effects, which can run after the status has rendered.
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(counter.count.mock.calls).toEqual([
         ['connected/demo'],
         ['recording/started'],

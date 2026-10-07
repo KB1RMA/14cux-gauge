@@ -4,6 +4,7 @@ import { Ecu, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { act, renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { EcuContext } from '../ecu/contexts';
+import { NotificationsProvider } from '../notifications/NotificationsProvider';
 import { ecuContextValue } from '../test-support/ecuContext';
 import { EcuWriteProvider } from './EcuWriteProvider';
 import { useEcuWrite } from './useEcuWrite';
@@ -24,9 +25,11 @@ function renderWrites(ecu: Ecu | undefined) {
   let current = ecu;
   const rendered = renderHook(() => useEcuWrite(), {
     wrapper: ({ children }: { children: ReactNode }) => (
-      <EcuContext value={ecuContextValue(current)}>
-        <EcuWriteProvider>{children}</EcuWriteProvider>
-      </EcuContext>
+      <NotificationsProvider>
+        <EcuContext value={ecuContextValue(current)}>
+          <EcuWriteProvider>{children}</EcuWriteProvider>
+        </EcuContext>
+      </NotificationsProvider>
     ),
   });
 

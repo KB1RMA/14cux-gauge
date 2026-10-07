@@ -5,8 +5,9 @@ import { WRITES, type WriteId } from '../ecuWrite/writes';
 import styles from './Panel.module.css';
 
 /**
- * How a write last went on this connection, the same way for every write:
- * a failure is an alert, a success an `<output>`. Nothing while it runs.
+ * How a write last went on this connection, the same way for every write,
+ * kept beside its controls. Nothing while it runs. Not a live region: the
+ * write's notification already announces it.
  */
 export function WriteResult({ id }: { id: WriteId }) {
   const outcome = useEcuWrite().outcomes[id];
@@ -15,10 +16,10 @@ export function WriteResult({ id }: { id: WriteId }) {
     return null;
   }
 
-  return outcome.status === 'done' ? (
-    <output className={styles['result']}>{outcome.message}</output>
-  ) : (
-    <p role="alert" className={styles['error']}>
+  return (
+    <p
+      className={`${styles['result'] ?? ''} ${outcome.status === 'done' ? '' : (styles['error'] ?? '')}`}
+    >
       {outcome.message}
     </p>
   );

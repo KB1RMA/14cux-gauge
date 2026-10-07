@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { expectNoAxeViolations } from './test-support/a11y';
@@ -107,7 +107,7 @@ describe('App with a serial ECU', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reconnect' }));
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(port.opens).toBe(2);
     });
 
@@ -170,7 +170,7 @@ describe('App with a serial ECU', () => {
     expect(
       await screen.findByRole('link', { name: /^Serial ECU, / }),
     ).toBeInTheDocument();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(counter.count.mock.calls).toEqual([
         ['connected/serial'],
         ['recording/started'],
@@ -256,11 +256,9 @@ describe('App with a serial ECU', () => {
     render(<App />);
     await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
 
-    const dialog = await screen.findByRole(
-      'dialog',
-      { name: 'Connection failed' },
-      { timeout: 3_000 },
-    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Connection failed',
+    });
     const recent = within(dialog).getByRole('textbox', { name: 'Recent log' });
 
     expect(dialog).toHaveTextContent('Error: TimeoutError: ');

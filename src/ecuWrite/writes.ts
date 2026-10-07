@@ -2,6 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { NotConnectedError } from '@kb1rma/libcomm14cux-ts';
 import { describeError } from '../ecu/errors';
+import type { NotificationInput } from '../notifications/context';
 
 /** Every feature that writes to the ECU. Only one may run at a time. */
 export type WriteId = 'clearFaultCodes' | 'idleAirControl' | 'fuelPump';
@@ -90,7 +91,30 @@ export function failureOutcome(
       };
 }
 
-/** The status bar's words for an outcome. */
+/** The words for an outcome, or for a write still running. */
 export function describeOutcome(id: WriteId, outcome: WriteOutcome): string {
   return outcome.status === 'running' ? WRITES[id].running : outcome.message;
+}
+
+/**
+ * The app-wide notification for a write starting or ending. Each write has
+ * its own, so one finishing on an old connection does not replace a write
+ * running on the new one. A partial write is an error: the ECU may be left
+ * partly changed.
+ */
+export function writeNotification(
+  id: WriteId,
+  outcome: WriteOutcome,
+): NotificationInput {
+  return {
+    key: `ecuWrite:${id}`,
+    tone:
+      outcome.status === 'running'
+        ? 'progress'
+        : outcome.status === 'done'
+          ? 'success'
+          : 'error',
+    title: WRITES[id].name,
+    message: describeOutcome(id, outcome),
+  };
 }

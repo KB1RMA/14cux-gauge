@@ -17,7 +17,7 @@ export interface EcuWriteValue {
   running: WriteId | undefined;
   /** How each write last went on the current connection. */
   outcomes: Partial<Record<WriteId, WriteOutcome>>;
-  /** The write that started or ended most recently, for the status bar. */
+  /** The write that started or ended most recently. */
   latest: WriteId | undefined;
   /**
    * Starts a write that the caller ends itself, as a repeating test does.

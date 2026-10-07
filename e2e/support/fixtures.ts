@@ -126,6 +126,14 @@ export function reading(page: Page, name: string): Locator {
     .locator('xpath=following-sibling::dd[1]');
 }
 
+/** The notification titled `title`, in the app's notifications region. */
+export function notification(page: Page, title: string): Locator {
+  return page
+    .getByRole('region', { name: 'Notifications (F8)' })
+    .getByRole('listitem')
+    .filter({ has: page.getByText(title, { exact: true }) });
+}
+
 /**
  * The key that moves focus to the next control. Safari's Tab skips buttons
  * unless the user turns on "Press Tab to highlight each item"; Option-Tab

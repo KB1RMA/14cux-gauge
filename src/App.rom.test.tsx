@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { App } from './App';
 import type * as demoEngine from './demo/demoEngine';
@@ -110,13 +110,13 @@ describe('Saving the ROM image', () => {
       'Polling paused while the ROM is read',
     );
 
-    await vi.waitFor(
+    await waitFor(
       () => {
         expect(downloads.names).toEqual([DEMO_FILE]);
       },
       { timeout: 10_000 },
     );
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(progress).not.toBeInTheDocument();
     });
 
@@ -138,7 +138,7 @@ describe('Saving the ROM image', () => {
       screen.getByRole('button', { name: 'Save ROM image' }),
     ).toHaveFocus();
     await expectNoAxeViolations(container);
-  }, 20_000);
+  });
 
   it('downloads a saved image again, byte for byte, and deletes it', async () => {
     const user = userEvent.setup();
@@ -163,7 +163,7 @@ describe('Saving the ROM image', () => {
     await user.click(
       screen.getByRole('button', { name: /^Download Tune 1234, ident 0xDE70/ }),
     );
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(downloads.names).toEqual([DEMO_FILE]);
     });
     expect(new Uint8Array(await firstBlob(downloads).arrayBuffer())).toEqual(
@@ -184,7 +184,7 @@ describe('Saving the ROM image', () => {
     expect(
       await screen.findByText('No images are kept in this browser yet.'),
     ).toBeInTheDocument();
-  }, 20_000);
+  });
 
   it('does not read anything if the user backs out of the confirmation', async () => {
     const user = userEvent.setup();
@@ -219,7 +219,7 @@ describe('Saving the ROM image', () => {
     });
 
     await user.click(within(progress).getByRole('button', { name: 'Cancel' }));
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(progress).not.toBeInTheDocument();
     });
 
@@ -228,10 +228,10 @@ describe('Saving the ROM image', () => {
     ).toBeInTheDocument();
     expect(downloads.names).toEqual([]);
     expect(await store.list()).toEqual([]);
-    await vi.waitFor(() => {});
+    await waitFor(() => {});
     await act(() => new Promise((resolve) => setTimeout(resolve, 300)));
     expect(screen.getByText(/^Demo ECU · Polling$/)).toBeInTheDocument();
-  }, 20_000);
+  });
 
   it('stops a recording in progress, and says it will first', async () => {
     const user = userEvent.setup();
@@ -251,7 +251,7 @@ describe('Saving the ROM image', () => {
       within(confirm).getByRole('button', { name: 'Read ROM image' }),
     );
     await screen.findByRole('alertdialog', { name: 'Reading the ROM image' });
-    await vi.waitFor(
+    await waitFor(
       () => {
         expect(
           screen.queryByRole('alertdialog', { name: 'Reading the ROM image' }),
@@ -260,5 +260,5 @@ describe('Saving the ROM image', () => {
       { timeout: 10_000 },
     );
     expect(screen.getByRole('button', { name: 'Record' })).toBeInTheDocument();
-  }, 20_000);
+  });
 });
