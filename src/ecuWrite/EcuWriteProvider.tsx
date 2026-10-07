@@ -3,12 +3,14 @@
 import type { Ecu } from '@kb1rma/libcomm14cux-ts';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useEcu } from '../ecu/useEcu';
+import { useNotify } from '../notifications/useNotify';
 import { EcuWriteContext, type WriteHandle } from './context';
 import {
   failureOutcome,
   notConnectedOutcome,
   type WriteId,
   type WriteOutcome,
+  writeNotification,
 } from './writes';
 
 interface Writes {
@@ -24,10 +26,13 @@ const NONE: Writes = { ecu: undefined, outcomes: {}, latest: undefined };
  * Tracks every write to the ECU, so only one runs at a time and each one's
  * outcome outlives the view that started it. A write belongs to the `Ecu` it
  * was sent to: a new or lost connection starts clean, and a write still
- * finishing on an old one neither blocks nor reports on the new one.
+ * finishing on an old one neither blocks nor reports on the new one. Every
+ * start and end is also a notification, which outlives the connection: the
+ * user still needs to know how a write on a lost one ended.
  */
 export function EcuWriteProvider({ children }: { children: ReactNode }) {
   const { ecu } = useEcu();
+  const notify = useNotify();
   const [writes, setWrites] = useState<Writes>(NONE);
   // Set synchronously, so two starts in one event cannot both get through.
   const holderRef = useRef<{ ecu: Ecu; id: WriteId } | undefined>(undefined);
@@ -54,6 +59,7 @@ export function EcuWriteProvider({ children }: { children: ReactNode }) {
         },
         latest: id,
       }));
+      notify(writeNotification(id, { status: 'running' }));
 
       return {
         ecu,
@@ -68,6 +74,7 @@ export function EcuWriteProvider({ children }: { children: ReactNode }) {
             holderRef.current = undefined;
           }
 
+          notify(writeNotification(id, outcome));
           setWrites((previous) =>
             previous.ecu === ecu
               ? {
@@ -80,7 +87,7 @@ export function EcuWriteProvider({ children }: { children: ReactNode }) {
         },
       };
     },
-    [ecu],
+    [ecu, notify],
   );
 
   const run = useCallback(

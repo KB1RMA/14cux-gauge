@@ -1,0 +1,162 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright (C) 2026 14cux-gauge contributors */
+.viewport {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(26rem, 100vw);
+  max-height: 100vh;
+  margin: 0;
+  padding: 1rem;
+  list-style: none;
+  overflow-y: auto;
+  outline: none;
+  /* The space around the notifications does not block the page. */
+  pointer-events: none;
+  /* Above the page and its popovers, below a confirmation dialog. */
+  z-index: 15;
+}
+
+.viewport:empty {
+  padding: 0;
+}
+
+.toast {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas:
+    'icon title close'
+    'icon message close';
+  column-gap: 0.75rem;
+  align-items: start;
+  padding: 0.75rem 0.75rem 0.75rem 1rem;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--control-border);
+  border-left-width: 0.35rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-popover);
+  pointer-events: auto;
+}
+
+.toast:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The icon and the words say the same; the colour is only a cue. */
+.toast[data-tone='progress'] {
+  border-left-color: var(--accent);
+}
+
+.toast[data-tone='success'] {
+  border-left-color: var(--good);
+}
+
+.toast[data-tone='error'] {
+  border-left-color: var(--danger);
+}
+
+.icon {
+  grid-area: icon;
+  display: flex;
+  padding-top: 0.2rem;
+}
+
+.icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.toast[data-tone='progress'] .icon {
+  color: var(--accent);
+}
+
+.toast[data-tone='success'] .icon {
+  color: var(--good);
+}
+
+.toast[data-tone='error'] .icon {
+  color: var(--danger);
+}
+
+.title {
+  grid-area: title;
+  font-weight: 600;
+}
+
+.message {
+  grid-area: message;
+}
+
+.close {
+  grid-area: close;
+  display: inline-flex;
+  padding: 0.3rem;
+  border-color: transparent;
+  background: transparent;
+}
+
+.spin {
+  animation: spin 1.2s linear infinite;
+}
+
+.toast[data-state='open'] {
+  animation: slide-in 200ms ease-out;
+}
+
+.toast[data-state='closed'] {
+  animation: fade-out 150ms ease-in forwards;
+}
+
+.toast[data-swipe='move'] {
+  transform: translateY(var(--radix-toast-swipe-move-y));
+}
+
+.toast[data-swipe='cancel'] {
+  transform: translateY(0);
+  transition: transform 200ms ease-out;
+}
+
+.toast[data-swipe='end'] {
+  animation: swipe-out 150ms ease-out forwards;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes swipe-out {
+  from {
+    transform: translateY(var(--radix-toast-swipe-end-y));
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}

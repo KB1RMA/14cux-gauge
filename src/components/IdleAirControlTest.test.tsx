@@ -140,9 +140,11 @@ describe('IdleAirControlTest', () => {
       }),
     );
 
-    expect(await panel().findByRole('alert')).toHaveTextContent(
-      'The idle air control test may have partly run. The ECU stopped responding.',
-    );
+    expect(
+      await panel().findByText(
+        /^The idle air control test may have partly run\. The ECU stopped responding\./,
+      ),
+    ).toBeInTheDocument();
   });
 
   it('has no accessibility violations, with the dialog open', async () => {

@@ -4,6 +4,7 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { expectNoAxeViolations, readingFor } from './test-support/a11y';
+import { notification } from './test-support/notifications';
 
 describe('App in demo mode', () => {
   it('connects to the demo ECU, polls live data, and disconnects', async () => {
@@ -155,7 +156,7 @@ describe('App in demo mode', () => {
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
   });
 
-  it('announces ECU writes in the status bar, and keeps them across views', async () => {
+  it('notifies ECU writes over every view, apart from the status bar', async () => {
     const user = userEvent.setup();
 
     render(<App pollIntervalMs={{ demo: 10 }} />);
@@ -172,7 +173,10 @@ describe('App in demo mode', () => {
         name: 'Run fuel pump',
       }),
     );
-    expect(status).toHaveTextContent('Demo ECU · Polling · Fuel pump running');
+    expect(notification('Fuel pump test')).toHaveTextContent(
+      'Fuel pump running',
+    );
+    expect(status).toHaveTextContent(/^Demo ECU · Polling$/);
     expect(
       screen.getByRole('button', { name: 'Clear fault codes' }),
     ).toBeDisabled();
@@ -180,15 +184,18 @@ describe('App in demo mode', () => {
     // A single run is not cut short by leaving the view, and is reported
     // only once the pump has stopped.
     await user.click(screen.getByRole('tab', { name: 'Graphs' }));
-    expect(status).toHaveTextContent('Demo ECU · Polling · Fuel pump running');
+    expect(notification('Fuel pump test')).toHaveTextContent(
+      'Fuel pump running',
+    );
     await vi.waitFor(
       () => {
-        expect(status).toHaveTextContent(
-          'Demo ECU · Polling · Fuel pump stopped.',
+        expect(notification('Fuel pump test')).toHaveTextContent(
+          'Fuel pump stopped.',
         );
       },
       { timeout: 3000 },
     );
+    await expectNoAxeViolations(document.body);
 
     await user.click(screen.getByRole('tab', { name: 'Overview' }));
     await user.click(screen.getByRole('button', { name: 'Clear fault codes' }));
@@ -198,10 +205,15 @@ describe('App in demo mode', () => {
       }),
     );
     await vi.waitFor(() => {
-      expect(status).toHaveTextContent(
-        'Demo ECU · Polling · Fault codes cleared.',
+      expect(notification('Clear fault codes')).toHaveTextContent(
+        'Fault codes cleared.',
       );
     });
+    // Each write has its own notification.
+    expect(notification('Fuel pump test')).toHaveTextContent(
+      'Fuel pump stopped.',
+    );
+    expect(status).toHaveTextContent(/^Demo ECU · Polling$/);
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
   });
 

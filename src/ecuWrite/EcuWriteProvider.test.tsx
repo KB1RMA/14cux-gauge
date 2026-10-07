@@ -8,6 +8,7 @@ import { FuelPumpTest } from '../components/FuelPumpTest';
 import { IdleAirControlTest } from '../components/IdleAirControlTest';
 import { LatencyTransport } from '../demo/latencyTransport';
 import { expectNoAxeViolations } from '../test-support/a11y';
+import { notification } from '../test-support/notifications';
 import { snapshotAt } from '../test-support/snapshots';
 import { WriteHarness } from '../test-support/WriteHarness';
 
@@ -95,6 +96,9 @@ describe('ECU writes', () => {
     );
 
     expect(announcement()).toBe('Fuel pump running');
+    expect(notification('Fuel pump test')).toHaveTextContent(
+      'Fuel pump running',
+    );
 
     const clear = screen.getByRole('button', { name: 'Clear fault codes' });
     const iac = screen.getByRole('button', { name: 'Run test' });
@@ -147,8 +151,13 @@ describe('ECU writes', () => {
       }),
     );
 
-    expect(await panel('Fault codes').findByRole('alert')).toHaveTextContent(
-      /^Clearing may be incomplete\. The ECU stopped responding\./,
+    expect(
+      await panel('Fault codes').findByText(
+        /^Clearing may be incomplete\. The ECU stopped responding\./,
+      ),
+    ).toBeInTheDocument();
+    expect(notification('Clear fault codes')).toHaveTextContent(
+      /Clearing may be incomplete\. The ECU stopped responding\./,
     );
     expect(announcement()).toMatch(/^Clearing may be incomplete\./);
     // The first byte was cleared; the second was not.
@@ -172,9 +181,11 @@ describe('ECU writes', () => {
       }),
     );
 
-    expect(await panel('Fault codes').findByRole('alert')).toHaveTextContent(
-      'Clearing may be incomplete. The connection to the ECU was closed.',
-    );
+    expect(
+      await panel('Fault codes').findByText(
+        'Clearing may be incomplete. The connection to the ECU was closed.',
+      ),
+    ).toBeInTheDocument();
     expect(faultBlock(transport)).toEqual([0, 0x80, 0, 0, 0, 0]);
   });
 
@@ -193,8 +204,11 @@ describe('ECU writes', () => {
     );
 
     expect(
-      await panel('Idle air control test').findByRole('alert'),
-    ).toHaveTextContent(
+      await panel('Idle air control test').findByText(
+        'The idle air control test did not run. The connection to the ECU was closed.',
+      ),
+    ).toBeInTheDocument();
+    expect(notification('Idle air control test')).toHaveTextContent(
       'The idle air control test did not run. The connection to the ECU was closed.',
     );
     expect(transport.memory[MemoryOffset.IdleAirControlStepCount]).toBe(0);
@@ -233,8 +247,8 @@ describe('ECU writes', () => {
     await user.click(screen.getByRole('button', { name: 'Return to view' }));
 
     expect(
-      panel('Idle air control test').getByRole('status'),
-    ).toHaveTextContent('Commanded 10 steps open.');
+      panel('Idle air control test').getByText('Commanded 10 steps open.'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run test' })).toBeEnabled();
   });
 
@@ -252,13 +266,19 @@ describe('ECU writes', () => {
     await waitFor(() => {
       expect(announcement()).toBe('Fault codes cleared.');
     });
-    expect(panel('Fault codes').getByRole('status')).toHaveTextContent(
-      'Fault codes cleared.',
-    );
+    expect(
+      panel('Fault codes').getByText('Fault codes cleared.'),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Drop link' }));
 
     expect(announcement()).toBe('none');
-    expect(panel('Fault codes').queryByRole('status')).not.toBeInTheDocument();
+    expect(
+      panel('Fault codes').queryByText('Fault codes cleared.'),
+    ).not.toBeInTheDocument();
+    // The notification reports what happened, so it outlives the connection.
+    expect(notification('Clear fault codes')).toHaveTextContent(
+      'Fault codes cleared.',
+    );
   });
 });

@@ -6,10 +6,11 @@ import { EcuContext } from '../ecu/contexts';
 import { EcuWriteProvider } from '../ecuWrite/EcuWriteProvider';
 import { useEcuWrite } from '../ecuWrite/useEcuWrite';
 import { describeOutcome } from '../ecuWrite/writes';
+import { NotificationsProvider } from '../notifications/NotificationsProvider';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { ecuContextValue } from './ecuContext';
 
-/** What the status bar would announce about writes. */
+/** The latest write's state, as the provider holds it. */
 function WriteAnnouncement() {
   const { latest, outcomes, running } = useEcuWrite();
   const outcome = latest && outcomes[latest];
@@ -44,28 +45,30 @@ export function WriteHarness({
 
   return (
     <PreferencesProvider>
-      <EcuContext value={value}>
-        <EcuWriteProvider>
-          <WriteAnnouncement />
-          <button
-            type="button"
-            onClick={() => {
-              setConnected(false);
-            }}
-          >
-            Drop link
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setShown((previous) => !previous);
-            }}
-          >
-            {shown ? 'Leave view' : 'Return to view'}
-          </button>
-          {shown ? children : null}
-        </EcuWriteProvider>
-      </EcuContext>
+      <NotificationsProvider>
+        <EcuContext value={value}>
+          <EcuWriteProvider>
+            <WriteAnnouncement />
+            <button
+              type="button"
+              onClick={() => {
+                setConnected(false);
+              }}
+            >
+              Drop link
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShown((previous) => !previous);
+              }}
+            >
+              {shown ? 'Leave view' : 'Return to view'}
+            </button>
+            {shown ? children : null}
+          </EcuWriteProvider>
+        </EcuContext>
+      </NotificationsProvider>
     </PreferencesProvider>
   );
 }

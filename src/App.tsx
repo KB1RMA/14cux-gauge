@@ -14,6 +14,7 @@ import { StatusBar } from './components/StatusBar';
 import { EcuProvider, type EcuProviderProps } from './ecu/EcuProvider';
 import { useEcu } from './ecu/useEcu';
 import { EcuWriteProvider } from './ecuWrite/EcuWriteProvider';
+import { NotificationsProvider } from './notifications/NotificationsProvider';
 import { PreferencesProvider } from './preferences/PreferencesProvider';
 import { AppStatusProvider } from './pwa/AppStatusProvider';
 import type { AppStatusStoreOptions } from './pwa/appStatusStore';
@@ -89,42 +90,44 @@ export function App({
     <HashRouter>
       <PreferencesProvider>
         <AppStatusProvider {...(appStatus ? { options: appStatus } : {})}>
-          <EcuProvider {...(pollIntervalMs ? { pollIntervalMs } : {})}>
-            <EcuWriteProvider>
-              <SessionsProvider
-                {...(openSessionStore ? { open: openSessionStore } : {})}
-              >
-                <RecordingProvider>
-                  <RomsProvider
-                    {...(openRomStore ? { open: openRomStore } : {})}
-                  >
-                    <div className={styles['app']}>
-                      <header className={styles['appBar']}>
-                        <h1 className={styles['brand']}>14CUX Gauge</h1>
-                        <nav aria-label="Views" className={styles['nav']}>
-                          {VIEWS.map(({ label, to }) => (
-                            <NavLink
-                              key={to}
-                              to={to}
-                              className={styles['navItem'] ?? ''}
-                            >
-                              {label}
-                            </NavLink>
-                          ))}
-                        </nav>
-                        <PreferencesMenu
-                          offerUsageCounts={usageCounter !== undefined}
-                        />
-                      </header>
-                      <AppNotices />
-                      <Main usageCounter={usageCounter} />
-                      <Footer countsUsage={usageCounter !== undefined} />
-                    </div>
-                  </RomsProvider>
-                </RecordingProvider>
-              </SessionsProvider>
-            </EcuWriteProvider>
-          </EcuProvider>
+          <NotificationsProvider>
+            <EcuProvider {...(pollIntervalMs ? { pollIntervalMs } : {})}>
+              <EcuWriteProvider>
+                <SessionsProvider
+                  {...(openSessionStore ? { open: openSessionStore } : {})}
+                >
+                  <RecordingProvider>
+                    <RomsProvider
+                      {...(openRomStore ? { open: openRomStore } : {})}
+                    >
+                      <div className={styles['app']}>
+                        <header className={styles['appBar']}>
+                          <h1 className={styles['brand']}>14CUX Gauge</h1>
+                          <nav aria-label="Views" className={styles['nav']}>
+                            {VIEWS.map(({ label, to }) => (
+                              <NavLink
+                                key={to}
+                                to={to}
+                                className={styles['navItem'] ?? ''}
+                              >
+                                {label}
+                              </NavLink>
+                            ))}
+                          </nav>
+                          <PreferencesMenu
+                            offerUsageCounts={usageCounter !== undefined}
+                          />
+                        </header>
+                        <AppNotices />
+                        <Main usageCounter={usageCounter} />
+                        <Footer countsUsage={usageCounter !== undefined} />
+                      </div>
+                    </RomsProvider>
+                  </RecordingProvider>
+                </SessionsProvider>
+              </EcuWriteProvider>
+            </EcuProvider>
+          </NotificationsProvider>
         </AppStatusProvider>
       </PreferencesProvider>
     </HashRouter>
