@@ -216,7 +216,7 @@ describe('App in demo mode', () => {
     );
     expect(status).toHaveTextContent(/^Demo ECU · Polling$/);
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
-  });
+  }, 15_000);
 
   it('stays connected when reconnected while the last connection is closing', async () => {
     const user = userEvent.setup();

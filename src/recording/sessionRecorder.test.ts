@@ -1,10 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
+import type { WriteLogEntry } from '../ecuWrite/writes';
 import { MemorySessionStore } from '../storage/sessionStore';
 import { snapshotAt } from '../test-support/snapshots';
 import { SessionRecorder } from './sessionRecorder';
 
 const NEW_SESSION = { name: 'Test', source: 'demo', startedAt: 0 } as const;
+
+function pumpWrite(id: string, endedAt: number | null): WriteLogEntry {
+  return {
+    id,
+    write: 'fuelPump',
+    startedAt: 500,
+    endedAt,
+    outcome:
+      endedAt === null
+        ? { status: 'running' }
+        : { status: 'done', message: 'Fuel pump stopped.' },
+  };
+}
 
 describe('SessionRecorder', () => {
   beforeEach(() => {
@@ -103,5 +117,50 @@ describe('SessionRecorder', () => {
     await recorder.flush();
 
     expect(append).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps writes it saw start, with their ends while it records', async () => {
+    const store = new MemorySessionStore();
+    const recorder = await SessionRecorder.start(store, NEW_SESSION);
+    const { id } = recorder.session;
+
+    recorder.recordWrite(pumpWrite('a', null));
+    await recorder.flush();
+
+    expect(await store.readWrites(id)).toEqual([pumpWrite('a', null)]);
+
+    recorder.recordWrite(pumpWrite('a', 2600));
+    // The end of a write it never saw start, such as one on an earlier
+    // connection, is not kept.
+    recorder.recordWrite(pumpWrite('earlier', 2700));
+    recorder.recordWrite(pumpWrite('b', null));
+    await recorder.stop();
+    // Ends after recording stopped are not kept: b has no recorded end.
+    recorder.recordWrite(pumpWrite('b', 3000));
+    recorder.recordWrite(pumpWrite('c', null));
+    await recorder.flush();
+
+    expect(await store.readWrites(id)).toEqual([
+      pumpWrite('a', 2600),
+      pumpWrite('b', null),
+    ]);
+  });
+
+  it('stops keeping writes once saving fails', async () => {
+    const store = new MemorySessionStore();
+    const onError = vi.fn();
+    const recorder = await SessionRecorder.start(store, NEW_SESSION, {
+      onError,
+    });
+
+    vi.spyOn(store, 'putWrite').mockRejectedValueOnce(new Error('full'));
+    recorder.recordWrite(pumpWrite('a', null));
+    await recorder.flush();
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(recorder.recording).toBe(false);
+    recorder.recordWrite(pumpWrite('b', null));
+    await recorder.flush();
+    expect(await store.readWrites(recorder.session.id)).toEqual([]);
   });
 });

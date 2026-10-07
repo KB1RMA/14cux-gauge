@@ -5,10 +5,12 @@ import type uPlot from 'uplot';
 import { mountPlot } from '../charts/mountPlot';
 import { formatTimelineTick, timelinePlotOptions } from '../charts/plotOptions';
 import {
+  marks,
   overlay,
   placeLine,
   timelineGestures,
   type Overlay,
+  type TimelineMark,
 } from '../charts/timelinePlugins';
 import type { Metric } from '../metrics';
 import { usePreferences } from '../preferences/usePreferences';
@@ -17,6 +19,8 @@ import { rangeOf, valueAt, visibleSeries } from '../replay/timeline';
 import { ChartCaption, ChartStats } from './ChartParts';
 import styles from './TimeSeriesChart.module.css';
 import timeline from './Timeline.module.css';
+
+const NO_MARKS: readonly TimelineMark[] = [];
 
 /** Points drawn per pixel of width before the samples are reduced. */
 const POINTS_PER_PIXEL = 2;
@@ -29,7 +33,8 @@ const POINTS_PER_PIXEL = 2;
  * replay controls and timeline slider do everything the pointer can.
  *
  * `times` are seconds into the recording, `samples` the metric's samples
- * at those times; neither may change.
+ * at those times, and `writes` the writes to the ECU made during it; none
+ * may change.
  */
 export function TimelineChart({
   metric,
@@ -37,12 +42,14 @@ export function TimelineChart({
   samples,
   replay,
   syncKey,
+  writes = NO_MARKS,
 }: {
   metric: Metric;
   times: readonly number[];
   samples: readonly (number | null)[];
   replay: Replay;
   syncKey: string;
+  writes?: readonly TimelineMark[];
 }) {
   const units = usePreferences();
   const captionId = useId();
@@ -99,6 +106,12 @@ export function TimelineChart({
     return mountPlot(
       container,
       (plot, width) => {
+        // Unlabelled: a label would cover samples. The overview strip and
+        // the list of writes name them.
+        const writeMarks = marks(writes, {
+          className: timeline['marks'] ?? '',
+          markClassName: timeline['mark'] ?? '',
+        });
         const playhead = overlay(timeline['playhead'] ?? '', (chart, line) => {
           placeLine(chart, line, latestRef.current.replay.position / 1000);
         });
@@ -153,6 +166,7 @@ export function TimelineChart({
                   latestRef.current.replay.seek(next);
                 },
               }),
+              writeMarks.plugin,
               playhead.plugin,
               readout.plugin,
             ],
@@ -165,7 +179,7 @@ export function TimelineChart({
         chartRef.current = chart;
       },
     );
-  }, [metric, syncKey, times]);
+  }, [metric, syncKey, times, writes]);
 
   // A new window or new units: draw the samples now in view.
   useEffect(() => {

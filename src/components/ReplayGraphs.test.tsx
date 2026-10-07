@@ -3,6 +3,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { LiveSnapshot } from '../ecu/poller';
+import type { TimelineMark } from '../charts/timelinePlugins';
 import type { MetricKey } from '../metrics';
 import { loadPlot } from '../charts/plotOptions';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
@@ -26,9 +27,11 @@ const samples = Array.from({ length: 11 }, (_, i) =>
 function Replay({
   recording,
   recorded,
+  writes,
 }: {
   recording: readonly LiveSnapshot[];
   recorded?: readonly MetricKey[];
+  writes?: readonly TimelineMark[];
 }) {
   const replay = useReplay(recording);
 
@@ -39,6 +42,7 @@ function Replay({
         samples={recording}
         replay={replay}
         {...(recorded ? { recorded } : {})}
+        {...(writes ? { writes } : {})}
       />
     </PreferencesProvider>
   );
@@ -285,6 +289,36 @@ describe('ReplayGraphs drawing', () => {
       .getByRole('slider', { name: 'Playback position' })
       .getAttribute('aria-valuetext');
   }
+
+  it('marks writes to the ECU on the overview and every graph, naming them on the overview', async () => {
+    const writes: TimelineMark[] = [
+      { from: 2, to: 4.1, label: 'Fuel pump test', open: false },
+      { from: 7, to: 10, label: 'Clear fault codes', open: true },
+    ];
+    const { container } = render(
+      <Replay recording={samples} writes={writes} />,
+    );
+    const overview = await plotArea(container, 0);
+    const graph = await plotArea(container, 1);
+
+    expect(
+      [...overview.querySelectorAll('[class*="markLabel"]')].map(
+        (label) => label.textContent,
+      ),
+    ).toEqual(['Fuel pump test', 'Clear fault codes']);
+    // A label on a graph would cover its samples.
+    expect(graph.querySelector('[class*="markLabel"]')).toBeNull();
+
+    for (const over of [overview, graph]) {
+      expect(
+        [...over.querySelectorAll<HTMLElement>('[data-open]')].map(
+          (mark) => mark.dataset['open'],
+        ),
+      ).toEqual(['false', 'true']);
+    }
+
+    await expectNoAxeViolations(container);
+  });
 
   it('draws the overview and a graph per metric, with a playhead over each', async () => {
     const { container, unmount } = renderReplay();

@@ -142,4 +142,57 @@ describe('useEcuWrite', () => {
     });
     expect(result.current.begin('clearFaultCodes')).toBeUndefined();
   });
+
+  it('tells watchers of each start and end, starting with the write running now', async () => {
+    const old = await connected();
+    const next = await connected();
+    const { result, reconnect } = renderWrites(old);
+    let pump: ReturnType<typeof result.current.begin>;
+
+    vi.spyOn(Date, 'now').mockReturnValue(1000);
+    act(() => {
+      pump = result.current.begin('fuelPump');
+    });
+
+    const seen = vi.fn();
+    const stop = result.current.watch(seen);
+
+    expect(seen).toHaveBeenLastCalledWith({
+      id: expect.any(String) as string,
+      write: 'fuelPump',
+      startedAt: 1000,
+      endedAt: null,
+      outcome: { status: 'running' },
+    });
+
+    vi.spyOn(Date, 'now').mockReturnValue(3100);
+    act(() => {
+      pump?.finish({ status: 'done', message: 'Fuel pump stopped.' });
+    });
+
+    expect(seen).toHaveBeenLastCalledWith({
+      id: (seen.mock.calls[0]?.[0] as { id: string }).id,
+      write: 'fuelPump',
+      startedAt: 1000,
+      endedAt: 3100,
+      outcome: { status: 'done', message: 'Fuel pump stopped.' },
+    });
+
+    stop();
+    act(() => {
+      result.current.begin('idleAirControl');
+    });
+
+    expect(seen).toHaveBeenCalledTimes(2);
+
+    // A write still running on an old connection is not offered to a new
+    // watcher.
+    reconnect(next);
+
+    const later = vi.fn();
+
+    result.current.watch(later);
+
+    expect(later).not.toHaveBeenCalled();
+  });
 });

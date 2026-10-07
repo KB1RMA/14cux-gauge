@@ -2,6 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import type { EcuSource } from '../ecu/connect';
 import type { LiveSnapshot } from '../ecu/poller';
+import type { WriteLogEntry } from '../ecuWrite/writes';
 
 /**
  * Recorded debug sessions: the live snapshots from one connection, kept so
@@ -14,14 +15,19 @@ import type { LiveSnapshot } from '../ecu/poller';
  *
  * Snapshots are stored as the poller produced them, in the library's units,
  * so a recording does not depend on the display units chosen at the time.
+ * Writes to the ECU made while recording are kept beside them.
  */
 
 /**
  * Bumped when the stored shape changes; readers must check it.
  *
- * 1: the first format. 2: adds `notes`.
+ * 1: the first format. 2: adds `notes`. 3: keeps the writes to the ECU made
+ * while recording. Sessions in format 2 stay in it: whether any writes were
+ * made during them is not known.
  */
-export const SESSION_FORMAT_VERSION = 2;
+export const SESSION_FORMAT_VERSION = 3;
+
+export type SessionFormatVersion = 2 | typeof SESSION_FORMAT_VERSION;
 
 export interface SessionSummary {
   id: string;
@@ -34,7 +40,12 @@ export interface SessionSummary {
   sampleCount: number;
   /** Free text the user keeps with the session; empty if none. */
   notes: string;
-  formatVersion: typeof SESSION_FORMAT_VERSION;
+  formatVersion: SessionFormatVersion;
+}
+
+/** Whether `session` kept its writes to the ECU (format 3 on). */
+export function keepsWrites(session: SessionSummary): boolean {
+  return session.formatVersion >= 3;
 }
 
 export interface NewSession {
@@ -59,7 +70,11 @@ export interface SessionStore {
   get(id: string): Promise<SessionSummary | undefined>;
   /** Every sample in a session, in the order appended. */
   readSamples(id: string): Promise<LiveSnapshot[]>;
-  /** Deletes a session and its samples. Unknown ids are ignored. */
+  /** Adds a write to a session, or replaces the one with the same `id`. */
+  putWrite(id: string, write: WriteLogEntry): Promise<void>;
+  /** Every write kept with a session, in the order they started. */
+  readWrites(id: string): Promise<WriteLogEntry[]>;
+  /** Deletes a session, its samples and its writes. Unknown ids are ignored. */
   remove(id: string): Promise<void>;
   close(): void;
 }
@@ -103,6 +118,15 @@ export function newestFirst(a: SessionSummary, b: SessionSummary): number {
   return b.startedAt - a.startedAt;
 }
 
+export function byStart(a: WriteLogEntry, b: WriteLogEntry): number {
+  return a.startedAt - b.startedAt;
+}
+
+/** A copy of `write`, so a store never shares one with its caller. */
+export function copyWrite(write: WriteLogEntry): WriteLogEntry {
+  return { ...write, outcome: { ...write.outcome } };
+}
+
 /**
  * Keeps sessions in memory only: the fallback when no persistent storage is
  * available, and a reference implementation for tests.
@@ -110,13 +134,17 @@ export function newestFirst(a: SessionSummary, b: SessionSummary): number {
 export class MemorySessionStore implements SessionStore {
   private readonly sessions = new Map<
     string,
-    { summary: SessionSummary; samples: LiveSnapshot[] }
+    {
+      summary: SessionSummary;
+      samples: LiveSnapshot[];
+      writes: Map<string, WriteLogEntry>;
+    }
   >();
 
   async create(session: NewSession): Promise<SessionSummary> {
     const summary = emptySummary(session);
 
-    this.sessions.set(summary.id, { summary, samples: [] });
+    this.sessions.set(summary.id, { summary, samples: [], writes: new Map() });
 
     return { ...summary };
   }
@@ -161,6 +189,14 @@ export class MemorySessionStore implements SessionStore {
 
   async readSamples(id: string): Promise<LiveSnapshot[]> {
     return this.entry(id).samples.map((sample) => ({ ...sample }));
+  }
+
+  async putWrite(id: string, write: WriteLogEntry): Promise<void> {
+    this.entry(id).writes.set(write.id, copyWrite(write));
+  }
+
+  async readWrites(id: string): Promise<WriteLogEntry[]> {
+    return [...this.entry(id).writes.values()].map(copyWrite).sort(byStart);
   }
 
   async remove(id: string): Promise<void> {

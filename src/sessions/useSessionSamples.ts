@@ -2,16 +2,17 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { useEffect, useState } from 'react';
 import type { LiveSnapshot } from '../ecu/poller';
+import type { WriteLogEntry } from '../ecuWrite/writes';
 import { useSessions } from './useSessions';
 
 export type SessionSamples =
   | { status: 'loading' }
-  | { status: 'loaded'; samples: LiveSnapshot[] }
+  | { status: 'loaded'; samples: LiveSnapshot[]; writes: WriteLogEntry[] }
   | { status: 'failed' };
 
 /**
- * A session's samples, read once. A session still being recorded gives the
- * samples written so far.
+ * A session's samples and its writes to the ECU, read once. A session still
+ * being recorded gives what has been saved so far.
  */
 export function useSessionSamples(id: string): SessionSamples {
   const { store } = useSessions();
@@ -27,10 +28,10 @@ export function useSessionSamples(id: string): SessionSamples {
 
     let stale = false;
 
-    store.readSamples(id).then(
-      (samples) => {
+    Promise.all([store.readSamples(id), store.readWrites(id)]).then(
+      ([samples, writes]) => {
         if (!stale) {
-          setResult({ id, samples: { status: 'loaded', samples } });
+          setResult({ id, samples: { status: 'loaded', samples, writes } });
         }
       },
       () => {

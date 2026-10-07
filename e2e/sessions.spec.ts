@@ -41,6 +41,53 @@ function nav(page: Page) {
 }
 
 test.describe('Recorded sessions', () => {
+  test('keeps the writes to the ECU made while recording, and marks them in replay', async ({
+    page,
+  }) => {
+    await page.goto('./');
+    await page.getByRole('button', { name: 'Demo mode' }).click();
+    await page.getByRole('button', { name: 'Record', exact: true }).click();
+    await expect(page.getByText('0:01 recorded')).toBeVisible();
+    await page.getByRole('button', { name: 'Run pump (once)' }).click();
+    await page
+      .getByRole('alertdialog', { name: 'Run the fuel pump once?' })
+      .getByRole('button', { name: 'Run fuel pump' })
+      .click();
+    await expect(
+      page.getByRole('button', { name: 'Run pump (once)' }),
+    ).toBeEnabled({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'Stop recording' }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Save recording' });
+
+    await dialog.getByRole('textbox', { name: 'Name' }).fill('Pump check');
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog).toBeHidden();
+    await nav(page).getByRole('link', { name: 'Sessions' }).click();
+    await page.getByRole('link', { name: 'Pump check', exact: true }).click();
+
+    const log = page.getByRole('region', { name: 'Writes to the ECU' });
+    const row = log.getByRole('row').filter({ hasText: 'Fuel pump test' });
+
+    await expect(row).toContainText('Done. Fuel pump stopped.');
+    await expect(row).toContainText(/\d\.\d s/);
+    await expectNoAxeViolations(page);
+
+    await row.getByRole('button', { name: /^Go to Fuel pump test, / }).click();
+    await expect(
+      log.getByRole('rowheader', { name: 'Fuel pump test At the playhead' }),
+    ).toBeVisible();
+
+    // The write's name shows once more on the graphs: on the overview
+    // strip's mark, which is hidden from assistive tech.
+    const named = page.getByText('Fuel pump test', { exact: true });
+    const before = await named.count();
+
+    await page.getByRole('tab', { name: 'Graphs' }).click();
+    await expect(named).toHaveCount(before + 1);
+    await expectNoAxeViolations(page);
+  });
+
   test('records, names, keeps across a reload, replays and deletes a session', async ({
     page,
   }) => {

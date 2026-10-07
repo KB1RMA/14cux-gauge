@@ -6,11 +6,13 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { mountPlot } from '../charts/mountPlot';
 import { overviewPlotOptions } from '../charts/plotOptions';
 import {
+  marks,
   overlay,
   overviewGestures,
   placeLine,
   placeSpan,
   type Overlay,
+  type TimelineMark,
 } from '../charts/timelinePlugins';
 import type { Metric } from '../metrics';
 import {
@@ -24,6 +26,8 @@ import type { Replay } from '../replay/useReplay';
 import { describeDuration, formatDuration } from '../sessions/format';
 import controls from './ReplayControls.module.css';
 import styles from './Timeline.module.css';
+
+const NO_MARKS: readonly TimelineMark[] = [];
 
 /** A time for a screen reader, in tenths of a second if the step is finer. */
 function describeTime(ms: number, step: number): string {
@@ -68,19 +72,22 @@ function ViewButton({
  * the highlight on the strip moves it; clicking the strip moves the
  * playhead.
  *
- * `times` are seconds into the recording and `samples` the overview
- * metric's samples at those times; neither may change.
+ * `times` are seconds into the recording, `samples` the overview metric's
+ * samples at those times, and `writes` the writes to the ECU made during it;
+ * none may change.
  */
 export function TimelineOverview({
   metric,
   times,
   samples,
   replay,
+  writes = NO_MARKS,
 }: {
   metric: Metric;
   times: readonly number[];
   samples: readonly (number | null)[];
   replay: Replay;
+  writes?: readonly TimelineMark[];
 }) {
   const { position, duration, view } = replay;
   const plotRef = useRef<HTMLDivElement>(null);
@@ -108,6 +115,11 @@ export function TimelineOverview({
     }
 
     return mountPlot(container, (plot, width) => {
+      const writeMarks = marks(writes, {
+        className: styles['marks'] ?? '',
+        markClassName: styles['mark'] ?? '',
+        labelClassName: styles['markLabel'] ?? '',
+      });
       const highlight = overlay(styles['window'] ?? '', (chart, element) => {
         const { start, end } = latestRef.current.view;
 
@@ -138,6 +150,7 @@ export function TimelineOverview({
                 latestRef.current.seek(next);
               },
             }),
+            writeMarks.plugin,
             highlight.plugin,
             playhead.plugin,
           ],
@@ -146,7 +159,7 @@ export function TimelineOverview({
         container,
       );
     });
-  }, [metric, times, samples]);
+  }, [metric, times, samples, writes]);
 
   useEffect(() => {
     windowRef.current?.update();

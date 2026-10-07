@@ -94,3 +94,39 @@
   border-radius: 4px;
   pointer-events: none;
 }
+
+/* Writes to the ECU, as stretches of the timeline with their names. */
+.marks {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 2px;
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  /* Its edges mark when the write started and ended: 3:1 contrast. */
+  border-inline: 2px solid var(--warn);
+}
+
+/* No end was recorded: the stretch runs off the end, without an edge. */
+.mark[data-open='true'] {
+  border-right-style: dashed;
+}
+
+/* No background, so the samples behind it stay visible. */
+.markLabel {
+  position: absolute;
+  top: 0.1rem;
+  /* May run past a short write's end, so the name stays readable. */
+  left: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--text);
+}

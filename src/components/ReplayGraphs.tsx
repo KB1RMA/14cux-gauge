@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { useId, useState } from 'react';
+import type { TimelineMark } from '../charts/timelinePlugins';
 import type { LiveSnapshot } from '../ecu/poller';
 import { METRIC_KEYS, METRICS, sampleOf, type MetricKey } from '../metrics';
 import type { Replay } from '../replay/useReplay';
@@ -12,24 +13,28 @@ import { TimelineChart } from './TimelineChart';
 import { TimelineOverview } from './TimelineOverview';
 import styles from './GraphsView.module.css';
 
+const NO_MARKS: readonly TimelineMark[] = [];
+
 /** The metric the overview strip draws, if it was recorded. */
 const OVERVIEW_METRIC: MetricKey = 'engineRpm';
 
 /**
  * A recording's graphs on one timeline: an overview of the whole session
  * that picks the stretch to show, and a graph per chosen metric over that
- * stretch, sharing the playhead and the pointer's crosshair. Only the
- * `recorded` metrics can be shown. Key it by session: the samples must not
- * change.
+ * stretch, sharing the playhead and the pointer's crosshair, with the
+ * writes to the ECU marked on each. Only the `recorded` metrics can be
+ * shown. Key it by session: the samples and writes must not change.
  */
 export function ReplayGraphs({
   samples,
   replay,
   recorded = METRIC_KEYS,
+  writes = NO_MARKS,
 }: {
   samples: readonly LiveSnapshot[];
   replay: Replay;
   recorded?: readonly MetricKey[];
+  writes?: readonly TimelineMark[];
 }) {
   const [settings, setSettings] = useStoredState(
     GRAPH_SETTINGS_KEY,
@@ -64,6 +69,7 @@ export function ReplayGraphs({
           times={times}
           samples={column(overview.key)}
           replay={replay}
+          writes={writes}
         />
       ) : null}
       <div className={styles['toolbar']}>
@@ -92,6 +98,7 @@ export function ReplayGraphs({
             samples={column(metric.key)}
             replay={replay}
             syncKey={syncId}
+            writes={writes}
           />
         )}
       />

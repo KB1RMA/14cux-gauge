@@ -6,19 +6,21 @@ import type { SessionSummary } from './sessionStore';
  * The browser database that holds recorded sessions and saved ROM images,
  * and the small helpers the stores over it share.
  *
- * Three object stores: `sessions` holds one summary per recording, `chunks`
+ * Four object stores: `sessions` holds one summary per recording, `chunks`
  * holds the samples in batches, one record per `append` (chunk keys
  * auto-increment, so reading a session's chunks through the `sessionId`
- * index returns them in the order they were appended), and `roms` holds
- * one record per saved ROM image.
+ * index returns them in the order they were appended), `writes` holds one
+ * record per write to the ECU made while recording, and `roms` holds one
+ * record per saved ROM image.
  */
 
 export const DB_NAME = 'cuxGauge';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 export const SESSIONS = 'sessions';
 export const CHUNKS = 'chunks';
 export const BY_SESSION = 'sessionId';
 export const ROMS = 'roms';
+export const WRITES = 'writes';
 
 export function request<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -98,6 +100,15 @@ function upgrade(
   if (oldVersion < 3) {
     // ROM images.
     db.createObjectStore(ROMS, { keyPath: 'id' });
+  }
+
+  if (oldVersion < 4) {
+    // Session format 3 keeps writes to the ECU. Sessions already recorded
+    // stay in format 2: whether writes were made during them is not known.
+    db.createObjectStore(WRITES, { keyPath: 'id' }).createIndex(
+      BY_SESSION,
+      BY_SESSION,
+    );
   }
 }
 

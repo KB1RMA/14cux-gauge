@@ -91,6 +91,61 @@ export function placeSpan(
   element.style.width = `${String(chart.valToPos(to, 'x') - left)}px`;
 }
 
+/** A labelled stretch of the timeline, in seconds into the recording. */
+export interface TimelineMark {
+  from: number;
+  to: number;
+  label: string;
+  /** The stretch has no recorded end: `to` is only where the recording ends. */
+  open: boolean;
+}
+
+/**
+ * Marks stretches of the timeline in a container with `className`. Each mark
+ * has `markClassName`, with `data-open` on one with no recorded end. Given
+ * `labelClassName`, each also holds its label in an element with that class;
+ * leave it out where a label would cover the samples.
+ */
+export function marks(
+  list: readonly TimelineMark[],
+  {
+    className,
+    markClassName,
+    labelClassName,
+  }: { className: string; markClassName: string; labelClassName?: string },
+): Overlay {
+  const elements = list.map((mark) => {
+    const element = document.createElement('div');
+
+    element.className = markClassName;
+    element.dataset['open'] = String(mark.open);
+
+    if (labelClassName !== undefined) {
+      const label = document.createElement('span');
+
+      label.className = labelClassName;
+      label.textContent = mark.label;
+      element.append(label);
+    }
+
+    return element;
+  });
+
+  return overlay(className, (chart, container) => {
+    if (container.childElementCount !== elements.length) {
+      container.replaceChildren(...elements);
+    }
+
+    list.forEach((mark, index) => {
+      const element = elements[index];
+
+      if (element) {
+        placeSpan(chart, element, mark.from, mark.to);
+      }
+    });
+  });
+}
+
 /** What the timeline's gestures change. Times are milliseconds. */
 export interface TimelineHandlers {
   view(): TimeWindow;
