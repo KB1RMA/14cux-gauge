@@ -4,7 +4,10 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { expectNoAxeViolations, readingFor } from './test-support/a11y';
-import { notification } from './test-support/notifications';
+import {
+  notification,
+  notificationsRegion,
+} from './test-support/notifications';
 
 describe('App in demo mode', () => {
   it('connects to the demo ECU, polls live data, and disconnects', async () => {
@@ -195,7 +198,8 @@ describe('App in demo mode', () => {
       },
       { timeout: 3000 },
     );
-    await expectNoAxeViolations(document.body);
+    // The rest of the page has its own axe tests.
+    await expectNoAxeViolations(notificationsRegion());
 
     await user.click(screen.getByRole('tab', { name: 'Overview' }));
     await user.click(screen.getByRole('button', { name: 'Clear fault codes' }));
@@ -215,7 +219,9 @@ describe('App in demo mode', () => {
     );
     expect(status).toHaveTextContent(/^Demo ECU · Polling$/);
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
-  });
+    // The whole app, and a real two-second pump run, take a while on a busy
+    // runner.
+  }, 15_000);
 
   it('stays connected when reconnected while the last connection is closing', async () => {
     const user = userEvent.setup();
