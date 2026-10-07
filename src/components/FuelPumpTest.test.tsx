@@ -237,6 +237,11 @@ describe('FuelPumpTest', () => {
     expect(pumpWritten(transport)).toBe(false);
     expect(running()).toBe('none');
     expect(announcement()).toBe('none');
+    // The notification outlives the connection, and says it closed rather
+    // than that the user left the view.
+    expect(notification('Fuel pump test')).toHaveTextContent(
+      'The fuel pump test stopped and may have partly run. The connection to the ECU was closed.',
+    );
   });
 
   it('stops when the user leaves the view', async () => {
@@ -252,6 +257,9 @@ describe('FuelPumpTest', () => {
 
     expect(pumpWritten(transport)).toBe(false);
     expect(announcement()).toBe('Fuel pump stopped when you left the view.');
+    expect(notification('Fuel pump test')).toHaveTextContent(
+      'Fuel pump stopped when you left the view.',
+    );
   });
 
   it('stops and says why when the ECU stops answering', async () => {
