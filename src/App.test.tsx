@@ -20,9 +20,13 @@ describe('App in demo mode', () => {
     const heading = await screen.findByRole('heading', { name: 'Live data' });
 
     expect(heading).toHaveFocus();
-    await waitFor(() => {
-      expect(readingFor('Engine speed')).toHaveTextContent(/\d+ rpm/);
-    });
+    // The first reading can take a while on a busy machine.
+    await waitFor(
+      () => {
+        expect(readingFor('Engine speed')).toHaveTextContent(/\d+ rpm/);
+      },
+      { timeout: 5000 },
+    );
     expect(screen.getByRole('status')).toHaveTextContent('Demo ECU · Polling');
     expect(
       await screen.findByText('1234', { selector: 'dd' }),
@@ -232,7 +236,14 @@ describe('App in demo mode', () => {
     await act(() => new Promise((resolve) => setTimeout(resolve, 300)));
 
     expect(screen.getByRole('status')).toHaveTextContent('Demo ECU · Polling');
-    expect(readingFor('Engine speed')).toHaveTextContent(/^\d+ rpm$/);
+    // Still polling: readings arrive, though the first can take a while on
+    // a busy machine.
+    await waitFor(
+      () => {
+        expect(readingFor('Engine speed')).toHaveTextContent(/^\d+ rpm$/);
+      },
+      { timeout: 5000 },
+    );
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
   });
 });

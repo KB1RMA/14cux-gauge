@@ -99,8 +99,11 @@ describe('Recording and browsing sessions', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
     await savedAndClosed(dialog);
 
-    // The same button, now offering to record again.
-    expect(screen.getByRole('button', { name: 'Record' })).toHaveFocus();
+    // The same button, now offering to record again. Radix moves focus a
+    // tick after the dialog has gone.
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Record' })).toHaveFocus();
+    });
     expect(screen.getByRole('status')).toHaveTextContent(/Polling$/);
 
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
@@ -403,9 +406,12 @@ describe('Recording and browsing sessions', () => {
 
     expect(dialog).not.toBeInTheDocument();
     // The status bar went with the connection; start at the connect screen.
-    expect(
-      screen.getByRole('heading', { name: 'Connect to an ECU' }),
-    ).toHaveFocus();
+    // Radix moves focus a tick after the dialog has gone.
+    await vi.waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Connect to an ECU' }),
+      ).toHaveFocus();
+    });
 
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
 
