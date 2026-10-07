@@ -42,6 +42,12 @@ describe('formatAgo', () => {
     expect(formatAgo(-90)).toBe('−90 s');
     expect(formatAgo(-600)).toBe('−10 min');
   });
+
+  it('labels whole hours in hours', () => {
+    expect(formatAgo(-3600)).toBe('−1 h');
+    expect(formatAgo(-5400)).toBe('−90 min');
+    expect(formatAgo(-7200)).toBe('−2 h');
+  });
 });
 
 describe('formatTimelineTick', () => {
@@ -111,6 +117,19 @@ describe('plotOptions', () => {
       '−150 s',
       'now',
     ]);
+  });
+
+  it('reads a changing time window each time the data is set', () => {
+    let span = 30;
+    const options = plotOptions(plot, metric('engineRpm'), {
+      width: 400,
+      windowSeconds: () => span,
+    });
+    const range = options.scales?.['x']?.range;
+
+    expect(call<number[]>(range, chart, 0, 0)).toEqual([-30, 0]);
+    span = 5400;
+    expect(call<number[]>(range, chart, 0, 0)).toEqual([-5400, 0]);
   });
 
   it('draws in the theme colours', () => {

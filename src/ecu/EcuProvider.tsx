@@ -52,8 +52,13 @@ const NO_LIVE_DATA: LiveData = {
   stats: { sampleRateHz: 0 },
 };
 
-/** Enough for the longest graph window (10 minutes) at 25 samples a second. */
-export const HISTORY_CAPACITY = 15_000;
+/**
+ * Samples kept for the graphs' session window: about 21 MB once full (25
+ * readings and a time, 8 bytes each), which is 66 minutes at 25 samples a
+ * second or 5 hours at a typical 5.5. The history only grows this big as a
+ * session runs on.
+ */
+export const HISTORY_CAPACITY = 100_000;
 
 export interface EcuProviderProps {
   children: ReactNode;

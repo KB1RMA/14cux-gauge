@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { MixerHorizontalIcon } from '@radix-ui/react-icons';
-import { Popover, ToggleGroup, VisuallyHidden } from 'radix-ui';
+import { Popover, ToggleGroup, Toolbar, VisuallyHidden } from 'radix-ui';
 import { useId } from 'react';
 import {
   METRIC_GROUPS,
@@ -35,22 +35,26 @@ function sameKeys(a: readonly MetricKey[], b: readonly MetricKey[]): boolean {
 /**
  * A button that opens the list of readings to take from the ECU. The
  * choice applies to the tiles, the graphs and recordings; fewer readings
- * are polled faster.
+ * are polled faster. Set `inToolbar` when it sits in a Radix toolbar, so
+ * the arrow keys reach it.
  */
-export function ReadingsPicker() {
+export function ReadingsPicker({ inToolbar = false }: { inToolbar?: boolean }) {
   const { chosen, off, setOff } = useReadings();
   const titleId = useId();
   const hintId = useId();
+  const trigger = (
+    <Popover.Trigger className={graphs['pickerTrigger']}>
+      <MixerHorizontalIcon aria-hidden="true" />
+      Choose readings
+      <span className={graphs['count']}>
+        {chosen.length} of {METRICS.length}
+      </span>
+    </Popover.Trigger>
+  );
 
   return (
     <Popover.Root>
-      <Popover.Trigger className={graphs['pickerTrigger']}>
-        <MixerHorizontalIcon aria-hidden="true" />
-        Choose readings
-        <span className={graphs['count']}>
-          {chosen.length} of {METRICS.length}
-        </span>
-      </Popover.Trigger>
+      {inToolbar ? <Toolbar.Button asChild>{trigger}</Toolbar.Button> : trigger}
       <Popover.Portal>
         <Popover.Content
           className={`${graphs['picker']} ${styles['picker']}`}

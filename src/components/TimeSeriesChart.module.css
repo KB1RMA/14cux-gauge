@@ -57,3 +57,10 @@
   /* Reserve the height before uPlot draws, so the page does not jump. */
   min-height: 140px;
 }
+
+@media print {
+  /* Keep each graph whole on one sheet. */
+  .chart {
+    break-inside: avoid;
+  }
+}

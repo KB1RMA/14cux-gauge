@@ -2,7 +2,10 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { HistoryContext } from '../ecu/contexts';
 import { EcuProvider } from '../ecu/EcuProvider';
+import { SampleHistory } from '../history/sampleHistory';
+import { METRIC_KEYS } from '../metrics';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { expectNoAxeViolations } from '../test-support/a11y';
 import { GraphsView } from './GraphsView';
@@ -74,12 +77,107 @@ describe('GraphsView', () => {
     expect(
       within(window).getByRole('radio', { name: '5 minutes' }),
     ).toBeChecked();
-    expect(storedGraphs()).toEqual({ windowSeconds: 300, hidden: [] });
+    expect(storedGraphs()).toEqual({
+      window: 300,
+      layout: 'grid',
+      hidden: [],
+    });
 
     unmount();
     renderGraphs();
 
     expect(screen.getByRole('radio', { name: '5 minutes' })).toBeChecked();
+  });
+
+  it('puts the controls in one toolbar', () => {
+    renderGraphs();
+
+    const toolbar = screen.getByRole('toolbar', { name: 'Graph options' });
+
+    expect(
+      within(toolbar).getByRole('radiogroup', { name: 'Time window' }),
+    ).toBeInTheDocument();
+    expect(
+      within(toolbar).getByRole('radiogroup', { name: 'Layout' }),
+    ).toBeInTheDocument();
+    expect(
+      within(toolbar).getByRole('button', { name: /Choose readings/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the whole session, and remembers it', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderGraphs();
+
+    await user.click(screen.getByRole('radio', { name: 'Whole session' }));
+
+    expect(screen.getByRole('radio', { name: 'Whole session' })).toBeChecked();
+    expect(storedGraphs()).toMatchObject({ window: 'session' });
+
+    unmount();
+    renderGraphs();
+
+    expect(screen.getByRole('radio', { name: 'Whole session' })).toBeChecked();
+  });
+
+  it('says when the session window has lost its oldest samples', () => {
+    const history = new SampleHistory(METRIC_KEYS, 3);
+
+    localStorage.setItem(
+      'cuxGauge.graphs',
+      JSON.stringify({ window: 'session' }),
+    );
+
+    for (let i = 0; i <= 3; i++) {
+      history.push(i * 60_000, { engineRpm: 800 });
+    }
+
+    render(
+      <PreferencesProvider>
+        <EcuProvider>
+          <HistoryContext value={history}>
+            <GraphsView />
+          </HistoryContext>
+        </EcuProvider>
+      </PreferencesProvider>,
+    );
+
+    expect(screen.getByText(/older ones have been dropped/)).toHaveTextContent(
+      'The graphs hold a limited number of samples, so older ones have been dropped. They show the last 2:00 of the session; record the session to keep all of it.',
+    );
+  });
+
+  it('does not mention dropped samples before any are dropped', () => {
+    localStorage.setItem(
+      'cuxGauge.graphs',
+      JSON.stringify({ window: 'session' }),
+    );
+    renderGraphs();
+
+    expect(screen.queryByText(/dropped/)).not.toBeInTheDocument();
+  });
+
+  it('lays the graphs out in a grid or stacked, and remembers it', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderGraphs();
+    const layout = screen.getByRole('radiogroup', { name: 'Layout' });
+
+    expect(within(layout).getByRole('radio', { name: 'Grid' })).toBeChecked();
+
+    await user.click(within(layout).getByRole('radio', { name: 'Stacked' }));
+    // Pressing the chosen layout again keeps it chosen.
+    await user.click(within(layout).getByRole('radio', { name: 'Stacked' }));
+
+    expect(
+      within(layout).getByRole('radio', { name: 'Stacked' }),
+    ).toBeChecked();
+    expect(storedGraphs()).toMatchObject({ layout: 'stacked' });
+
+    unmount();
+    renderGraphs();
+
+    expect(screen.getByRole('radio', { name: 'Stacked' })).toBeChecked();
+    expect(screen.getAllByRole('figure')).toHaveLength(25);
   });
 
   it('graphs only the chosen readings, and remembers the choice', async () => {
@@ -165,7 +263,7 @@ describe('GraphsView', () => {
   it('ignores stored settings it does not recognise', () => {
     localStorage.setItem(
       'cuxGauge.graphs',
-      JSON.stringify({ windowSeconds: 45 }),
+      JSON.stringify({ window: 45, layout: 'masonry' }),
     );
     localStorage.setItem(
       'cuxGauge.readings',
@@ -175,6 +273,7 @@ describe('GraphsView', () => {
     renderGraphs();
 
     expect(screen.getByRole('radio', { name: '1 minute' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Grid' })).toBeChecked();
     expect(screen.getAllByRole('figure')).toHaveLength(24);
     expect(figureNames()).toContain('MIL');
   });

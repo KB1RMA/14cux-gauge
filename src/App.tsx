@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { HashRouter, Navigate, NavLink, Route, Routes } from 'react-router';
-import { goatCounter, type UsageCounter } from './analytics/goatCounter';
-import { useUsageCounts } from './analytics/useUsageCounts';
+import { goatCounter, type UsageCounter } from './usage/goatCounter';
+import { useUsageCounts } from './usage/useUsageCounts';
 import { AppNotices } from './components/AppNotices';
 import { ConnectScreen } from './components/ConnectScreen';
 import { Dashboard } from './components/Dashboard';
