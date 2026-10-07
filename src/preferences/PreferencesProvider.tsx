@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { useLayoutEffect, useMemo, type ReactNode } from 'react';
-import { browserAsksNotToTrack } from '../analytics/goatCounter';
+import { browserAsksNotToTrack } from '../usage/goatCounter';
 import { asRecord, oneOf } from '../storage/settings';
 import { useStoredState } from '../storage/useStoredState';
 import type { SpeedUnit, TemperatureUnit } from '../units';

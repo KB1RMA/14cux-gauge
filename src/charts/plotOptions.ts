@@ -28,12 +28,16 @@ export async function loadPlot(): Promise<UPlot> {
 
 export const PLOT_HEIGHT = 140;
 
-/** Seconds ago as an axis label: "now", "−30 s", "−5 min". */
+/** Seconds ago as an axis label: "now", "−30 s", "−5 min", "−2 h". */
 export function formatAgo(seconds: number): string {
   const ago = Math.round(-seconds);
 
   if (ago <= 0) {
     return 'now';
+  }
+
+  if (ago >= 3600 && ago % 3600 === 0) {
+    return `−${String(ago / 3600)} h`;
   }
 
   return ago >= 60 && ago % 60 === 0
@@ -68,10 +72,18 @@ function padded([min, max]: readonly [number, number]): [number, number] {
   return [min - margin, max + margin];
 }
 
+/**
+ * `windowSeconds` is the span of the x axis; pass a function for a span
+ * that changes (the session window), and it is read each time the data is
+ * set.
+ */
 export function plotOptions(
   plot: UPlot,
   metric: Metric,
-  { width, windowSeconds }: { width: number; windowSeconds: number },
+  {
+    width,
+    windowSeconds,
+  }: { width: number; windowSeconds: number | (() => number) },
 ): uPlot.Options {
   const { step = false, range, atLeast } = metric.chart;
   // Optional in uPlot's types, but part of every build we ship.
@@ -92,7 +104,14 @@ export function plotOptions(
     legend: { show: false },
     cursor: { show: false, drag: { x: false, y: false } },
     scales: {
-      x: { time: false, auto: false, range: [-windowSeconds, 0] },
+      x: {
+        time: false,
+        auto: false,
+        range:
+          typeof windowSeconds === 'number'
+            ? [-windowSeconds, 0]
+            : () => [-windowSeconds(), 0],
+      },
       y: range
         ? { auto: false, range: padded(range) }
         : {
@@ -113,7 +132,9 @@ export function plotOptions(
       {
         ...axis,
         space: 60,
-        incrs: [1, 2, 5, 10, 15, 30, 60, 120, 300, 600],
+        incrs: [
+          1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400,
+        ],
         values: (_chart, splits) => splits.map(formatAgo),
       },
       {

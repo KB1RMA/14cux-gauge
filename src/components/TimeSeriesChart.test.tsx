@@ -9,6 +9,7 @@ import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { expectNoAxeViolations } from '../test-support/a11y';
 import { loadPlot } from '../charts/plotOptions';
 import { installCanvasStandIns } from '../test-support/canvas';
+import type { GraphWindow } from './graphSettings';
 import { TimeSeriesChart } from './TimeSeriesChart';
 
 function metric(key: MetricKey) {
@@ -24,12 +25,12 @@ function metric(key: MetricKey) {
 function renderChart(
   key: MetricKey,
   history = new SampleHistory(METRIC_KEYS, 100),
-  windowSeconds = 60,
+  timeWindow: GraphWindow = 60,
 ) {
   const result = render(
     <PreferencesProvider>
       <HistoryContext value={history}>
-        <TimeSeriesChart metric={metric(key)} windowSeconds={windowSeconds} />
+        <TimeSeriesChart metric={metric(key)} timeWindow={timeWindow} />
       </HistoryContext>
     </PreferencesProvider>,
   );
@@ -92,6 +93,37 @@ describe('TimeSeriesChart', () => {
 
     expect(stat(figure, 'Max')).toBe('20 %');
     expect(stat(figure, 'Min')).toBe('10 %');
+  });
+
+  it('summarises the whole session in the session window', () => {
+    const history = new SampleHistory(METRIC_KEYS, 100);
+
+    history.push(0, { throttle: 0.9 });
+    history.push(3_600_000, { throttle: 0.1 });
+    history.push(7_200_000, { throttle: 0.2 });
+    renderChart('throttle', history, 'session');
+
+    const figure = screen.getByRole('figure', { name: 'Throttle (%)' });
+
+    expect(stat(figure, 'Now')).toBe('20 %');
+    expect(stat(figure, 'Max')).toBe('90 %');
+    expect(stat(figure, 'Min')).toBe('10 %');
+  });
+
+  it('keeps a one-sample spike in a long session', () => {
+    const history = new SampleHistory(METRIC_KEYS, 10_000);
+
+    // An hour at one sample a second, thinned to a few per bucket.
+    for (let i = 0; i < 3600; i++) {
+      history.push(i * 1000, { engineRpm: i === 1234 ? 412 : 800 });
+    }
+
+    renderChart('engineRpm', history, 'session');
+
+    const figure = screen.getByRole('figure', { name: 'Engine speed (rpm)' });
+
+    expect(stat(figure, 'Min')).toBe('412 rpm');
+    expect(stat(figure, 'Max')).toBe('800 rpm');
   });
 
   it('says when the latest reading is invalid', () => {
@@ -197,6 +229,53 @@ describe('TimeSeriesChart drawing', () => {
     expect(() => {
       observers[0]?.();
     }).not.toThrow();
+    expect(container.querySelector('.uplot')).not.toBeNull();
+  });
+
+  it('refits the chart when the page is printed', async () => {
+    const listeners: (() => void)[] = [];
+
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener: (_type: string, listener: () => void) => {
+        listeners.push(listener);
+      },
+      removeEventListener: (_type: string, listener: () => void) => {
+        listeners.splice(listeners.indexOf(listener), 1);
+      },
+    }));
+
+    const { container, unmount } = renderChart('engineRpm');
+
+    await vi.waitFor(() => {
+      expect(listeners).toHaveLength(1);
+    });
+
+    expect(() => {
+      listeners[0]?.();
+    }).not.toThrow();
+    expect(container.querySelector('.uplot')).not.toBeNull();
+
+    unmount();
+
+    expect(listeners).toHaveLength(0);
+  });
+
+  it('draws the session window', async () => {
+    const history = new SampleHistory(METRIC_KEYS, 100);
+
+    history.push(0, { engineRpm: 750 });
+
+    const { container } = renderChart('engineRpm', history, 'session');
+
+    await vi.waitFor(() => {
+      expect(container.querySelector('canvas')).not.toBeNull();
+    });
+
+    act(() => {
+      history.push(120_000, { engineRpm: 800 });
+    });
+
     expect(container.querySelector('.uplot')).not.toBeNull();
   });
 

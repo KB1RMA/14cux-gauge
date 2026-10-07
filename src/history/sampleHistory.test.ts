@@ -90,4 +90,99 @@ describe('SampleHistory', () => {
 
     expect(history.window('speed')).toEqual({ times: [], values: [] });
   });
+
+  it('grows past its first allocation, keeping every sample', () => {
+    const history = new SampleHistory(['rpm'], 5000);
+
+    for (let i = 0; i < 3000; i++) {
+      history.push(i, { rpm: i });
+    }
+
+    expect(history.size).toBe(3000);
+    expect(history.truncated).toBe(false);
+    expect(history.earliestTime).toBe(0);
+    expect(history.window('rpm', 2998).values).toEqual([2998, 2999]);
+    expect(history.window('rpm').values.slice(0, 3)).toEqual([0, 1, 2]);
+  });
+
+  it('says when samples have been dropped, until cleared', () => {
+    const history = new SampleHistory(['rpm'], 3);
+
+    for (let i = 0; i < 3; i++) {
+      history.push(i * 100, { rpm: i });
+    }
+
+    expect(history.truncated).toBe(false);
+
+    history.push(300, { rpm: 3 });
+
+    expect(history.truncated).toBe(true);
+    expect(history.earliestTime).toBe(100);
+
+    history.clear();
+
+    expect(history.truncated).toBe(false);
+    expect(history.earliestTime).toBeUndefined();
+  });
+
+  describe('thinned', () => {
+    it('keeps each bucket’s first, lowest, highest and last sample, in time order', () => {
+      const history = new SampleHistory(['rpm'], 100);
+      const rpm = [800, 900, 400, 850, 820, 810, 1200, 805];
+
+      rpm.forEach((value, i) => {
+        history.push(i * 10, { rpm: value });
+      });
+
+      // Buckets of 40 ms: 0–30 and 40–70.
+      expect(history.thinned('rpm', -Infinity, 40)).toEqual({
+        times: [0, 10, 20, 30, 40, 60, 70],
+        values: [800, 900, 400, 850, 820, 1200, 805],
+      });
+    });
+
+    it('keeps one null for each run of invalid samples, and never joins across it', () => {
+      const history = new SampleHistory(['volts'], 100);
+      const volts = [14.1, null, null, 13.9, 14.0, null, 14.2, 14.3];
+
+      volts.forEach((value, i) => {
+        history.push(i * 10, { volts: value });
+      });
+
+      expect(history.thinned('volts', -Infinity, 1000)).toEqual({
+        times: [0, 10, 30, 40, 50, 60, 70],
+        values: [14.1, null, 13.9, 14.0, null, 14.2, 14.3],
+      });
+    });
+
+    it('aligns buckets to time, so scrolling does not change them', () => {
+      const history = new SampleHistory(['rpm'], 100);
+
+      for (let i = 0; i < 10; i++) {
+        history.push(i * 10, { rpm: i === 5 ? 0 : 100 + i });
+      }
+
+      // From 25 ms: the bucket 0–49 holds only 30 and 40 now.
+      expect(history.thinned('rpm', 25, 50)).toEqual({
+        times: [30, 40, 50, 90],
+        values: [103, 104, 0, 109],
+      });
+    });
+
+    it('returns every sample when no bucket holds more than one', () => {
+      const history = new SampleHistory(['rpm'], 100);
+
+      history.push(0, { rpm: 1 });
+      history.push(100, { rpm: 2 });
+
+      expect(history.thinned('rpm', -Infinity, 64)).toEqual({
+        times: [0, 100],
+        values: [1, 2],
+      });
+      expect(history.thinned('missing' as 'rpm', -Infinity, 64)).toEqual({
+        times: [],
+        values: [],
+      });
+    });
+  });
 });

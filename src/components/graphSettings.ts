@@ -5,17 +5,28 @@ import { asRecord, oneOf } from '../storage/settings';
 
 export const GRAPH_SETTINGS_KEY = 'graphs';
 
+/**
+ * The live graphs' time windows: a number of seconds back from the newest
+ * sample, or the whole session since connecting.
+ */
 export const WINDOW_OPTIONS = [
-  { seconds: 30, text: '30 s', name: '30 seconds' },
-  { seconds: 60, text: '1 min', name: '1 minute' },
-  { seconds: 300, text: '5 min', name: '5 minutes' },
-  { seconds: 600, text: '10 min', name: '10 minutes' },
+  { value: 30, text: '30 s', name: '30 seconds' },
+  { value: 60, text: '1 min', name: '1 minute' },
+  { value: 300, text: '5 min', name: '5 minutes' },
+  { value: 600, text: '10 min', name: '10 minutes' },
+  { value: 'session', text: 'Session', name: 'Whole session' },
 ] as const;
 
-export type WindowSeconds = (typeof WINDOW_OPTIONS)[number]['seconds'];
+export type GraphWindow = (typeof WINDOW_OPTIONS)[number]['value'];
+
+export const LAYOUT_OPTIONS = ['grid', 'stacked'] as const;
+
+/** Graphs side by side in a grid, or each the full width, one under another. */
+export type GraphLayout = (typeof LAYOUT_OPTIONS)[number];
 
 export interface GraphSettings {
-  windowSeconds: WindowSeconds;
+  window: GraphWindow;
+  layout: GraphLayout;
   /**
    * Graphs the user has turned off in session replay. (Live graphs show the
    * chosen readings instead.) Stored this way round so a metric added in a
@@ -29,11 +40,13 @@ export function parseGraphSettings(stored: unknown): GraphSettings {
   const hidden = Array.isArray(s['hidden']) ? (s['hidden'] as unknown[]) : [];
 
   return {
-    windowSeconds: oneOf(
-      s['windowSeconds'],
-      WINDOW_OPTIONS.map((o) => o.seconds),
+    // Earlier versions stored the window as `windowSeconds`.
+    window: oneOf<GraphWindow>(
+      s['window'] ?? s['windowSeconds'],
+      WINDOW_OPTIONS.map((o) => o.value),
       60,
     ),
+    layout: oneOf<GraphLayout>(s['layout'], LAYOUT_OPTIONS, 'grid'),
     hidden: METRIC_KEYS.filter((key) => hidden.includes(key)),
   };
 }

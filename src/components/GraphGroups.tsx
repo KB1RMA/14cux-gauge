@@ -12,9 +12,11 @@ import styles from './GraphsView.module.css';
 
 function ChartGroup({
   title,
+  stacked,
   children,
 }: {
   title: string;
+  stacked: boolean;
   children: ReactNode;
 }) {
   const id = useId();
@@ -22,20 +24,24 @@ function ChartGroup({
   return (
     <section aria-labelledby={id} className={styles['group']}>
       <h3 id={id}>{title}</h3>
-      <div className={styles['grid']}>{children}</div>
+      <div className={styles[stacked ? 'stacked' : 'grid']}>{children}</div>
     </section>
   );
 }
 
 /**
  * A graph, drawn by `chart`, for each metric not `hidden`, in sections by
- * group; or a hint when every graph is hidden.
+ * group; or a hint when every graph is hidden. The graphs sit in a grid,
+ * or one under another at full width when `stacked`. Printed, they always
+ * stack.
  */
 export function GraphGroups({
   hidden,
+  stacked = false,
   chart,
 }: {
   hidden: readonly MetricKey[];
+  stacked?: boolean;
   chart(metric: Metric): ReactNode;
 }) {
   const visible = (key: MetricKey) => !hidden.includes(key);
@@ -52,7 +58,7 @@ export function GraphGroups({
     const metrics = metricsInGroup(group.id).filter((m) => visible(m.key));
 
     return metrics.length === 0 ? null : (
-      <ChartGroup key={group.id} title={group.title}>
+      <ChartGroup key={group.id} title={group.title} stacked={stacked}>
         {metrics.map((metric) => chart(metric))}
       </ChartGroup>
     );

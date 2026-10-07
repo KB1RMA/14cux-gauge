@@ -3,6 +3,7 @@
 .graphs {
   display: grid;
   gap: 1.25rem;
+  container-type: inline-size;
 }
 
 .toolbar {
@@ -11,6 +12,19 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+.toolbarEnd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.layoutItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 /* A segmented control: the pressed window is filled with the accent. */
@@ -26,6 +40,14 @@
   border-radius: 0;
   background: var(--surface);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Five windows fit a phone's width only with narrower padding. */
+@media (max-width: 30rem) {
+  .windowItem {
+    padding-inline: 0.45rem;
+  }
 }
 
 .windowItem + .windowItem {
@@ -157,10 +179,21 @@
   color: var(--text-muted);
 }
 
-.grid {
+.grid,
+.stacked {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
   gap: 0.75rem;
+}
+
+.grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+}
+
+@media print {
+  /* Full width on paper, so each graph is as readable as it can be. */
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .empty {
@@ -171,4 +204,15 @@
   margin: 0;
   font-size: 0.85rem;
   color: var(--text-muted);
+}
+
+/*
+ * Under two grid columns' width (2 × 22rem + the 0.75rem gap) the grid is
+ * one column already, the same as stacked, so the layout switch would do
+ * nothing. Last, so it overrides `.window`.
+ */
+@container (width < 44.75rem) {
+  .layout {
+    display: none;
+  }
 }

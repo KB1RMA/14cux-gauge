@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { UsageCounter } from '../analytics/goatCounter';
+import type { UsageCounter } from '../usage/goatCounter';
 
 /** A usage counter that records what the app counts, for assertions. */
 export function fakeUsageCounter() {
