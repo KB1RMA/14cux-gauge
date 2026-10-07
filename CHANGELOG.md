@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.5.0...v0.6.0) (2026-10-07)
+
+
+### Features
+
+* keep writes to the ECU in recorded sessions, and show them in replay ([#56](https://github.com/KB1RMA/14cux-gauge/issues/56)) ([2ecfab3](https://github.com/KB1RMA/14cux-gauge/commit/2ecfab3fa6f81e93fd230df2d7fe5be28f9e9ec9))
+
 ## [0.5.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.4.0...v0.5.0) (2026-10-07)
 
 
