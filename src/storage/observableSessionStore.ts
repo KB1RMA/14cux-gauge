@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import type { UnreadableRecord } from '../model/record';
 import type { LiveSnapshot } from '../model/snapshot';
-import type { WriteLogEntry } from '../model/write';
+import type { RecordedWrite, WriteLogEntry } from '../model/write';
 import type {
   NewSession,
   SessionChanges,
@@ -62,7 +62,7 @@ export class ObservableSessionStore implements SessionStore {
     return this.inner.putWrite(id, write);
   }
 
-  readWrites(id: string): Promise<WriteLogEntry[]> {
+  readWrites(id: string): Promise<RecordedWrite[]> {
     return this.inner.readWrites(id);
   }
 

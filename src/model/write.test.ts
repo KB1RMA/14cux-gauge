@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { writeLogEntrySchema } from './write';
+import { recordedWriteSchema, writeLogEntrySchema } from './write';
 
 const RUNNING = {
   id: 'pump-1',
@@ -32,6 +32,37 @@ describe('writeLogEntrySchema', () => {
         ...RUNNING,
         outcome: { status: 'done' },
       }).success,
+    ).toBe(false);
+  });
+});
+
+describe('recordedWriteSchema', () => {
+  it('keeps a write or result a newer version recorded', () => {
+    const newer = {
+      ...RUNNING,
+      write: 'flashRom',
+      endedAt: 4100,
+      outcome: { status: 'cancelled', message: 'Stopped by the user.' },
+    };
+    const noMessage = { ...newer, outcome: { status: 'cancelled' } };
+
+    expect(recordedWriteSchema.parse(newer)).toEqual(newer);
+    expect(recordedWriteSchema.parse(noMessage)).toEqual(noMessage);
+    expect(recordedWriteSchema.parse(RUNNING)).toEqual(RUNNING);
+  });
+
+  it('rejects a known result in the wrong shape, and a damaged write', () => {
+    expect(
+      recordedWriteSchema.safeParse({
+        ...RUNNING,
+        outcome: { status: 'done' },
+      }).success,
+    ).toBe(false);
+    expect(
+      recordedWriteSchema.safeParse({ ...RUNNING, startedAt: '2000' }).success,
+    ).toBe(false);
+    expect(
+      recordedWriteSchema.safeParse({ ...RUNNING, write: 7 }).success,
     ).toBe(false);
   });
 });

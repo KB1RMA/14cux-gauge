@@ -43,3 +43,36 @@ export const writeLogEntrySchema = z.object({
 });
 
 export type WriteLogEntry = z.infer<typeof writeLogEntrySchema>;
+
+/** The statuses this version of the app records. */
+const KNOWN_STATUSES: readonly string[] = [
+  'running',
+  'done',
+  'failed',
+  'partial',
+];
+
+/**
+ * A write as read back from a recording. A newer version of the app may have
+ * recorded a kind of write or a result that this one does not know, without
+ * changing the session format; such a write is kept as recorded rather than
+ * making the whole session unreadable. A known result must still have its
+ * known shape.
+ */
+export const recordedWriteSchema = z.object({
+  id: z.string(),
+  write: z.string(),
+  startedAt: z.number(),
+  endedAt: z.nullable(z.number()),
+  outcome: z.union([
+    writeOutcomeSchema,
+    z.object({
+      status: z
+        .string()
+        .check(z.refine((status) => !KNOWN_STATUSES.includes(status))),
+      message: z.optional(z.string()),
+    }),
+  ]),
+});
+
+export type RecordedWrite = z.infer<typeof recordedWriteSchema>;

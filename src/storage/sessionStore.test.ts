@@ -505,12 +505,63 @@ describe('IndexedDbSessionStore stored records', () => {
     await plantRecords(factory, {
       sessions: [GOOD],
       chunks: [{ sessionId: 'good', samples: [{ engineRpm: 750 }] }],
-      writes: [{ ...PUMP_RUNNING, write: 'flashRom', sessionId: 'good' }],
+      writes: [{ ...PUMP_RUNNING, startedAt: '2000', sessionId: 'good' }],
     });
 
     const store = await IndexedDbSessionStore.open({ factory });
 
     await expect(store.readSamples('good')).rejects.toThrow(InvalidRecordError);
+    await expect(store.readWrites('good')).rejects.toThrow(InvalidRecordError);
+    store.close();
+  });
+
+  it('keeps a write a newer version recorded as it was recorded', async () => {
+    const factory = new IDBFactory();
+    const flash = {
+      id: 'flash-1',
+      write: 'flashRom',
+      startedAt: 3000,
+      endedAt: 3500,
+      outcome: { status: 'cancelled', message: 'Stopped by the user.' },
+    };
+    const quiet = {
+      ...flash,
+      id: 'flash-2',
+      startedAt: 5000,
+      outcome: { status: 'cancelled' },
+    };
+
+    await plantRecords(factory, {
+      sessions: [GOOD],
+      writes: [
+        { ...PUMP_STOPPED, sessionId: 'good' },
+        { ...flash, sessionId: 'good' },
+        { ...quiet, sessionId: 'good' },
+      ],
+    });
+
+    const store = await IndexedDbSessionStore.open({ factory });
+
+    expect(await store.readWrites('good')).toEqual([
+      PUMP_STOPPED,
+      flash,
+      quiet,
+    ]);
+    store.close();
+  });
+
+  it('still rejects a known result without its message', async () => {
+    const factory = new IDBFactory();
+
+    await plantRecords(factory, {
+      sessions: [GOOD],
+      writes: [
+        { ...PUMP_STOPPED, outcome: { status: 'done' }, sessionId: 'good' },
+      ],
+    });
+
+    const store = await IndexedDbSessionStore.open({ factory });
+
     await expect(store.readWrites('good')).rejects.toThrow(InvalidRecordError);
     store.close();
   });

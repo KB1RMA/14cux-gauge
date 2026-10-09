@@ -8,7 +8,7 @@ import {
 } from '../model/session';
 import type { UnreadableRecord } from '../model/record';
 import type { LiveSnapshot } from '../model/snapshot';
-import type { WriteLogEntry } from '../model/write';
+import type { RecordedWrite, WriteLogEntry } from '../model/write';
 
 /**
  * Recorded debug sessions (see `src/model/session.ts`) and where they are
@@ -42,8 +42,12 @@ export interface SessionStore {
   readSamples(id: string): Promise<LiveSnapshot[]>;
   /** Adds a write to a session, or replaces the one with the same `id`. */
   putWrite(id: string, write: WriteLogEntry): Promise<void>;
-  /** Every write kept with a session, in the order they started. */
-  readWrites(id: string): Promise<WriteLogEntry[]>;
+  /**
+   * Every write kept with a session, in the order they started, as recorded:
+   * a newer version of the app may have recorded one this version does not
+   * know.
+   */
+  readWrites(id: string): Promise<RecordedWrite[]>;
   /** Deletes a session, its samples and its writes. Unknown ids are ignored. */
   remove(id: string): Promise<void>;
   close(): void;
@@ -88,12 +92,12 @@ export function newestFirst(a: SessionSummary, b: SessionSummary): number {
   return b.startedAt - a.startedAt;
 }
 
-export function byStart(a: WriteLogEntry, b: WriteLogEntry): number {
+export function byStart(a: RecordedWrite, b: RecordedWrite): number {
   return a.startedAt - b.startedAt;
 }
 
 /** A copy of `write`, so a store never shares one with its caller. */
-export function copyWrite(write: WriteLogEntry): WriteLogEntry {
+export function copyWrite<T extends RecordedWrite>(write: T): T {
   return { ...write, outcome: { ...write.outcome } };
 }
 
@@ -170,7 +174,7 @@ export class MemorySessionStore implements SessionStore {
     this.entry(id).writes.set(write.id, copyWrite(write));
   }
 
-  async readWrites(id: string): Promise<WriteLogEntry[]> {
+  async readWrites(id: string): Promise<RecordedWrite[]> {
     return [...this.entry(id).writes.values()].map(copyWrite).sort(byStart);
   }
 

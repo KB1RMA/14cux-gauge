@@ -2,12 +2,12 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { useEffect, useState } from 'react';
 import type { LiveSnapshot } from '../model/snapshot';
-import type { WriteLogEntry } from '../model/write';
+import type { RecordedWrite } from '../model/write';
 import { useSessions } from './useSessions';
 
 export type SessionSamples =
   | { status: 'loading' }
-  | { status: 'loaded'; samples: LiveSnapshot[]; writes: WriteLogEntry[] }
+  | { status: 'loaded'; samples: LiveSnapshot[]; writes: RecordedWrite[] }
   | { status: 'failed' };
 
 /**

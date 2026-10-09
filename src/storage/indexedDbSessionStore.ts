@@ -14,7 +14,11 @@ import {
   type SessionSummary,
 } from '../model/session';
 import { isSnapshotLike, type LiveSnapshot } from '../model/snapshot';
-import { writeLogEntrySchema, type WriteLogEntry } from '../model/write';
+import {
+  recordedWriteSchema,
+  type RecordedWrite,
+  type WriteLogEntry,
+} from '../model/write';
 import {
   BY_SESSION,
   CHUNKS,
@@ -41,11 +45,11 @@ interface ChunkRecord {
   samples: LiveSnapshot[];
 }
 
-const writeRecordSchema = z.extend(writeLogEntrySchema, {
+const writeRecordSchema = z.extend(recordedWriteSchema, {
   sessionId: z.string(),
 });
 
-type WriteRecord = z.infer<typeof writeRecordSchema>;
+type WriteRecord = WriteLogEntry & { sessionId: string };
 
 /**
  * The samples of a stored chunk. Each is only checked to be a snapshot with a
@@ -172,7 +176,7 @@ export class IndexedDbSessionStore implements SessionStore {
     await done;
   }
 
-  async readWrites(id: string): Promise<WriteLogEntry[]> {
+  async readWrites(id: string): Promise<RecordedWrite[]> {
     const tx = this.db.transaction([SESSIONS, WRITES], 'readonly');
 
     await this.summaryIn(tx.objectStore(SESSIONS), id, tx);
