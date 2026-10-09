@@ -87,14 +87,6 @@ export function affectsSetting(event: StorageEvent, key: string): boolean {
   return event.key === null || event.key === PREFIX + key;
 }
 
-export function removeSetting(key: string): void {
-  try {
-    localStorage.removeItem(PREFIX + key);
-  } catch {
-    // Nothing to remove if storage is unavailable.
-  }
-}
-
 /** Treats a stored value as a plain object, or an empty one if it is not. */
 export function asRecord(stored: unknown): Record<string, unknown> {
   return typeof stored === 'object' && stored !== null && !Array.isArray(stored)

@@ -23,9 +23,9 @@ export function storageWith({
 
 /**
  * Makes `localStorage` throw on every access, as in a private window or with
- * site data blocked. Returns a function that undoes it.
+ * site data blocked, until the test finishes, whether it passes or not.
  */
-export function blockStorage(): () => void {
+export function blockStorage(): void {
   const fail = () => {
     throw new DOMException('blocked', 'SecurityError');
   };
@@ -36,9 +36,9 @@ export function blockStorage(): () => void {
     vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(fail),
   ];
 
-  return () => {
+  onTestFinished(() => {
     for (const spy of spies) {
       spy.mockRestore();
     }
-  };
+  });
 }

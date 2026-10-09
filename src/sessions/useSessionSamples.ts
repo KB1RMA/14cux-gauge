@@ -15,8 +15,7 @@ export type SessionSamples =
  * being recorded gives what has been saved so far.
  */
 export function useSessionSamples(id: string): SessionSamples {
-  const { persistent, read } = useSessions();
-  const opened = persistent !== undefined;
+  const { opened, read } = useSessions();
   const [result, setResult] = useState<{
     id: string;
     samples: SessionSamples;

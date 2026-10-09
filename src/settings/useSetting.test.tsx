@@ -61,14 +61,48 @@ describe('useSetting', () => {
     });
 
     expect(result.current[0].window).toBe(30);
-    expect(localStorage.getItem('cuxGauge.graphs')).toBe(
-      '{"window":30,"layout":"stacked","hidden":[]}',
-    );
     unmount();
 
+    // Saved: read back from storage once nothing holds it.
     const again = renderHook(() => useSetting('graphs'));
 
-    expect(again.result.current[0].layout).toBe('stacked');
+    expect(again.result.current[0]).toEqual({
+      window: 30,
+      layout: 'stacked',
+      hidden: [],
+    });
+  });
+
+  it('loads every setting an earlier version saved', () => {
+    // As earlier versions stored them, each under its own key.
+    localStorage.setItem(
+      'cuxGauge.preferences',
+      '{"temperatureUnit":"C","speedUnit":"kmh","theme":"dark","palette":"arles","usageCounts":"off"}',
+    );
+    localStorage.setItem('cuxGauge.readings', '{"off":["fuelTempF"]}');
+    localStorage.setItem('cuxGauge.graphs', '{"windowSeconds":600}');
+    localStorage.setItem('cuxGauge.doubleSpeed', 'true');
+
+    expect(
+      renderHook(() => useSetting('preferences')).result.current[0],
+    ).toEqual({
+      temperatureUnit: 'C',
+      speedUnit: 'kmh',
+      theme: 'dark',
+      palette: 'arles',
+      usageCounts: 'off',
+    });
+    expect(renderHook(() => useSetting('readings')).result.current[0]).toEqual({
+      off: ['fuelTempF'],
+    });
+    expect(renderHook(() => useSetting('graphs')).result.current[0]).toEqual({
+      window: 600,
+      layout: 'grid',
+      hidden: [],
+    });
+    expect(renderHook(() => useSetting('doubleSpeed')).result.current[0]).toBe(
+      true,
+    );
   });
 
   it('shares one value between every component using it', async () => {
@@ -142,7 +176,8 @@ describe('useSetting', () => {
 
   it('still changes while in use when storage is blocked', async () => {
     const user = userEvent.setup();
-    const restore = blockStorage();
+    blockStorage();
+
     const { unmount } = render(<WindowButton view="Live" />);
 
     await user.click(screen.getByRole('button', { name: 'Live: 60 s' }));
@@ -154,7 +189,6 @@ describe('useSetting', () => {
     render(<WindowButton view="Live" />);
 
     expect(screen.getByRole('button', { name: 'Live: 60 s' })).toBeVisible();
-    restore();
   });
 
   it('keeps a change storage has no room for, until storage changes', async () => {
@@ -168,10 +202,12 @@ describe('useSetting', () => {
         throw new DOMException('full', 'QuotaExceededError');
       });
 
+    onTestFinished(() => {
+      full.mockRestore();
+    });
     await user.click(screen.getByRole('button', { name: 'Live: 60 s' }));
 
     expect(screen.getByRole('button', { name: 'Live: 300 s' })).toBeVisible();
-    expect(localStorage.getItem('cuxGauge.graphs')).toBeNull();
 
     full.mockRestore();
     changeInAnotherWindow('cuxGauge.graphs', '{"window":30}');

@@ -55,6 +55,7 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
     [store, settled],
   );
   const persistent = storage?.persistent;
+  const opened = storage !== undefined;
   const value = useMemo<SessionsValue>(
     () => ({
       list:
@@ -62,9 +63,10 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
           ? { status: 'loaded', ...query.value }
           : query,
       persistent,
+      opened,
       ...actions,
     }),
-    [query, persistent, actions],
+    [query, persistent, opened, actions],
   );
 
   return <SessionsContext value={value}>{children}</SessionsContext>;

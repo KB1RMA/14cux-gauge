@@ -7,7 +7,6 @@ import {
   oneOf,
   parseRawSetting,
   readRawSetting,
-  removeSetting,
   writeSetting,
 } from './settings';
 
@@ -21,10 +20,6 @@ describe('settings', () => {
     expect(
       parseRawSetting(readRawSetting('graphs'), (s) => asRecord(s)['window']),
     ).toBe(300);
-
-    removeSetting('graphs');
-
-    expect(readRawSetting('graphs')).toBeNull();
   });
 
   it('gives the parser undefined when nothing, or nothing readable, is stored', () => {
@@ -44,14 +39,10 @@ describe('settings', () => {
   });
 
   it('works without storage', () => {
-    const restore = blockStorage();
+    blockStorage();
 
     expect(readRawSetting('window')).toBeUndefined();
     expect(writeSetting('window', 30)).toBeUndefined();
-    expect(() => {
-      removeSetting('window');
-    }).not.toThrow();
-    restore();
   });
 
   it('tells which changes in another window affect a setting', () => {

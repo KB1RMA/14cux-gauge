@@ -2,17 +2,6 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { SETTINGS } from './registry';
 
-describe('the settings registry', () => {
-  it('lists every stored setting under the key it is stored by', () => {
-    expect(Object.keys(SETTINGS)).toEqual([
-      'preferences',
-      'readings',
-      'graphs',
-      'doubleSpeed',
-    ]);
-  });
-});
-
 describe('preferences', () => {
   const parse = SETTINGS.preferences;
 
@@ -45,10 +34,18 @@ describe('preferences', () => {
   });
 
   it('keeps the default for values it does not recognise', () => {
+    const defaults = {
+      temperatureUnit: 'F',
+      speedUnit: 'mph',
+      theme: 'system',
+      palette: 'coniston',
+      usageCounts: 'on',
+    };
+
     expect(parse({ temperatureUnit: 'K', theme: 'sepia', palette: 3 })).toEqual(
-      parse(undefined),
+      defaults,
     );
-    expect(parse(['F'])).toEqual(parse(undefined));
+    expect(parse(['F'])).toEqual(defaults);
   });
 });
 

@@ -34,6 +34,8 @@ export interface SessionsValue {
    * and `undefined` while it is being opened.
    */
   persistent: boolean | undefined;
+  /** Whether storage has finished opening; `read` fails until it has. */
+  opened: boolean;
   /** Renames a session or changes its notes. */
   edit(id: string, changes: SessionChanges): Promise<void>;
   /** Deletes a session, readable or not, by its `id`. */
