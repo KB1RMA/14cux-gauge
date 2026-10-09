@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { Ecu, MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
+import { MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FaultCodes } from '../components/FaultCodes';
 import { FuelPumpTest } from '../components/FuelPumpTest';
 import { IdleAirControlTest } from '../components/IdleAirControlTest';
 import { LatencyTransport } from '../demo/latencyTransport';
+import type { EcuSession } from '../ecu/session';
 import { expectNoAxeViolations } from '../test-support/a11y';
+import { connectedSession } from '../test-support/ecuSession';
 import { notification } from '../test-support/notifications';
-import { snapshotAt } from '../test-support/snapshots';
 import { WriteHarness } from '../test-support/WriteHarness';
 
 const BLOCKED = 'Disabled while another write to the ECU runs: Fuel pump test.';
@@ -36,12 +37,8 @@ class ClosesAfterFirstClear extends SimulatedTransport {
   }
 }
 
-async function connect(transport: SimulatedTransport | LatencyTransport) {
-  const ecu = new Ecu(transport);
-
-  await ecu.connect();
-
-  return ecu;
+function connect(transport: SimulatedTransport | LatencyTransport) {
+  return connectedSession(transport);
 }
 
 function withFaults<T extends SimulatedTransport>(transport: T): T {
@@ -61,12 +58,12 @@ function faultBlock(transport: SimulatedTransport): number[] {
   ];
 }
 
-function Panels({ ecu }: { ecu: Ecu }) {
+function Panels({ session }: { session: EcuSession }) {
   return (
-    <WriteHarness ecu={ecu}>
-      <FaultCodes ecu={ecu} />
+    <WriteHarness session={session}>
+      <FaultCodes />
       <FuelPumpTest />
-      <IdleAirControlTest snapshot={snapshotAt(0)} />
+      <IdleAirControlTest />
     </WriteHarness>
   );
 }
@@ -83,9 +80,9 @@ describe('ECU writes', () => {
   it('disables every other write, and says why, while one runs', async () => {
     const user = userEvent.setup();
     const transport = withFaults(new SimulatedTransport());
-    const ecu = await connect(transport);
+    const { session } = await connect(transport);
 
-    render(<Panels ecu={ecu} />);
+    render(<Panels session={session} />);
     await user.click(
       screen.getByRole('button', { name: 'Run pump (continuous)' }),
     );
@@ -138,9 +135,9 @@ describe('ECU writes', () => {
   it('reports a write that fails part-way as possibly incomplete', async () => {
     const user = userEvent.setup();
     const transport = withFaults(new FailsAfterFirstClear());
-    const ecu = await connect(transport);
+    const { session } = await connect(transport);
 
-    render(<Panels ecu={ecu} />);
+    render(<Panels session={session} />);
     await user.click(screen.getByRole('button', { name: 'Clear fault codes' }));
     await user.click(
       within(screen.getByRole('alertdialog')).getByRole('button', {
@@ -168,9 +165,9 @@ describe('ECU writes', () => {
   it('reports a write as possibly incomplete when the link drops part-way', async () => {
     const user = userEvent.setup();
     const transport = withFaults(new ClosesAfterFirstClear());
-    const ecu = await connect(transport);
+    const { session } = await connect(transport);
 
-    render(<Panels ecu={ecu} />);
+    render(<Panels session={session} />);
     await user.click(screen.getByRole('button', { name: 'Clear fault codes' }));
     await user.click(
       within(screen.getByRole('alertdialog')).getByRole('button', {
@@ -189,9 +186,9 @@ describe('ECU writes', () => {
   it('says nothing was written when the connection had already closed', async () => {
     const user = userEvent.setup();
     const transport = new SimulatedTransport();
-    const ecu = await connect(transport);
+    const { session, ecu } = await connect(transport);
 
-    render(<Panels ecu={ecu} />);
+    render(<Panels session={session} />);
     await ecu.disconnect();
     await user.click(screen.getByRole('button', { name: 'Run test' }));
     await user.click(
@@ -214,11 +211,11 @@ describe('ECU writes', () => {
   it('keeps a write running, and its result, when the user leaves the view', async () => {
     const user = userEvent.setup();
     const transport = new SimulatedTransport();
-    const ecu = await connect(
+    const { session } = await connect(
       new LatencyTransport(transport, { perReadMs: 40, perByteMs: 0 }),
     );
 
-    render(<Panels ecu={ecu} />);
+    render(<Panels session={session} />);
     await user.click(screen.getByRole('button', { name: 'Run test' }));
     await user.click(
       within(screen.getByRole('alertdialog')).getByRole('button', {
@@ -251,9 +248,9 @@ describe('ECU writes', () => {
 
   it('forgets writes when the connection goes', async () => {
     const user = userEvent.setup();
-    const ecu = await connect(withFaults(new SimulatedTransport()));
+    const { session } = await connect(withFaults(new SimulatedTransport()));
 
-    render(<Panels ecu={ecu} />);
+    render(<Panels session={session} />);
     await user.click(screen.getByRole('button', { name: 'Clear fault codes' }));
     await user.click(
       within(screen.getByRole('alertdialog')).getByRole('button', {

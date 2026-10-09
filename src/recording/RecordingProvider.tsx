@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { recordedSource } from '../ecu/connect';
 import { useEcu } from '../ecu/useEcu';
+import { useEcuSession } from '../ecu/useEcuSession';
 import { useEcuWrite } from '../ecuWrite/useEcuWrite';
 import { defaultSessionName, describeStorageError } from '../sessions/format';
 import type { SessionSummary } from '../model/session';
@@ -28,6 +29,7 @@ interface Active {
  * ends, keeping what was recorded, or if saving fails.
  */
 export function RecordingProvider({ children }: { children: ReactNode }) {
+  const session = useEcuSession();
   const { state, onSnapshot } = useEcu();
   const { watch } = useEcuWrite();
   const store = useStorage()?.sessions;
@@ -66,6 +68,8 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
     }
   }, [finish]);
 
+  // Something else needs the link (see `LinkHolder.stopsRecording`). What
+  // was recorded is kept under its default name, with no prompt to rename it.
   const interrupt = useCallback(async () => {
     try {
       await finish();
@@ -73,6 +77,8 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
       setError(describeStorageError(cause));
     }
   }, [finish]);
+
+  useEffect(() => session.setRecordingStopper(interrupt), [session, interrupt]);
 
   const dismissFinished = useCallback(() => {
     setFinished(undefined);
@@ -146,18 +152,8 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
       start,
       stop,
       dismissFinished,
-      interrupt,
     }),
-    [
-      active,
-      canRecord,
-      error,
-      finished,
-      start,
-      stop,
-      dismissFinished,
-      interrupt,
-    ],
+    [active, canRecord, error, finished, start, stop, dismissFinished],
   );
 
   return <RecordingContext value={value}>{children}</RecordingContext>;

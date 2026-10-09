@@ -1,55 +1,66 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { Ecu } from '@kb1rma/libcomm14cux-ts';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import type { EcuLink } from '../ecu/session';
 import { useEcu } from '../ecu/useEcu';
+import { useEcuSession } from '../ecu/useEcuSession';
 import { useNotify } from '../notifications/useNotify';
 import { EcuWriteContext, type WriteHandle } from './context';
 import type { WriteId, WriteLogEntry, WriteOutcome } from '../model/write';
 import {
   failureOutcome,
   notConnectedOutcome,
+  performWrite,
+  WRITE_HOLDER,
   writeNotification,
+  type WriteRequest,
 } from './writes';
 
 interface Writes {
   /** The connection these outcomes belong to. */
-  ecu: Ecu | undefined;
+  link: EcuLink | undefined;
   outcomes: Partial<Record<WriteId, WriteOutcome>>;
   latest: WriteId | undefined;
 }
 
-const NONE: Writes = { ecu: undefined, outcomes: {}, latest: undefined };
+const NONE: Writes = { link: undefined, outcomes: {}, latest: undefined };
 
 /**
- * Tracks every write to the ECU, so only one runs at a time and each one's
- * outcome outlives the view that started it. A write belongs to the `Ecu` it
- * was sent to: a new or lost connection starts clean, and a write still
- * finishing on an old one neither blocks nor reports on the new one. Every
- * start and end is also a notification, which outlives the connection: the
- * user still needs to know how a write on a lost one ended. Watchers, such as
- * a recording, are told of every start and end too.
+ * Tracks every write to the ECU, and each one's outcome, which outlives the
+ * view that started it. A write holds the ECU session's link while it runs,
+ * so only one write runs at a time, and none while a ROM read has the link.
+ * A write belongs to the connection it was sent on: a new or lost connection
+ * starts clean, and a write still finishing on an old one neither blocks nor
+ * reports on the new one. Every start and end is also a notification, which
+ * outlives the connection: the user still needs to know how a write on a
+ * lost one ended. Watchers, such as a recording, are told of every start and
+ * end too.
  */
 export function EcuWriteProvider({ children }: { children: ReactNode }) {
-  const { ecu } = useEcu();
+  const session = useEcuSession();
+  const { link } = useEcu();
   const notify = useNotify();
   const [writes, setWrites] = useState<Writes>(NONE);
-  // Set synchronously, so two starts in one event cannot both get through.
-  const holderRef = useRef<{ ecu: Ecu; entry: WriteLogEntry } | undefined>(
-    undefined,
-  );
+  // The write running now, for watchers that start watching part-way.
+  const runningRef = useRef<
+    { link: EcuLink; entry: WriteLogEntry } | undefined
+  >(undefined);
   const watchersRef = useRef(new Set<(entry: WriteLogEntry) => void>());
-  const current = writes.ecu === ecu ? writes : NONE;
+  const current = writes.link === link ? writes : NONE;
   const latestOutcome = current.latest && current.outcomes[current.latest];
   const running =
     latestOutcome?.status === 'running' ? current.latest : undefined;
 
   const begin = useCallback(
     (id: WriteId): WriteHandle | undefined => {
-      if (!ecu || holderRef.current?.ecu === ecu) {
+      // Taken at once, so two starts in one event cannot both get through.
+      const lease = session.acquire(WRITE_HOLDER);
+
+      if (!lease) {
         return undefined;
       }
 
+      const on = lease.link;
       const entry: WriteLogEntry = {
         id: crypto.randomUUID(),
         write: id,
@@ -57,7 +68,7 @@ export function EcuWriteProvider({ children }: { children: ReactNode }) {
         endedAt: null,
         outcome: { status: 'running' },
       };
-      const token = { ecu, entry };
+      const token = { link: on, entry };
 
       const tell = (update: WriteLogEntry) => {
         for (const watcher of watchersRef.current) {
@@ -67,11 +78,11 @@ export function EcuWriteProvider({ children }: { children: ReactNode }) {
 
       let finished = false;
 
-      holderRef.current = token;
+      runningRef.current = token;
       setWrites((previous) => ({
-        ecu,
+        link: on,
         outcomes: {
-          ...(previous.ecu === ecu ? previous.outcomes : {}),
+          ...(previous.link === on ? previous.outcomes : {}),
           [id]: { status: 'running' },
         },
         latest: id,
@@ -80,24 +91,26 @@ export function EcuWriteProvider({ children }: { children: ReactNode }) {
       tell(entry);
 
       return {
-        ecu,
+        link: on,
+        ecu: lease.ecu,
         finish(outcome) {
           if (finished) {
             return;
           }
 
           finished = true;
+          lease.release();
 
-          if (holderRef.current === token) {
-            holderRef.current = undefined;
+          if (runningRef.current === token) {
+            runningRef.current = undefined;
           }
 
           notify(writeNotification(id, outcome));
           tell({ ...entry, endedAt: Date.now(), outcome });
           setWrites((previous) =>
-            previous.ecu === ecu
+            previous.link === on
               ? {
-                  ecu,
+                  link: on,
                   outcomes: { ...previous.outcomes, [id]: outcome },
                   latest: id,
                 }
@@ -106,11 +119,12 @@ export function EcuWriteProvider({ children }: { children: ReactNode }) {
         },
       };
     },
-    [ecu, notify],
+    [session, notify],
   );
 
   const run = useCallback(
-    async (id: WriteId, task: (ecu: Ecu) => Promise<string>) => {
+    async (request: WriteRequest) => {
+      const { id } = request;
       const handle = begin(id);
 
       if (!handle) {
@@ -126,7 +140,10 @@ export function EcuWriteProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        handle.finish({ status: 'done', message: await task(handle.ecu) });
+        handle.finish({
+          status: 'done',
+          message: await performWrite(handle.ecu, request),
+        });
 
         return true;
       } catch (error) {
@@ -140,9 +157,9 @@ export function EcuWriteProvider({ children }: { children: ReactNode }) {
 
   const watch = useCallback(
     (watcher: (entry: WriteLogEntry) => void) => {
-      const holder = holderRef.current;
+      const holder = runningRef.current;
 
-      if (holder && holder.ecu === ecu) {
+      if (holder && holder.link === session.getSnapshot().link) {
         watcher(holder.entry);
       }
 
@@ -152,7 +169,7 @@ export function EcuWriteProvider({ children }: { children: ReactNode }) {
         watchersRef.current.delete(watcher);
       };
     },
-    [ecu],
+    [session],
   );
 
   const value = useMemo(

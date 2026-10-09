@@ -2,9 +2,9 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Ecu, MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
+import { MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { expectNoAxeViolations } from '../test-support/a11y';
-import { snapshotAt } from '../test-support/snapshots';
+import { connectedSession } from '../test-support/ecuSession';
 import { WriteHarness } from '../test-support/WriteHarness';
 import { IdleAirControlTest } from './IdleAirControlTest';
 
@@ -12,14 +12,13 @@ async function setup(bits = 0b1010_1010) {
   const transport = new SimulatedTransport();
 
   transport.memory[MemoryOffset.Bits008A] = bits;
+  // 180 counts is fully closed: (180 - 90) / 180 is half open.
+  transport.memory[MemoryOffset.IdleBypassPosition] = 90;
 
-  const ecu = new Ecu(transport);
-
-  await ecu.connect();
-
+  const { session } = await connectedSession(transport);
   const ui = (
-    <WriteHarness ecu={ecu}>
-      <IdleAirControlTest snapshot={snapshotAt(0, { idleBypass: 0.5 })} />
+    <WriteHarness session={session}>
+      <IdleAirControlTest />
     </WriteHarness>
   );
 

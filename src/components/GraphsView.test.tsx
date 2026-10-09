@@ -7,6 +7,7 @@ import { EcuProvider } from '../ecu/EcuProvider';
 import { SampleHistory } from '../history/sampleHistory';
 import { METRIC_KEYS } from '../metrics';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
+import { ReadingsProvider } from '../readings/ReadingsProvider';
 import { expectNoAxeViolations } from '../test-support/a11y';
 import { GraphsView } from './GraphsView';
 
@@ -14,7 +15,9 @@ function renderGraphs() {
   return render(
     <PreferencesProvider>
       <EcuProvider>
-        <GraphsView />
+        <ReadingsProvider>
+          <GraphsView />
+        </ReadingsProvider>
       </EcuProvider>
     </PreferencesProvider>,
   );
@@ -135,9 +138,11 @@ describe('GraphsView', () => {
     render(
       <PreferencesProvider>
         <EcuProvider>
-          <HistoryContext value={history}>
-            <GraphsView />
-          </HistoryContext>
+          <ReadingsProvider>
+            <HistoryContext value={history}>
+              <GraphsView />
+            </HistoryContext>
+          </ReadingsProvider>
         </EcuProvider>
       </PreferencesProvider>,
     );

@@ -2,22 +2,21 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Ecu, MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
+import { MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { expectNoAxeViolations } from '../test-support/a11y';
+import { connectedSession } from '../test-support/ecuSession';
 import { WriteHarness } from '../test-support/WriteHarness';
 import { FaultCodes } from './FaultCodes';
 
-async function ecuWithFaults() {
+async function sessionWithFaults() {
   const transport = new SimulatedTransport();
 
   transport.memory[MemoryOffset.FaultCodes] = 0x02; // lambda sensor, odd bank
   transport.memory[MemoryOffset.FaultCodes + 1] = 0x80; // purge valve leak
 
-  const ecu = new Ecu(transport);
+  const { session } = await connectedSession(transport);
 
-  await ecu.connect();
-
-  return { transport, ecu };
+  return { transport, session };
 }
 
 function faultBlock(transport: SimulatedTransport): number[] {
@@ -32,11 +31,11 @@ function faultBlock(transport: SimulatedTransport): number[] {
 describe('FaultCodes', () => {
   it('lists the active fault codes on demand', async () => {
     const user = userEvent.setup();
-    const { ecu } = await ecuWithFaults();
+    const { session } = await sessionWithFaults();
 
     render(
-      <WriteHarness ecu={ecu}>
-        <FaultCodes ecu={ecu} />
+      <WriteHarness session={session}>
+        <FaultCodes />
       </WriteHarness>,
     );
 
@@ -56,11 +55,11 @@ describe('FaultCodes', () => {
 
   it('clears the codes in ECU memory only after confirmation', async () => {
     const user = userEvent.setup();
-    const { transport, ecu } = await ecuWithFaults();
+    const { transport, session } = await sessionWithFaults();
 
     render(
-      <WriteHarness ecu={ecu}>
-        <FaultCodes ecu={ecu} />
+      <WriteHarness session={session}>
+        <FaultCodes />
       </WriteHarness>,
     );
 
@@ -93,11 +92,11 @@ describe('FaultCodes', () => {
 
   it('cancels the confirmation with Escape', async () => {
     const user = userEvent.setup();
-    const { transport, ecu } = await ecuWithFaults();
+    const { transport, session } = await sessionWithFaults();
 
     render(
-      <WriteHarness ecu={ecu}>
-        <FaultCodes ecu={ecu} />
+      <WriteHarness session={session}>
+        <FaultCodes />
       </WriteHarness>,
     );
     await user.click(screen.getByRole('button', { name: 'Clear fault codes' }));
@@ -116,11 +115,11 @@ describe('FaultCodes', () => {
 
   it('returns focus to the button that opened the confirmation', async () => {
     const user = userEvent.setup();
-    const { ecu } = await ecuWithFaults();
+    const { session } = await sessionWithFaults();
 
     render(
-      <WriteHarness ecu={ecu}>
-        <FaultCodes ecu={ecu} />
+      <WriteHarness session={session}>
+        <FaultCodes />
       </WriteHarness>,
     );
 
@@ -134,10 +133,10 @@ describe('FaultCodes', () => {
 
   it('has no detectable accessibility violations with codes listed and the dialog open', async () => {
     const user = userEvent.setup();
-    const { ecu } = await ecuWithFaults();
+    const { session } = await sessionWithFaults();
     const { container } = render(
-      <WriteHarness ecu={ecu}>
-        <FaultCodes ecu={ecu} />
+      <WriteHarness session={session}>
+        <FaultCodes />
       </WriteHarness>,
     );
 
@@ -150,12 +149,12 @@ describe('FaultCodes', () => {
 
   it('shows an error when the ECU does not answer', async () => {
     const user = userEvent.setup();
-    const { transport, ecu } = await ecuWithFaults();
+    const { transport, session } = await sessionWithFaults();
 
     transport.silent = true;
     render(
-      <WriteHarness ecu={ecu}>
-        <FaultCodes ecu={ecu} />
+      <WriteHarness session={session}>
+        <FaultCodes />
       </WriteHarness>,
     );
     await user.click(screen.getByRole('button', { name: 'Read fault codes' }));

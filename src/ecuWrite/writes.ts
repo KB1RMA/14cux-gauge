@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { NotConnectedError } from '@kb1rma/libcomm14cux-ts';
+import { NotConnectedError, type Ecu } from '@kb1rma/libcomm14cux-ts';
 import { describeError } from '../ecu/errors';
+import type { LinkHolder } from '../ecu/session';
 import type { FinishedOutcome, WriteId, WriteOutcome } from '../model/write';
 import type { NotificationInput } from '../notifications/context';
 
@@ -40,6 +41,46 @@ export const WRITES: Record<WriteId, WriteText> = {
     partial: 'The fuel pump test stopped and may have partly run',
   },
 };
+
+/**
+ * How a write holds the link: polling carries on beside it, as does any
+ * recording, which keeps the write in its log.
+ */
+export const WRITE_HOLDER: LinkHolder = {
+  kind: 'write',
+  pausesPolling: false,
+  stopsRecording: false,
+};
+
+export type IdleAirDirection = 'open' | 'close';
+
+/** A one-off write and what it needs; the fuel pump test repeats instead. */
+export type WriteRequest =
+  | { id: 'clearFaultCodes' }
+  | { id: 'idleAirControl'; direction: IdleAirDirection; steps: number };
+
+/** Makes a one-off write's ECU calls; settles with the sentence for success. */
+export async function performWrite(
+  ecu: Ecu,
+  request: WriteRequest,
+): Promise<string> {
+  switch (request.id) {
+    case 'clearFaultCodes':
+      await ecu.clearFaultCodes();
+
+      return 'Fault codes cleared.';
+
+    case 'idleAirControl': {
+      const { direction, steps } = request;
+
+      // The library writes the direction bit before the step count, so a
+      // failure part-way through can leave the ECU changed.
+      await ecu.driveIdleAirControlMotor(direction === 'open' ? 0 : 1, steps);
+
+      return `Commanded ${steps} ${steps === 1 ? 'step' : 'steps'} ${direction}.`;
+    }
+  }
+}
 
 /**
  * The outcome of a write that was refused because the connection had already

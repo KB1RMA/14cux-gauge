@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { useId, type ReactNode } from 'react';
+import { useLiveSample } from '../ecu/useLiveData';
 import type { LiveSnapshot } from '../model/snapshot';
 import {
   formatSample,
@@ -30,18 +31,17 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 
 function MetricTile({
   metric,
-  snapshot,
+  sample,
 }: {
   metric: Metric;
-  snapshot: LiveSnapshot | undefined;
+  /** In library units; `null` is an invalid reading, `undefined` no data yet. */
+  sample: number | null | undefined;
 }) {
   const units = usePreferences();
-  const sample = snapshot ? sampleOf(snapshot, metric.key) : undefined;
 
   return (
     <Tile
       label={metric.label}
-      // `null` is an invalid reading, `undefined` no data yet.
       value={
         sample === null || sample === undefined
           ? sample
@@ -63,13 +63,17 @@ function MetricTile({
   );
 }
 
-/** A tile for each metric in `keys` (all by default), in sections by group. */
-export function LiveTiles({
-  snapshot,
-  keys = METRIC_KEYS,
+/** A tile that follows its own reading, so it changes only when that does. */
+function PolledTile({ metric }: { metric: Metric }) {
+  return <MetricTile metric={metric} sample={useLiveSample(metric.key)} />;
+}
+
+function TileGroups({
+  keys,
+  tile,
 }: {
-  snapshot: LiveSnapshot | undefined;
-  keys?: readonly MetricKey[];
+  keys: readonly MetricKey[];
+  tile(metric: Metric): ReactNode;
 }) {
   return (
     <div className={styles['groups']}>
@@ -80,16 +84,49 @@ export function LiveTiles({
 
         return metrics.length === 0 ? null : (
           <Group key={group.id} title={group.title}>
-            {metrics.map((metric) => (
-              <MetricTile
-                key={metric.key}
-                metric={metric}
-                snapshot={snapshot}
-              />
-            ))}
+            {metrics.map(tile)}
           </Group>
         );
       })}
     </div>
+  );
+}
+
+/**
+ * A tile for each metric in `keys` (all by default), in sections by group,
+ * showing the live readings.
+ */
+export function LiveTiles({
+  keys = METRIC_KEYS,
+}: {
+  keys?: readonly MetricKey[];
+}) {
+  return (
+    <TileGroups
+      keys={keys}
+      tile={(metric) => <PolledTile key={metric.key} metric={metric} />}
+    />
+  );
+}
+
+/** Like `LiveTiles`, showing the readings in `snapshot`, as replay does. */
+export function SnapshotTiles({
+  snapshot,
+  keys = METRIC_KEYS,
+}: {
+  snapshot: LiveSnapshot | undefined;
+  keys?: readonly MetricKey[];
+}) {
+  return (
+    <TileGroups
+      keys={keys}
+      tile={(metric) => (
+        <MetricTile
+          key={metric.key}
+          metric={metric}
+          sample={snapshot ? sampleOf(snapshot, metric.key) : undefined}
+        />
+      )}
+    />
   );
 }

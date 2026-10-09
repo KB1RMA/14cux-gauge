@@ -21,11 +21,6 @@ export interface RecordingValue {
   /** Stops recording and sets {@link finished}. */
   stop(): Promise<void>;
   dismissFinished(): void;
-  /**
-   * Stops recording because something else needs the link. What was
-   * recorded is kept under its default name, with no prompt to rename it.
-   */
-  interrupt(): Promise<void>;
 }
 
 export const RecordingContext = createContext<RecordingValue | undefined>(

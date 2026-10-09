@@ -27,10 +27,11 @@ export function WriteResult({ id }: { id: WriteId }) {
 }
 
 /**
- * Says why a write's controls are disabled while a different write runs.
- * Point the disabled controls' `aria-describedby` at `noteId`.
+ * Says why controls that use the link are disabled while a write runs: a
+ * write other than `id`, or any write when there is no `id` (as for the ROM
+ * read). Point the disabled controls' `aria-describedby` at `noteId`.
  */
-export function WriteBlocked({ id, noteId }: { id: WriteId; noteId: string }) {
+export function WriteBlocked({ id, noteId }: { id?: WriteId; noteId: string }) {
   const { running } = useEcuWrite();
 
   if (running === undefined || running === id) {
@@ -39,7 +40,8 @@ export function WriteBlocked({ id, noteId }: { id: WriteId; noteId: string }) {
 
   return (
     <p id={noteId} className={styles['muted']}>
-      Disabled while another write to the ECU runs: {WRITES[running].name}.
+      Disabled while {id ? 'another' : 'a'} write to the ECU runs:{' '}
+      {WRITES[running].name}.
     </p>
   );
 }

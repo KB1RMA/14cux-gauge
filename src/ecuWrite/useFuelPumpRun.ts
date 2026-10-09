@@ -51,7 +51,7 @@ export function useFuelPumpRun(): {
   start(mode: PumpMode): void;
   stop(): void;
 } {
-  const { ecu } = useEcu();
+  const { link } = useEcu();
   const { begin } = useEcuWrite();
   const [pumpRun, setPumpRun] = useState<PumpRun | undefined>(undefined);
   // What a continuous run ending from outside its own loop reports.
@@ -59,13 +59,13 @@ export function useFuelPumpRun(): {
   // The connection as of this commit. A layout effect updates it before the
   // run's cleanup below runs, so the cleanup can tell a closed connection
   // from leaving the view.
-  const ecuRef = useRef(ecu);
+  const linkRef = useRef(link);
   // A run belongs to its connection: a new or lost one stops it.
-  const live = pumpRun && pumpRun.handle.ecu === ecu ? pumpRun : undefined;
+  const live = pumpRun && pumpRun.handle.link === link ? pumpRun : undefined;
 
   useLayoutEffect(() => {
-    ecuRef.current = ecu;
-  }, [ecu]);
+    linkRef.current = link;
+  }, [link]);
 
   useEffect(() => {
     if (!live) {
@@ -171,7 +171,7 @@ export function useFuelPumpRun(): {
       // closed did not end as asked, so it is an error.
       if (!continuous) {
         release({ status: 'done', message: STOPPED });
-      } else if (ecuRef.current === handle.ecu) {
+      } else if (linkRef.current === handle.link) {
         release({ status: 'done', message: stopMessageRef.current });
       } else {
         release(

@@ -6,7 +6,7 @@ import { Gear } from '@kb1rma/libcomm14cux-ts';
 import type { LiveSnapshot } from '../model/snapshot';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { expectNoAxeViolations, readingFor } from '../test-support/a11y';
-import { LiveTiles } from './LiveTiles';
+import { SnapshotTiles } from './LiveTiles';
 import { PreferencesMenu } from './PreferencesMenu';
 
 const SNAPSHOT: LiveSnapshot = {
@@ -37,7 +37,7 @@ function renderWithTiles() {
   return render(
     <PreferencesProvider>
       <PreferencesMenu />
-      <LiveTiles snapshot={SNAPSHOT} />
+      <SnapshotTiles snapshot={SNAPSHOT} />
     </PreferencesProvider>,
   );
 }

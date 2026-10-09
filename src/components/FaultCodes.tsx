@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type {
-  Ecu,
-  FaultCodeName,
-  FaultCodes as FaultCodeFlags,
-} from '@kb1rma/libcomm14cux-ts';
 import { useCallback, useId, useState } from 'react';
-import { describeError } from '../ecu/errors';
+import {
+  readFaultCodes,
+  type FaultCodeFlags,
+  type FaultCodeName,
+} from '../ecu/reads';
+import { useEcuRead } from '../ecu/useEcuRead';
 import { useEcuWrite } from '../ecuWrite/useEcuWrite';
 import { ConfirmDialog } from './ConfirmDialog';
 import styles from './Panel.module.css';
@@ -45,38 +45,21 @@ function activeFaults(codes: FaultCodeFlags): FaultCodeName[] {
   );
 }
 
-export function FaultCodes({ ecu }: { ecu: Ecu }) {
+export function FaultCodes() {
   const writes = useEcuWrite();
   const blockedId = useId();
-  const [faults, setFaults] = useState<FaultCodeName[] | undefined>(undefined);
-  const [reading, setReading] = useState(false);
-  const [error, setError] = useState<string | undefined>(undefined);
+  const { value, reading, error, read, clearError } =
+    useEcuRead(readFaultCodes);
+  const faults = value && activeFaults(value);
   const [confirming, setConfirming] = useState(false);
   const clearing = writes.running === 'clearFaultCodes';
   const blocked = writes.running !== undefined && !clearing;
 
-  const read = useCallback(async () => {
-    setReading(true);
-    setError(undefined);
-
-    try {
-      setFaults(activeFaults(await ecu.getFaultCodes()));
-    } catch (e) {
-      setError(describeError(e));
-    } finally {
-      setReading(false);
-    }
-  }, [ecu]);
-
   const clear = async () => {
     setConfirming(false);
-    setError(undefined);
+    clearError();
 
-    const cleared = await writes.run('clearFaultCodes', async (target) => {
-      await target.clearFaultCodes();
-
-      return 'Fault codes cleared.';
-    });
+    const cleared = await writes.run({ id: 'clearFaultCodes' });
 
     if (cleared) {
       await read();

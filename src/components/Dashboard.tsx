@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { Ecu } from '@kb1rma/libcomm14cux-ts';
 import { Tabs } from 'radix-ui';
 import { useEffect, useRef } from 'react';
-import { useLiveData } from '../ecu/useLiveData';
 import { useReadings } from '../readings/useReadings';
 import { LIVE_TAB_PATHS, type LiveTab } from '../routing/paths';
 import { useNavigateOnce } from '../routing/useNavigateOnce';
@@ -19,9 +17,8 @@ import { ReadingsPicker } from './ReadingsPicker';
 import styles from './Dashboard.module.css';
 
 /** The live views; which one is showing is part of the address. */
-export function Dashboard({ ecu, tab }: { ecu: Ecu; tab: LiveTab }) {
+export function Dashboard({ tab }: { tab: LiveTab }) {
   const navigate = useNavigateOnce();
-  const { snapshot } = useLiveData();
   const { chosen } = useReadings();
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -70,13 +67,13 @@ export function Dashboard({ ecu, tab }: { ecu: Ecu; tab: LiveTab }) {
             </h2>
             <ReadingsPicker />
           </div>
-          <LiveTiles snapshot={snapshot} keys={chosen} />
+          <LiveTiles keys={chosen} />
         </section>
         <aside className={styles['side']}>
-          <FaultCodes ecu={ecu} />
+          <FaultCodes />
           <FuelPumpTest />
-          <IdleAirControlTest snapshot={snapshot} />
-          <EcuInfo ecu={ecu} />
+          <IdleAirControlTest />
+          <EcuInfo />
           <RomImages />
         </aside>
       </Tabs.Content>
@@ -105,7 +102,7 @@ export function Dashboard({ ecu, tab }: { ecu: Ecu; tab: LiveTab }) {
           >
             Fuel map
           </h2>
-          <FuelMapView ecu={ecu} snapshot={snapshot} />
+          <FuelMapView />
         </section>
       </Tabs.Content>
     </Tabs.Root>

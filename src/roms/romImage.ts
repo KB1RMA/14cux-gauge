@@ -6,11 +6,23 @@ import {
   ReadCancelledError,
   type Ecu,
 } from '@kb1rma/libcomm14cux-ts';
+import type { LinkHolder } from '../ecu/session';
 import type { RecordedSource } from '../model/source';
 import { hex } from '../hex';
 
 /** Length of the ROM image in bytes. */
 export const ROM_SIZE: number = DataSize.ROM;
+
+/**
+ * How a ROM read holds the link. It takes about half a minute, with nothing
+ * else on the link, so polling pauses; a recording would have a gap that
+ * replay could draw across, so it ends first.
+ */
+export const ROM_READ_HOLDER: LinkHolder = {
+  kind: 'romRead',
+  pausesPolling: true,
+  stopsRecording: true,
+};
 
 /** Bytes read per request: 64 steps, so progress moves smoothly. */
 const BLOCK_SIZE = 256;
@@ -50,6 +62,37 @@ export async function readRomImage(
   }
 
   return image;
+}
+
+export interface RomRead {
+  tuneNumber: number;
+  tuneIdent: number;
+  bytes: Uint8Array;
+}
+
+/**
+ * Reads the tune revision, which names the image, then the image itself.
+ *
+ * @throws {ReadCancelledError} if `isCancelled` returned true.
+ */
+export async function readRom(
+  ecu: Ecu,
+  options: ReadRomOptions,
+): Promise<RomRead> {
+  const { tuneNumber, tuneIdent } = await ecu.getTuneRevision();
+  const bytes = await readRomImage(ecu, options);
+
+  return { tuneNumber, tuneIdent, bytes };
+}
+
+/** Stops a ROM read in progress after the block in flight. */
+export function cancelRomRead(ecu: Ecu): void {
+  ecu.cancelRead();
+}
+
+/** Whether `error` is a read stopped by `cancelRomRead` or `isCancelled`. */
+export function isRomReadCancelled(error: unknown): boolean {
+  return error instanceof ReadCancelledError;
 }
 
 /**

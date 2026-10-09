@@ -1,45 +1,45 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { Ecu, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
+import { MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { act, renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { EcuContext } from '../ecu/contexts';
+import { EcuProvider } from '../ecu/EcuProvider';
+import type { EcuSession } from '../ecu/session';
 import { NotificationsProvider } from '../notifications/NotificationsProvider';
-import { ecuContextValue } from '../test-support/ecuContext';
+import { ROM_READ_HOLDER } from '../roms/romImage';
+import { firstSnapshot, sessionOver } from '../test-support/ecuSession';
 import { EcuWriteProvider } from './EcuWriteProvider';
 import { useEcuWrite } from './useEcuWrite';
 
-async function connected() {
-  const ecu = new Ecu(new SimulatedTransport());
+/** A transport whose ECU has two fault codes stored. */
+function withFaults(): SimulatedTransport {
+  const transport = new SimulatedTransport();
 
-  await ecu.connect();
+  transport.memory[MemoryOffset.FaultCodes] = 0x02;
+  transport.memory[MemoryOffset.FaultCodes + 1] = 0x80;
 
-  return ecu;
+  return transport;
 }
 
-/**
- * The hook inside a provider connected to `ecu`; `reconnect` swaps the
- * connection, as a new or lost one does.
- */
-function renderWrites(ecu: Ecu | undefined) {
-  let current = ecu;
-  const rendered = renderHook(() => useEcuWrite(), {
+/** The hook inside a provider on `session`. */
+function renderWrites(session: EcuSession) {
+  return renderHook(() => useEcuWrite(), {
     wrapper: ({ children }: { children: ReactNode }) => (
       <NotificationsProvider>
-        <EcuContext value={ecuContextValue(current)}>
+        <EcuProvider session={session}>
           <EcuWriteProvider>{children}</EcuWriteProvider>
-        </EcuContext>
+        </EcuProvider>
       </NotificationsProvider>
     ),
   });
+}
 
-  return {
-    result: rendered.result,
-    reconnect(next: Ecu | undefined) {
-      current = next;
-      rendered.rerender();
-    },
-  };
+/** Connects `session` again, as a new or lost connection does. */
+async function connect(session: EcuSession) {
+  await act(async () => {
+    await session.connect({ kind: 'demo' });
+    await firstSnapshot(session);
+  });
 }
 
 describe('useEcuWrite', () => {
@@ -52,29 +52,31 @@ describe('useEcuWrite', () => {
   });
 
   it('starts nothing without a connection', async () => {
-    const { result } = renderWrites(undefined);
+    const transport = withFaults();
+    const { session } = sessionOver([transport]);
+    const { result } = renderWrites(session);
 
     expect(result.current.begin('fuelPump')).toBeUndefined();
 
     let ran = true;
 
     await act(async () => {
-      ran = await result.current.run('clearFaultCodes', () =>
-        Promise.resolve('Fault codes cleared.'),
-      );
+      ran = await result.current.run({ id: 'clearFaultCodes' });
     });
 
     expect(ran).toBe(false);
     expect(result.current.running).toBeUndefined();
     expect(result.current.outcomes).toEqual({});
+    expect(transport.memory[MemoryOffset.FaultCodes]).toBe(0x02);
   });
 
   it('refuses a second write until the first finishes', async () => {
-    const ecu = await connected();
-    const { result } = renderWrites(ecu);
-    const task = vi.fn(() => Promise.resolve('Fault codes cleared.'));
+    const transport = withFaults();
+    const { session } = sessionOver([transport]);
+    const { result } = renderWrites(session);
     let first: ReturnType<typeof result.current.begin>;
 
+    await connect(session);
     act(() => {
       first = result.current.begin('fuelPump');
     });
@@ -85,11 +87,11 @@ describe('useEcuWrite', () => {
     let ran = true;
 
     await act(async () => {
-      ran = await result.current.run('clearFaultCodes', task);
+      ran = await result.current.run({ id: 'clearFaultCodes' });
     });
 
     expect(ran).toBe(false);
-    expect(task).not.toHaveBeenCalled();
+    expect(transport.memory[MemoryOffset.FaultCodes]).toBe(0x02);
 
     act(() => {
       first?.finish({ status: 'done', message: 'Fuel pump stopped.' });
@@ -103,23 +105,63 @@ describe('useEcuWrite', () => {
     });
 
     await act(async () => {
-      ran = await result.current.run('clearFaultCodes', task);
+      ran = await result.current.run({ id: 'clearFaultCodes' });
     });
 
     expect(ran).toBe(true);
     expect(result.current.latest).toBe('clearFaultCodes');
+    expect(transport.memory[MemoryOffset.FaultCodes]).toBe(0);
+  });
+
+  it('starts nothing while a ROM read holds the link', async () => {
+    const transport = withFaults();
+    const { session } = sessionOver([transport]);
+    const { result } = renderWrites(session);
+
+    await connect(session);
+
+    const romRead = session.acquire(ROM_READ_HOLDER);
+
+    await act(async () => {
+      await romRead?.ready;
+    });
+
+    expect(result.current.begin('fuelPump')).toBeUndefined();
+
+    let ran = true;
+
+    await act(async () => {
+      ran = await result.current.run({ id: 'clearFaultCodes' });
+    });
+
+    expect(ran).toBe(false);
+    expect(result.current.outcomes).toEqual({});
+    expect(transport.memory[MemoryOffset.FaultCodes]).toBe(0x02);
+
+    act(() => {
+      romRead?.release();
+    });
+    await act(async () => {
+      ran = await result.current.run({ id: 'clearFaultCodes' });
+    });
+
+    expect(ran).toBe(true);
+    expect(transport.memory[MemoryOffset.FaultCodes]).toBe(0);
   });
 
   it('lets a write on an old connection neither block nor report on a new one', async () => {
-    const old = await connected();
-    const next = await connected();
-    const { result, reconnect } = renderWrites(old);
+    const { session } = sessionOver([
+      new SimulatedTransport(),
+      new SimulatedTransport(),
+    ]);
+    const { result } = renderWrites(session);
     let stale: ReturnType<typeof result.current.begin>;
 
+    await connect(session);
     act(() => {
       stale = result.current.begin('idleAirControl');
     });
-    reconnect(next);
+    await connect(session);
 
     expect(result.current.running).toBeUndefined();
 
@@ -129,7 +171,8 @@ describe('useEcuWrite', () => {
       fresh = result.current.begin('fuelPump');
     });
 
-    expect(fresh?.ecu).toBe(next);
+    expect(fresh?.link).toBe(session.getSnapshot().link);
+    expect(fresh?.link).not.toBe(stale?.link);
 
     act(() => {
       stale?.finish({ status: 'done', message: 'Commanded 10 steps open.' });
@@ -144,11 +187,14 @@ describe('useEcuWrite', () => {
   });
 
   it('tells watchers of each start and end, starting with the write running now', async () => {
-    const old = await connected();
-    const next = await connected();
-    const { result, reconnect } = renderWrites(old);
+    const { session } = sessionOver([
+      new SimulatedTransport(),
+      new SimulatedTransport(),
+    ]);
+    const { result } = renderWrites(session);
     let pump: ReturnType<typeof result.current.begin>;
 
+    await connect(session);
     vi.spyOn(Date, 'now').mockReturnValue(1000);
     act(() => {
       pump = result.current.begin('fuelPump');
@@ -187,7 +233,8 @@ describe('useEcuWrite', () => {
 
     // A write still running on an old connection is not offered to a new
     // watcher.
-    reconnect(next);
+    vi.mocked(Date.now).mockRestore();
+    await connect(session);
 
     const later = vi.fn();
 
