@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { IDBFactory } from 'fake-indexeddb';
-import type { WriteLogEntry } from '../ecuWrite/writes';
+import type { WriteLogEntry } from '../model/write';
+import { InvalidRecordError } from '../model/record';
 import { snapshotAt } from '../test-support/snapshots';
+import { plantRecords } from '../test-support/storedRecords';
+import { openDatabase } from './database';
 import { IndexedDbSessionStore } from './indexedDbSessionStore';
 import { openSessionStore } from './openSessionStore';
 import {
@@ -72,6 +75,7 @@ describe.each(backends)('%s', (_name, open) => {
     });
     expect(await store.get(session.id)).toEqual(session);
     expect(await store.readSamples(session.id)).toEqual([]);
+    expect(await store.listUnreadable()).toEqual([]);
   });
 
   it('keeps appended samples in order and counts them', async () => {
@@ -403,5 +407,194 @@ describe('openSessionStore', () => {
     const blocked = await openSessionStore(factory);
 
     expect(blocked.store).toBeInstanceOf(MemorySessionStore);
+  });
+});
+
+describe.each(backends)('%s precision', (_name, open) => {
+  it('keeps samples and writes exactly as given, in library units', async () => {
+    const store = await open();
+    const { id } = await store.create({
+      name: 'Precision',
+      source: 'serial',
+      startedAt: 1,
+    });
+    const sample = snapshotAt(1_700_000_000_123, {
+      throttle: 0.123456789012,
+      mainVoltage: 13.987654321,
+      coolantTempF: 191.0625,
+      lambdaShortOdd: -0.0078125,
+      engineRpm: null,
+    });
+
+    await store.append(id, [sample, { timestamp: 1_700_000_000_300 }]);
+    await store.putWrite(id, PUMP_STOPPED);
+
+    expect(await store.readSamples(id)).toEqual([
+      sample,
+      { timestamp: 1_700_000_000_300 },
+    ]);
+    expect(await store.readWrites(id)).toEqual([PUMP_STOPPED]);
+    store.close();
+  });
+});
+
+describe('IndexedDbSessionStore stored records', () => {
+  const GOOD = {
+    id: 'good',
+    name: 'Good',
+    source: 'serial',
+    startedAt: 10,
+    endedAt: 20,
+    sampleCount: 0,
+    notes: '',
+    formatVersion: 3,
+  };
+
+  it('lists a damaged session apart, rejects reading it, and deletes it', async () => {
+    const factory = new IDBFactory();
+
+    await plantRecords(factory, {
+      sessions: [GOOD, { ...GOOD, id: 'damaged', name: 42 }],
+    });
+
+    const store = await IndexedDbSessionStore.open({ factory });
+
+    expect((await store.list()).map(({ id }) => id)).toEqual(['good']);
+    expect(await store.listUnreadable()).toEqual([
+      {
+        id: 'damaged',
+        detail: 'name: Invalid input',
+      },
+    ]);
+    await expect(store.get('damaged')).rejects.toThrow(InvalidRecordError);
+    await expect(store.readSamples('damaged')).rejects.toThrow(
+      InvalidRecordError,
+    );
+
+    await store.remove('damaged');
+
+    expect(await store.listUnreadable()).toEqual([]);
+    store.close();
+  });
+
+  it('lists a session from a newer version of the app apart', async () => {
+    const factory = new IDBFactory();
+
+    await plantRecords(factory, {
+      sessions: [GOOD, { ...GOOD, id: 'newer', formatVersion: 4 }],
+    });
+
+    const store = await IndexedDbSessionStore.open({ factory });
+
+    expect((await store.list()).map(({ id }) => id)).toEqual(['good']);
+    expect(await store.listUnreadable()).toEqual([
+      {
+        id: 'newer',
+        detail: 'format 4 is from a newer version of the app',
+      },
+    ]);
+    await expect(store.update('newer', { name: 'Renamed' })).rejects.toThrow(
+      'The stored session could not be read: format 4 is from a newer version of the app',
+    );
+    store.close();
+  });
+
+  it('rejects damaged samples and writes rather than passing them on', async () => {
+    const factory = new IDBFactory();
+
+    await plantRecords(factory, {
+      sessions: [GOOD],
+      chunks: [{ sessionId: 'good', samples: [{ engineRpm: 750 }] }],
+      writes: [{ ...PUMP_RUNNING, startedAt: '2000', sessionId: 'good' }],
+    });
+
+    const store = await IndexedDbSessionStore.open({ factory });
+
+    await expect(store.readSamples('good')).rejects.toThrow(InvalidRecordError);
+    await expect(store.readWrites('good')).rejects.toThrow(InvalidRecordError);
+    store.close();
+  });
+
+  it('keeps a write a newer version recorded as it was recorded', async () => {
+    const factory = new IDBFactory();
+    const flash = {
+      id: 'flash-1',
+      write: 'flashRom',
+      startedAt: 3000,
+      endedAt: 3500,
+      outcome: { status: 'cancelled', message: 'Stopped by the user.' },
+    };
+    const quiet = {
+      ...flash,
+      id: 'flash-2',
+      startedAt: 5000,
+      outcome: { status: 'cancelled' },
+    };
+
+    await plantRecords(factory, {
+      sessions: [GOOD],
+      writes: [
+        { ...PUMP_STOPPED, sessionId: 'good' },
+        { ...flash, sessionId: 'good' },
+        { ...quiet, sessionId: 'good' },
+      ],
+    });
+
+    const store = await IndexedDbSessionStore.open({ factory });
+
+    expect(await store.readWrites('good')).toEqual([
+      PUMP_STOPPED,
+      flash,
+      quiet,
+    ]);
+    store.close();
+  });
+
+  it('still rejects a known result without its message', async () => {
+    const factory = new IDBFactory();
+
+    await plantRecords(factory, {
+      sessions: [GOOD],
+      writes: [
+        { ...PUMP_STOPPED, outcome: { status: 'done' }, sessionId: 'good' },
+      ],
+    });
+
+    const store = await IndexedDbSessionStore.open({ factory });
+
+    await expect(store.readWrites('good')).rejects.toThrow(InvalidRecordError);
+    store.close();
+  });
+
+  it('saves a format 1 session in format 2 once it is changed', async () => {
+    const factory = new IDBFactory();
+    const { notes: _notes, ...format1 } = { ...GOOD, formatVersion: 1 };
+
+    await plantRecords(factory, { sessions: [format1] });
+
+    const store = await IndexedDbSessionStore.open({ factory });
+
+    await store.update('good', { name: 'Renamed' });
+    store.close();
+
+    const db = await openDatabase({ factory });
+    const stored: unknown = await new Promise((resolve) => {
+      const req = db
+        .transaction('sessions', 'readonly')
+        .objectStore('sessions')
+        .get('good');
+
+      req.onsuccess = () => {
+        resolve(req.result);
+      };
+    });
+
+    db.close();
+    expect(stored).toEqual({
+      ...GOOD,
+      name: 'Renamed',
+      notes: '',
+      formatVersion: 2,
+    });
   });
 });

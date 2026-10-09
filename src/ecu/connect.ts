@@ -7,12 +7,27 @@ import {
   WebSerialTransport,
 } from '@kb1rma/libcomm14cux-ts';
 import { createDemoEngine } from '../demo/demoEngine';
+import type { RecordedSource } from '../model/source';
 import type { DiagnosticLog } from '../diagnostics/diagnosticLog';
 import { TracingTransport } from '../diagnostics/tracingTransport';
 
 /** Where an ECU connection comes from; kept so the app can reconnect. */
 export type EcuSource =
   { kind: 'serial'; port: SerialPort; doubleSpeed: boolean } | { kind: 'demo' };
+
+/**
+ * How a recording or ROM image read from `source` names it in storage. A new
+ * kind of connection must choose a stored name here, deliberately, rather
+ * than widen what is stored.
+ */
+export function recordedSource(source: EcuSource): RecordedSource {
+  switch (source.kind) {
+    case 'serial':
+      return 'serial';
+    case 'demo':
+      return 'demo';
+  }
+}
 
 export interface EcuConnection {
   readonly ecu: Ecu;

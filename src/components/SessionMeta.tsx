@@ -5,7 +5,7 @@ import {
   formatDuration,
   sourceLabel,
 } from '../sessions/format';
-import type { SessionSummary } from '../storage/sessionStore';
+import type { SessionSummary } from '../model/session';
 import styles from './Sessions.module.css';
 
 /** When, how long and from what a session was recorded. */

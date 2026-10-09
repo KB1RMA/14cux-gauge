@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { Gear, PurgeValveState } from '@kb1rma/libcomm14cux-ts';
-import type { LiveSnapshot } from '../ecu/poller';
+import type { LiveSnapshot } from '../model/snapshot';
 
 /** A complete snapshot with plausible idle values, for tests to vary. */
 export function snapshotAt(

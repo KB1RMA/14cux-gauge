@@ -111,6 +111,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Why a stored session cannot be read; its ID is long and unbroken. */
+.unreadable {
+  margin: 0;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
 .notes {
   margin: 0;
   white-space: pre-line;

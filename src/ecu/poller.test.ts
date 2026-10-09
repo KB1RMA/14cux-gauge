@@ -7,12 +7,8 @@ import {
   SimulatedTransport,
   TimeoutError,
 } from '@kb1rma/libcomm14cux-ts';
-import {
-  startPoller,
-  type LiveSnapshot,
-  type PollerStats,
-  type ReadingKey,
-} from './poller';
+import type { LiveSnapshot, ReadingKey } from '../model/snapshot';
+import { startPoller, type PollerStats } from './poller';
 
 function plantWord(memory: Uint8Array, address: number, value: number): void {
   memory[address] = value >> 8;

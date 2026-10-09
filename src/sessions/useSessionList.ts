@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import type { SessionSummary } from '../storage/sessionStore';
+import type { UnreadableRecord } from '../model/record';
+import type { SessionSummary } from '../model/session';
 import { useSessions } from './useSessions';
 
 const noSubscription = () => () => undefined;
@@ -9,7 +10,12 @@ const noVersion = () => -1;
 
 export type SessionList =
   | { status: 'loading' }
-  | { status: 'loaded'; sessions: SessionSummary[] }
+  | {
+      status: 'loaded';
+      sessions: SessionSummary[];
+      /** Stored sessions that cannot be read, shown so they can be deleted. */
+      unreadable: UnreadableRecord[];
+    }
   | { status: 'failed' };
 
 /** Every recorded session, newest first, kept up to date as they change. */
@@ -29,10 +35,10 @@ export function useSessionList(): SessionList {
 
     let stale = false;
 
-    store.list().then(
-      (sessions) => {
+    Promise.all([store.list(), store.listUnreadable()]).then(
+      ([sessions, unreadable]) => {
         if (!stale) {
-          setList({ status: 'loaded', sessions });
+          setList({ status: 'loaded', sessions, unreadable });
         }
       },
       () => {

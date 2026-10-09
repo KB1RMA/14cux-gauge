@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { IDBFactory } from 'fake-indexeddb';
+import { InvalidRecordError } from '../model/record';
+import { plantRecords } from '../test-support/storedRecords';
 import { IndexedDbRomStore } from './indexedDbRomStore';
 import { IndexedDbSessionStore } from './indexedDbSessionStore';
 import { openRomStore } from './openRomStore';
@@ -103,6 +105,33 @@ describe('IndexedDbRomStore', () => {
     expect(saved.size).toBe(4);
     roms.close();
     sessions.close();
+  });
+});
+
+describe('IndexedDbRomStore stored records', () => {
+  it('lists a damaged image apart, rejects reading it, and deletes it', async () => {
+    const factory = new IDBFactory();
+    const roms = await IndexedDbRomStore.open({ factory });
+    const saved = await roms.save(rom(1000));
+
+    roms.close();
+
+    await plantRecords(factory, {
+      roms: [{ ...saved, id: 'damaged', bytes: 'not bytes' }],
+    });
+
+    const reopened = await IndexedDbRomStore.open({ factory });
+
+    expect(await reopened.list()).toEqual([saved]);
+    expect(await reopened.listUnreadable()).toEqual([
+      { id: 'damaged', detail: 'bytes: Invalid input' },
+    ]);
+    await expect(reopened.read('damaged')).rejects.toThrow(InvalidRecordError);
+
+    await reopened.remove('damaged');
+
+    expect(await reopened.listUnreadable()).toEqual([]);
+    reopened.close();
   });
 });
 

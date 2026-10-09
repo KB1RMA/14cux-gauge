@@ -4,13 +4,14 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { IDBFactory } from 'fake-indexeddb';
 import { App } from './App';
-import type { LiveSnapshot } from './ecu/poller';
+import type { LiveSnapshot } from './model/snapshot';
 import { openSessionStore } from './storage/openSessionStore';
 import { MemorySessionStore } from './storage/sessionStore';
 import { expectNoAxeViolations, readingFor } from './test-support/a11y';
 import { notification } from './test-support/notifications';
 import { fakeUsageCounter } from './test-support/usageCounter';
 import { snapshotAt } from './test-support/snapshots';
+import { plantRecords } from './test-support/storedRecords';
 
 const START = Date.UTC(2026, 9, 5, 14, 0);
 
@@ -723,5 +724,64 @@ describe('Recording and browsing sessions', () => {
     expect(terms).not.toContain('Fuel map column');
     expect(readingFor('Coolant')).toHaveTextContent(/^\d+ °F$/);
     expect(() => readingFor('Engine speed')).toThrow();
+  });
+
+  it('shows a session that cannot be read, and deletes it', async () => {
+    const user = userEvent.setup();
+    const factory = new IDBFactory();
+    const good = {
+      id: 'good',
+      name: 'Cold start',
+      source: 'serial',
+      startedAt: START,
+      endedAt: START + 60_000,
+      sampleCount: 0,
+      notes: '',
+      formatVersion: 3,
+    };
+
+    await plantRecords(factory, {
+      sessions: [good, { ...good, id: 'newer', formatVersion: 4 }],
+    });
+
+    const { container } = render(
+      <App openSessionStore={() => openSessionStore(factory)} />,
+    );
+
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+
+    const row = (
+      await screen.findByRole('heading', { name: 'Session that can’t be read' })
+    ).closest('li');
+
+    expect(row).toHaveTextContent(
+      'format 4 is from a newer version of the app. Its ID is newer.',
+    );
+    expect(screen.getByRole('link', { name: 'Cold start' })).toBeVisible();
+    await expectNoAxeViolations(container);
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Delete session that can’t be read, newer',
+      }),
+    );
+
+    const confirm = screen.getByRole('alertdialog', {
+      name: 'Delete this session?',
+    });
+
+    expect(confirm).toHaveTextContent(
+      'This session, which cannot be read, and its samples will be deleted from this browser.',
+    );
+    await user.click(
+      within(confirm).getByRole('button', { name: 'Delete session' }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('heading', { name: 'Session that can’t be read' }),
+      ).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: 'Cold start' })).toBeVisible();
   });
 });

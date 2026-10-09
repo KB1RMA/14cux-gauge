@@ -5,12 +5,10 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useEcu } from '../ecu/useEcu';
 import { useNotify } from '../notifications/useNotify';
 import { EcuWriteContext, type WriteHandle } from './context';
+import type { WriteId, WriteLogEntry, WriteOutcome } from '../model/write';
 import {
   failureOutcome,
   notConnectedOutcome,
-  type WriteId,
-  type WriteLogEntry,
-  type WriteOutcome,
   writeNotification,
 } from './writes';
 

@@ -7,68 +7,14 @@ import {
   ThrottlePosType,
   type Ecu,
   type FuelMapIndex,
-  type Gear,
-  type PurgeValveState,
 } from '@kb1rma/libcomm14cux-ts';
+import type {
+  LiveReadings,
+  LiveSnapshot,
+  Reading,
+  ReadingKey,
+} from '../model/snapshot';
 import { isTransientLinkError } from './errors';
-
-/** A reading, or `null` if the ECU returned a value outside its valid range. */
-export type Reading<T> = T | null;
-
-/** Every live value the poller can read. Units are those the library returns. */
-export interface LiveReadings {
-  engineRpm: Reading<number>;
-  roadSpeedMph: Reading<number>;
-  /** Fraction 0–1, corrected for the throttle's closed position. */
-  throttle: Reading<number>;
-  /** Linearised airflow, as a fraction 0–1 of the meter's range. */
-  airflow: Reading<number>;
-  lambdaShortOdd: Reading<number>;
-  lambdaShortEven: Reading<number>;
-  /** Fraction 0–1 (0 closed). */
-  idleBypass: Reading<number>;
-  gear: Reading<Gear>;
-  milOn: Reading<boolean>;
-  fuelPumpOn: Reading<boolean>;
-  /** Injector pulse width in microseconds. */
-  injectorPulseUs: Reading<number>;
-  /**
-   * The fuel map cell the ECU is using, counted from 0, with the
-   * interpolation weighting towards the next row or column as the fraction:
-   * 2.5 is halfway between rows 2 and 3.
-   */
-  fuelMapRow: Reading<number>;
-  fuelMapColumn: Reading<number>;
-  // Slow-changing values, read every `slowEvery` passes.
-  coolantTempF: Reading<number>;
-  fuelTempF: Reading<number>;
-  mainVoltage: Reading<number>;
-  lambdaLongOdd: Reading<number>;
-  lambdaLongEven: Reading<number>;
-  /** Whether the ECU is controlling the idle speed. */
-  idleMode: Reading<boolean>;
-  targetIdleRpm: Reading<number>;
-  /**
-   * The CO trim potentiometer's voltage. Only a tune without lambda feedback
-   * uses it; the ECU keeps it where a closed loop tune keeps the even bank's
-   * long term trim.
-   */
-  coTrimVoltage: Reading<number>;
-  purgeValve: Reading<PurgeValveState>;
-  acCompressorOn: Reading<boolean>;
-  screenHeaterOn: Reading<boolean>;
-}
-
-export type ReadingKey = keyof LiveReadings;
-
-/**
- * One pass over the live values. Only the readings asked for are present: a
- * missing key was not read, while `null` is a reading the ECU got wrong.
- */
-export type LiveSnapshot = {
-  /** `Date.now()` when the pass finished. */
-  timestamp: number;
-} & Partial<LiveReadings>;
 
 /** A fuel map index as one number: the index plus its weighting in 16ths. */
 function mapPosition({ index, weighting }: FuelMapIndex): number {

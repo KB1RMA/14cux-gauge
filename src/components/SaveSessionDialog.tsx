@@ -5,7 +5,7 @@ import { useRef, useState } from 'react';
 import { useRecording } from '../recording/useRecording';
 import { describeDuration, sourceLabel } from '../sessions/format';
 import { useSessions } from '../sessions/useSessions';
-import type { SessionSummary } from '../storage/sessionStore';
+import type { SessionSummary } from '../model/session';
 import { SessionFields } from './SessionFields';
 import styles from './ConfirmDialog.module.css';
 

@@ -14,7 +14,7 @@ import {
   type DisplayUnits,
   type MetricKey,
 } from './metrics';
-import type { LiveSnapshot } from './ecu/poller';
+import type { LiveSnapshot } from './model/snapshot';
 import { snapshotAt } from './test-support/snapshots';
 
 const IMPERIAL: DisplayUnits = { temperatureUnit: 'F', speedUnit: 'mph' };

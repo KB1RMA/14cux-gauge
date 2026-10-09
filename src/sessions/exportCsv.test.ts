@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { LiveSnapshot } from '../ecu/poller';
+import type { LiveSnapshot } from '../model/snapshot';
 import { sessionCsv, sessionCsvFileName } from './exportCsv';
 
 const T0 = Date.UTC(2026, 9, 5, 14, 0, 0);

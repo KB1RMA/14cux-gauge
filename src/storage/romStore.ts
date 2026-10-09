@@ -1,35 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { EcuSource } from '../ecu/connect';
+import type { UnreadableRecord } from '../model/record';
+import type { NewRom, RomSummary } from '../model/rom';
 
 /**
- * ROM images read from an ECU, kept so they can be downloaded again later.
+ * Where saved ROM images (see `src/model/rom.ts`) are kept.
  *
  * `RomStore` is the contract every backend meets: IndexedDB in the browser,
- * memory when storage is unavailable. The bytes are stored exactly as the
- * ECU returned them.
+ * memory when storage is unavailable.
  */
-
-export interface RomSummary {
-  id: string;
-  /** What the image was read from; a demo ECU's image is synthetic. */
-  source: EcuSource['kind'];
-  /** `Date.now()` when the read finished. */
-  readAt: number;
-  tuneNumber: number;
-  tuneIdent: number;
-  /** Length of the image in bytes. */
-  size: number;
-  /** SHA-256 of the image as lower-case hex; `undefined` if the browser cannot compute one. */
-  sha256: string | undefined;
-}
-
-export type NewRom = Omit<RomSummary, 'id' | 'size'> & { bytes: Uint8Array };
 
 export interface RomStore {
   save(rom: NewRom): Promise<RomSummary>;
-  /** Every saved image, newest first. */
+  /** Every saved image that can be read, newest first. */
   list(): Promise<RomSummary[]>;
+  /** Saved images that cannot be read, so the user can see and delete them. */
+  listUnreadable(): Promise<UnreadableRecord[]>;
   /** The bytes of an image, or `undefined` if it is not saved. */
   read(id: string): Promise<Uint8Array | undefined>;
   /** Deletes an image. Unknown ids are ignored. */
@@ -66,6 +52,11 @@ export class MemoryRomStore implements RomStore {
     return [...this.roms.values()]
       .map(({ summary }) => ({ ...summary }))
       .sort(newestRomFirst);
+  }
+
+  async listUnreadable(): Promise<UnreadableRecord[]> {
+    // Only this visit's images, which are always readable.
+    return [];
   }
 
   async read(id: string): Promise<Uint8Array | undefined> {

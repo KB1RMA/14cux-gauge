@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { useId, type ReactNode } from 'react';
-import type { LiveSnapshot } from '../ecu/poller';
+import type { LiveSnapshot } from '../model/snapshot';
 import {
   formatSample,
   METRIC_GROUPS,

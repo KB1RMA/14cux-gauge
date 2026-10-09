@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { LiveSnapshot } from '../ecu/poller';
+import type { LiveSnapshot } from '../model/snapshot';
 import type { TimelineMark } from '../charts/timelinePlugins';
 import type { MetricKey } from '../metrics';
 import { loadPlot } from '../charts/plotOptions';

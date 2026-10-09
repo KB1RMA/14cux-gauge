@@ -7,8 +7,7 @@ import { useRecording } from '../recording/useRecording';
 import { useSessionList } from '../sessions/useSessionList';
 import { useSessions } from '../sessions/useSessions';
 import { sessionPath } from '../routing/paths';
-import type { SessionSummary } from '../storage/sessionStore';
-import { DeleteSessionDialog } from './DeleteSessionDialog';
+import { DeleteSessionDialog, type DeleteTarget } from './DeleteSessionDialog';
 import { SessionMeta } from './SessionMeta';
 import styles from './Sessions.module.css';
 
@@ -20,9 +19,7 @@ export function SessionList({ returnTo }: { returnTo: string | undefined }) {
   const { store, persistent } = useSessions();
   const { active } = useRecording();
   const list = useSessionList();
-  const [deleting, setDeleting] = useState<SessionSummary | undefined>(
-    undefined,
-  );
+  const [deleting, setDeleting] = useState<DeleteTarget | undefined>(undefined);
   const [deleteFailed, setDeleteFailed] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const openLinksRef = useRef(new Map<string, HTMLAnchorElement>());
@@ -70,13 +67,16 @@ export function SessionList({ returnTo }: { returnTo: string | undefined }) {
           The recorded sessions could not be read.
         </p>
       ) : null}
-      {list.status === 'loaded' && list.sessions.length === 0 ? (
+      {list.status === 'loaded' &&
+      list.sessions.length === 0 &&
+      list.unreadable.length === 0 ? (
         <p className={styles['empty']}>
           No sessions yet. While connected to an ECU, choose Record in the
           status bar to record one.
         </p>
       ) : null}
-      {list.status === 'loaded' && list.sessions.length > 0 ? (
+      {list.status === 'loaded' &&
+      (list.sessions.length > 0 || list.unreadable.length > 0) ? (
         <ul className={styles['list']}>
           {list.sessions.map((session) => {
             const recording = active?.id === session.id;
@@ -116,6 +116,26 @@ export function SessionList({ returnTo }: { returnTo: string | undefined }) {
               </li>
             );
           })}
+          {list.unreadable.map((unreadable) => (
+            <li key={unreadable.id} className={styles['item']}>
+              <h3 className={styles['name']}>Session that can’t be read</h3>
+              <p className={styles['unreadable']}>
+                {unreadable.detail}. Its ID is <code>{unreadable.id}</code>.
+              </p>
+              <button
+                type="button"
+                className={`danger ${styles['delete'] ?? ''}`}
+                onClick={() => {
+                  setDeleting(unreadable);
+                }}
+              >
+                Delete{' '}
+                <VisuallyHidden.Root>
+                  session that can’t be read, {unreadable.id}
+                </VisuallyHidden.Root>
+              </button>
+            </li>
+          ))}
         </ul>
       ) : null}
 

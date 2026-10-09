@@ -6,7 +6,8 @@ import type { SampleHistory } from '../history/sampleHistory';
 import type { MetricKey } from '../metrics';
 import type { EcuSource } from './connect';
 import type { ConnectionState } from './connectionState';
-import type { LiveSnapshot, PollerStats } from './poller';
+import type { LiveSnapshot } from '../model/snapshot';
+import type { PollerStats } from './poller';
 
 export interface EcuContextValue {
   state: ConnectionState;

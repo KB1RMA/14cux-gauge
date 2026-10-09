@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { EcuSource } from '../ecu/connect';
+import type { RecordedSource } from '../model/source';
 
 /** What a session was recorded from, as the status bar names it. */
-export function sourceLabel(kind: EcuSource['kind']): string {
+export function sourceLabel(kind: RecordedSource): string {
   return kind === 'demo' ? 'Demo ECU' : 'Serial ECU';
 }
 
@@ -46,7 +46,7 @@ export function formatDateTime(ms: number): string {
 
 /** The name a recording gets until the user chooses one. */
 export function defaultSessionName(
-  kind: EcuSource['kind'],
+  kind: RecordedSource,
   startedAt: number,
 ): string {
   return `${sourceLabel(kind)}, ${formatDateTime(startedAt)}`;

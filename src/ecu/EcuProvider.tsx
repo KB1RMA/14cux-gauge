@@ -19,6 +19,7 @@ import {
 import { pushSnapshot } from '../history/pushSnapshot';
 import { SampleHistory } from '../history/sampleHistory';
 import { METRIC_KEYS, readingsFor, type MetricKey } from '../metrics';
+import type { LiveSnapshot } from '../model/snapshot';
 import { ReadingsContext } from '../readings/context';
 import {
   ALWAYS_READ,
@@ -40,12 +41,7 @@ import {
   type LiveData,
 } from './contexts';
 import { describeError, errorReason } from './errors';
-import {
-  pickReadings,
-  startPoller,
-  type LiveSnapshot,
-  type Poller,
-} from './poller';
+import { pickReadings, startPoller, type Poller } from './poller';
 
 const NO_LIVE_DATA: LiveData = {
   snapshot: undefined,

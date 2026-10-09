@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { PurgeValveState, type Gear } from '@kb1rma/libcomm14cux-ts';
-import type { LiveSnapshot, ReadingKey } from './ecu/poller';
+import type { LiveSnapshot, ReadingKey } from './model/snapshot';
 import {
   fahrenheitToCelsius,
   formatGear,

@@ -27,6 +27,96 @@ async function recordDemo(page: Page) {
   return dialog;
 }
 
+/**
+ * Records a demo session named "Pump check" that runs the fuel pump test
+ * once, and saves it.
+ */
+async function recordPumpCheck(page: Page) {
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Demo mode' }).click();
+  await page.getByRole('button', { name: 'Record', exact: true }).click();
+  await expect(page.getByText('0:01 recorded')).toBeVisible();
+  await page.getByRole('button', { name: 'Run pump (once)' }).click();
+  await page
+    .getByRole('alertdialog', { name: 'Run the fuel pump once?' })
+    .getByRole('button', { name: 'Run fuel pump' })
+    .click();
+  await expect(
+    page.getByRole('button', { name: 'Run pump (once)' }),
+  ).toBeEnabled({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'Stop recording' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Save recording' });
+
+  await dialog.getByRole('textbox', { name: 'Name' }).fill('Pump check');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toBeHidden();
+}
+
+/**
+ * Adds a write to the stored session named `sessionName`, starting just after
+ * its first recorded write, as a later version of the app could leave one.
+ * This version cannot record such a write, so it is put into the browser
+ * database directly.
+ */
+async function plantWrite(
+  page: Page,
+  sessionName: string,
+  write: { id: string; write: string; outcome: Record<string, string> },
+) {
+  await page.evaluate(
+    async ({ sessionName, write }) => {
+      const request = <T>(req: IDBRequest<T>) =>
+        new Promise<T>((resolve, reject) => {
+          req.onsuccess = () => {
+            resolve(req.result);
+          };
+
+          req.onerror = () => {
+            reject(req.error ?? new Error('IndexedDB request failed'));
+          };
+        });
+      // No version: open the database at whatever version the app made.
+      const db = await request(indexedDB.open('cuxGauge'));
+      const read = db.transaction(['sessions', 'writes'], 'readonly');
+      const sessions = await request<{ id: string; name: string }[]>(
+        read.objectStore('sessions').getAll(),
+      );
+      const session = sessions.find(({ name }) => name === sessionName);
+
+      if (!session) {
+        throw new Error(`No stored session named ${sessionName}`);
+      }
+
+      const [first] = await request<{ startedAt: number; endedAt: number }[]>(
+        read.objectStore('writes').index('sessionId').getAll(session.id),
+      );
+
+      if (!first) {
+        throw new Error(`${sessionName} has no recorded writes`);
+      }
+
+      const tx = db.transaction('writes', 'readwrite');
+
+      tx.objectStore('writes').put({
+        ...write,
+        sessionId: session.id,
+        startedAt: first.endedAt + 100,
+        endedAt: first.endedAt + 600,
+      });
+      await new Promise((resolve, reject) => {
+        tx.oncomplete = resolve;
+
+        tx.onerror = () => {
+          reject(tx.error ?? new Error('IndexedDB write failed'));
+        };
+      });
+      db.close();
+    },
+    { sessionName, write },
+  );
+}
+
 async function boxOf(locator: Locator) {
   const box = await locator.boundingBox();
 
@@ -45,25 +135,7 @@ test.describe('Recorded sessions', () => {
   test('keeps the writes to the ECU made while recording, and marks them in replay', async ({
     page,
   }) => {
-    await page.goto('./');
-    await page.getByRole('button', { name: 'Demo mode' }).click();
-    await page.getByRole('button', { name: 'Record', exact: true }).click();
-    await expect(page.getByText('0:01 recorded')).toBeVisible();
-    await page.getByRole('button', { name: 'Run pump (once)' }).click();
-    await page
-      .getByRole('alertdialog', { name: 'Run the fuel pump once?' })
-      .getByRole('button', { name: 'Run fuel pump' })
-      .click();
-    await expect(
-      page.getByRole('button', { name: 'Run pump (once)' }),
-    ).toBeEnabled({ timeout: 10_000 });
-    await page.getByRole('button', { name: 'Stop recording' }).click();
-
-    const dialog = page.getByRole('dialog', { name: 'Save recording' });
-
-    await dialog.getByRole('textbox', { name: 'Name' }).fill('Pump check');
-    await dialog.getByRole('button', { name: 'Save' }).click();
-    await expect(dialog).toBeHidden();
+    await recordPumpCheck(page);
     await nav(page).getByRole('link', { name: 'Sessions' }).click();
     await page.getByRole('link', { name: 'Pump check', exact: true }).click();
 
@@ -87,6 +159,39 @@ test.describe('Recorded sessions', () => {
         .getByRole('tabpanel', { name: 'Graphs' })
         .getByText('Fuel pump test', { exact: true }),
     ).toBeVisible();
+    await expectNoAxeViolations(page);
+  });
+
+  test('replays a session with a write a later version recorded, keeping that write as recorded', async ({
+    page,
+  }) => {
+    await recordPumpCheck(page);
+    await plantWrite(page, 'Pump check', {
+      id: 'from-a-later-version',
+      write: 'flashRom',
+      outcome: { status: 'cancelled', message: 'Stopped by the user.' },
+    });
+    await nav(page).getByRole('link', { name: 'Sessions' }).click();
+    await page.getByRole('link', { name: 'Pump check', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Pump check' }),
+    ).toBeFocused();
+
+    // The session still opens: its readings replay, and both writes are
+    // listed, the unknown one by the id and result it was recorded with.
+    await expect(reading(page, 'Engine speed')).toHaveText(/^\d+ rpm$/);
+
+    const log = page.getByRole('region', { name: 'Writes to the ECU' });
+
+    await expect(
+      log.getByRole('row').filter({ hasText: 'Fuel pump test' }),
+    ).toContainText('Done. Fuel pump stopped.');
+    await expect(
+      log.getByRole('row').filter({ hasText: 'flashRom' }),
+    ).toContainText('Result not known: cancelled. Stopped by the user.');
+    await expect(
+      log.getByRole('row').filter({ hasText: 'flashRom' }),
+    ).toContainText('0.5 s');
     await expectNoAxeViolations(page);
   });
 

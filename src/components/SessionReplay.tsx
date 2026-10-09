@@ -4,8 +4,8 @@ import { Tabs } from 'radix-ui';
 import { useState } from 'react';
 import { sessionPath, type ReplayTab } from '../routing/paths';
 import { useNavigateOnce } from '../routing/useNavigateOnce';
-import type { LiveSnapshot } from '../ecu/poller';
-import type { WriteLogEntry } from '../ecuWrite/writes';
+import type { LiveSnapshot } from '../model/snapshot';
+import type { RecordedWrite } from '../model/write';
 import { recordedKeys } from '../metrics';
 import { useReplay } from '../replay/useReplay';
 import { writeMarks } from '../sessions/writeLog';
@@ -32,7 +32,7 @@ export function SessionReplay({
   id: string;
   tab: ReplayTab;
   samples: readonly LiveSnapshot[];
-  writes: readonly WriteLogEntry[];
+  writes: readonly RecordedWrite[];
   /** Whether the session was recorded by a version that keeps writes. */
   keepsWrites: boolean;
 }) {

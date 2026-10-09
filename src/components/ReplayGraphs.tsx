@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { useId, useState } from 'react';
 import type { TimelineMark } from '../charts/timelinePlugins';
-import type { LiveSnapshot } from '../ecu/poller';
+import type { LiveSnapshot } from '../model/snapshot';
 import { METRIC_KEYS, METRICS, sampleOf, type MetricKey } from '../metrics';
 import type { Replay } from '../replay/useReplay';
 import { useStoredState } from '../storage/useStoredState';

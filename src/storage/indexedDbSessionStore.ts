@@ -1,11 +1,29 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { LiveSnapshot } from '../ecu/poller';
-import type { WriteLogEntry } from '../ecuWrite/writes';
+import * as z from 'zod/mini';
+import {
+  InvalidRecordError,
+  parseRecord,
+  sortRecords,
+  type UnreadableRecord,
+} from '../model/record';
+import {
+  readSession,
+  type NewSession,
+  type SessionChanges,
+  type SessionSummary,
+} from '../model/session';
+import { isSnapshotLike, type LiveSnapshot } from '../model/snapshot';
+import {
+  recordedWriteSchema,
+  type RecordedWrite,
+  type WriteLogEntry,
+} from '../model/write';
 import {
   BY_SESSION,
   CHUNKS,
   completed,
+  entries,
   openDatabase,
   request,
   SESSIONS,
@@ -19,10 +37,7 @@ import {
   emptySummary,
   newestFirst,
   UnknownSessionError,
-  type NewSession,
-  type SessionChanges,
   type SessionStore,
-  type SessionSummary,
 } from './sessionStore';
 
 interface ChunkRecord {
@@ -30,7 +45,26 @@ interface ChunkRecord {
   samples: LiveSnapshot[];
 }
 
+const writeRecordSchema = z.extend(recordedWriteSchema, {
+  sessionId: z.string(),
+});
+
 type WriteRecord = WriteLogEntry & { sessionId: string };
+
+/**
+ * The samples of a stored chunk. Each is only checked to be a snapshot with a
+ * time, not parsed reading by reading: a long session holds hundreds of
+ * thousands of samples.
+ */
+function samplesOf(raw: unknown): LiveSnapshot[] {
+  const samples = (raw as { samples?: unknown } | null)?.samples;
+
+  if (!Array.isArray(samples) || !samples.every(isSnapshotLike)) {
+    throw new InvalidRecordError('samples', 'not a list of snapshots');
+  }
+
+  return samples;
+}
 
 export type OpenOptions = DatabaseOptions;
 
@@ -104,20 +138,18 @@ export class IndexedDbSessionStore implements SessionStore {
   }
 
   async list(): Promise<SessionSummary[]> {
-    const tx = this.db.transaction(SESSIONS, 'readonly');
-    const all = await request<SessionSummary[]>(
-      tx.objectStore(SESSIONS).getAll(),
-    );
+    return (await this.readAll()).readable.sort(newestFirst);
+  }
 
-    return all.sort(newestFirst);
+  async listUnreadable(): Promise<UnreadableRecord[]> {
+    return (await this.readAll()).unreadable;
   }
 
   async get(id: string): Promise<SessionSummary | undefined> {
     const tx = this.db.transaction(SESSIONS, 'readonly');
+    const raw = await request<unknown>(tx.objectStore(SESSIONS).get(id));
 
-    return request<SessionSummary | undefined>(
-      tx.objectStore(SESSIONS).get(id),
-    );
+    return raw === undefined ? undefined : readSession(raw);
   }
 
   async readSamples(id: string): Promise<LiveSnapshot[]> {
@@ -125,11 +157,11 @@ export class IndexedDbSessionStore implements SessionStore {
 
     await this.summaryIn(tx.objectStore(SESSIONS), id, tx);
 
-    const chunks = await request<ChunkRecord[]>(
+    const chunks = await request<unknown[]>(
       tx.objectStore(CHUNKS).index(BY_SESSION).getAll(id),
     );
 
-    return chunks.flatMap((chunk) => chunk.samples);
+    return chunks.flatMap(samplesOf);
   }
 
   async putWrite(id: string, write: WriteLogEntry): Promise<void> {
@@ -144,17 +176,25 @@ export class IndexedDbSessionStore implements SessionStore {
     await done;
   }
 
-  async readWrites(id: string): Promise<WriteLogEntry[]> {
+  async readWrites(id: string): Promise<RecordedWrite[]> {
     const tx = this.db.transaction([SESSIONS, WRITES], 'readonly');
 
     await this.summaryIn(tx.objectStore(SESSIONS), id, tx);
 
-    const records = await request<WriteRecord[]>(
+    const records = await request<unknown[]>(
       tx.objectStore(WRITES).index(BY_SESSION).getAll(id),
     );
 
     return records
-      .map(({ sessionId: _sessionId, ...write }) => write)
+      .map((raw) => {
+        const { sessionId: _sessionId, ...write } = parseRecord(
+          writeRecordSchema,
+          raw,
+          'write to the ECU',
+        );
+
+        return write;
+      })
       .sort(byStart);
   }
 
@@ -179,22 +219,35 @@ export class IndexedDbSessionStore implements SessionStore {
     this.db.close();
   }
 
-  /** Reads a summary inside `tx`, aborting it if the session is unknown. */
+  private async readAll() {
+    const tx = this.db.transaction(SESSIONS, 'readonly');
+
+    return sortRecords(await entries(tx.objectStore(SESSIONS)), readSession);
+  }
+
+  /**
+   * Reads a summary inside `tx`, migrated to the current format, aborting
+   * `tx` if the session is unknown or cannot be read.
+   */
   private async summaryIn(
     sessions: IDBObjectStore,
     id: string,
     tx: IDBTransaction,
   ): Promise<SessionSummary> {
-    const summary = await request<SessionSummary | undefined>(sessions.get(id));
+    const raw = await request<unknown>(sessions.get(id));
 
-    if (!summary) {
+    try {
+      if (raw === undefined) {
+        throw new UnknownSessionError(id);
+      }
+
+      return readSession(raw);
+    } catch (error) {
       if (tx.mode !== 'readonly') {
         tx.abort();
       }
 
-      throw new UnknownSessionError(id);
+      throw error;
     }
-
-    return summary;
   }
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { WriteLogEntry } from '../ecuWrite/writes';
+import type { RecordedWrite } from '../model/write';
 import {
   writeDetail,
   writeLength,
@@ -12,7 +12,7 @@ import {
 
 const FIRST = 1_000_000;
 
-function entry(changes: Partial<WriteLogEntry>): WriteLogEntry {
+function entry(changes: Partial<RecordedWrite>): RecordedWrite {
   return {
     id: 'w',
     write: 'fuelPump',
@@ -29,9 +29,8 @@ describe('write log', () => {
     expect(writeName(entry({ write: 'clearFaultCodes' }))).toBe(
       'Clear fault codes',
     );
-    expect(
-      writeName(entry({ write: 'futureWrite' as WriteLogEntry['write'] })),
-    ).toBe('futureWrite');
+    expect(writeName(entry({ write: 'futureWrite' }))).toBe('futureWrite');
+    expect(writeName(entry({ write: 'toString' }))).toBe('toString');
   });
 
   it('says how each write went', () => {
@@ -54,6 +53,22 @@ describe('write log', () => {
 
     expect(writeStatus(open)).toBe('No end recorded');
     expect(writeDetail(open)).toBe('Still running when the recording stopped.');
+  });
+
+  it('keeps a result it does not know, with its message if recorded', () => {
+    const cancelled = entry({
+      outcome: { status: 'cancelled', message: 'Stopped by the user.' },
+    });
+
+    expect(writeStatus(cancelled)).toBe('Result not known: cancelled');
+    expect(writeDetail(cancelled)).toBe('Stopped by the user.');
+
+    const bare = entry({ outcome: { status: 'cancelled' } });
+
+    expect(writeStatus(bare)).toBe('Result not known: cancelled');
+    expect(writeDetail(bare)).toBe(
+      'This version of the app does not know what this result means.',
+    );
   });
 
   it('times a write from the first sample, to a tenth of a second', () => {
