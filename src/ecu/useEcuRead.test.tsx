@@ -4,7 +4,9 @@ import { SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { buildSyntheticRom } from '../demo/syntheticRom';
+import { WRITE_HOLDER } from '../ecuWrite/writes';
 import { useReadings } from '../readings/useReadings';
+import { ROM_READ_HOLDER } from '../roms/romImage';
 import { sessionOver } from '../test-support/ecuSession';
 import { EcuProvider } from './EcuProvider';
 import type { EcuRead } from './reads';
@@ -154,6 +156,46 @@ describe('useEcuRead', () => {
     expect(result.current).toMatchObject({ value: 1234, error: undefined });
   });
 
+  it('reads nothing while a ROM read has the link, and says why', async () => {
+    const { session } = sessionOver([onDemoRom()]);
+    const { result } = renderRead(session, tuneNumber);
+
+    await act(() => session.connect({ kind: 'demo' }));
+    await act(() => result.current.read());
+
+    const romRead = session.acquire(ROM_READ_HOLDER);
+
+    await act(async () => {
+      await romRead?.ready;
+    });
+    await act(() => result.current.read());
+
+    expect(result.current).toMatchObject({
+      value: 1234,
+      error:
+        'Not read: the ECU is busy reading its ROM image. Try again when it finishes.',
+      reading: false,
+    });
+
+    act(() => {
+      romRead?.release();
+    });
+    await act(() => result.current.read());
+
+    expect(result.current).toMatchObject({ value: 1234, error: undefined });
+  });
+
+  it('reads beside a write, as polling does', async () => {
+    const { session } = sessionOver([onDemoRom()]);
+    const { result } = renderRead(session, tuneNumber);
+
+    await act(() => session.connect({ kind: 'demo' }));
+    session.acquire(WRITE_HOLDER);
+    await act(() => result.current.read());
+
+    expect(result.current).toMatchObject({ value: 1234, error: undefined });
+  });
+
   it('reads nothing while not connected', async () => {
     const { session } = sessionOver([onDemoRom()]);
     const { result } = renderRead(session, tuneNumber);
@@ -175,7 +217,7 @@ describe('ECU hooks outside their providers', () => {
 
   it('say which provider they need', () => {
     expect(() => renderHook(() => useEcu())).toThrow(
-      'useEcu must be used inside <EcuProvider>',
+      'ECU hooks must be used inside <EcuProvider>',
     );
     expect(() => renderHook(() => useReadings())).toThrow(
       'useReadings must be used inside <ReadingsProvider>',

@@ -7,10 +7,29 @@ import type { EcuLink } from './session';
 import { useEcu } from './useEcu';
 import { useEcuSession } from './useEcuSession';
 
+/** Why a read was refused while a ROM read has the link to itself. */
+const BUSY =
+  'Not read: the ECU is busy reading its ROM image. Try again when it finishes.';
+
 interface Outcome<T> {
   link: EcuLink;
   value?: T | undefined;
   error?: string | undefined;
+}
+
+/** A read on `on` that failed, keeping the last value read on it. */
+function failedOn<T>(
+  previous: Outcome<T> | undefined,
+  on: EcuLink,
+  error: string,
+): Outcome<T> {
+  return {
+    link: on,
+    ...(previous?.link === on && 'value' in previous
+      ? { value: previous.value }
+      : {}),
+    error,
+  };
 }
 
 export interface EcuReadResult<T> {
@@ -60,13 +79,7 @@ export function useEcuRead<T>(
         }
       } catch (e) {
         if (session.getSnapshot().link === on) {
-          setOutcome((previous) => ({
-            link: on,
-            ...(previous?.link === on && 'value' in previous
-              ? { value: previous.value }
-              : {}),
-            error: describeError(e),
-          }));
+          setOutcome((previous) => failedOn(previous, on, describeError(e)));
         }
       }
     },
@@ -84,6 +97,15 @@ export function useEcuRead<T>(
       return;
     }
 
+    // A holder that pauses polling (the ROM read) has the link to itself. A
+    // read beside a write is like a polling pass, so it goes ahead. A read on
+    // connect never meets such a holder: a new link starts free.
+    if (session.getSnapshot().holder?.pausesPolling) {
+      setOutcome((previous) => failedOn(previous, link, BUSY));
+
+      return;
+    }
+
     setReadingOn(link);
     setOutcome((previous) =>
       previous?.link === link ? { ...previous, error: undefined } : previous,
@@ -94,7 +116,7 @@ export function useEcuRead<T>(
     } finally {
       setReadingOn((previous) => (previous === link ? undefined : previous));
     }
-  }, [link, settle]);
+  }, [session, link, settle]);
 
   const clearError = useCallback(() => {
     setOutcome((previous) =>

@@ -74,11 +74,12 @@ function Outcome({
  * which are kept in the browser.
  */
 export function RomImages() {
-  const { state } = useEcu();
+  const { state, holder } = useEcu();
   const demo = state.status !== 'idle' && state.source.kind === 'demo';
   const roms = useRoms();
   const { active: recording } = useRecording();
-  // A write holds the link, so the ROM cannot be read until it ends.
+  // The ROM cannot be read until whatever holds the link lets go. Only a
+  // write can hold it while this button shows, and the note names it.
   const { running } = useEcuWrite();
   const blockedId = useId();
   const [confirming, setConfirming] = useState(false);
@@ -106,7 +107,7 @@ export function RomImages() {
         <button
           ref={saveRef}
           type="button"
-          disabled={reading || running !== undefined}
+          disabled={reading || holder !== undefined}
           aria-describedby={running === undefined ? undefined : blockedId}
           onClick={() => {
             setConfirming(true);

@@ -9,7 +9,7 @@ export function useEcuSession(): EcuSession {
   const session = use(EcuSessionContext);
 
   if (!session) {
-    throw new Error('useEcu must be used inside <EcuProvider>');
+    throw new Error('ECU hooks must be used inside <EcuProvider>');
   }
 
   return session;

@@ -28,8 +28,8 @@ export function WriteResult({ id }: { id: WriteId }) {
 
 /**
  * Says why controls that use the link are disabled while a write runs: a
- * different write's (`id`), or another holder's, such as the ROM read. Point
- * the disabled controls' `aria-describedby` at `noteId`.
+ * write other than `id`, or any write when there is no `id` (as for the ROM
+ * read). Point the disabled controls' `aria-describedby` at `noteId`.
  */
 export function WriteBlocked({ id, noteId }: { id?: WriteId; noteId: string }) {
   const { running } = useEcuWrite();

@@ -69,6 +69,16 @@ export function RomsProvider({ children }: { children: ReactNode }) {
     const lease = session.acquire(ROM_READ_HOLDER);
 
     if (!lease) {
+      // The button is disabled while a write holds the link, so only a write
+      // that started after the read was confirmed gets here.
+      if (session.getSnapshot().holder?.kind === 'write') {
+        setOutcome({
+          kind: 'failed',
+          message:
+            'The ROM image was not read: a write to the ECU started first. Try again when it finishes.',
+        });
+      }
+
       return;
     }
 
