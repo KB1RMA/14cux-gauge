@@ -2,6 +2,8 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { waitFor } from '@testing-library/react';
+import { onTestFinished } from 'vitest';
+import { LatencyTransport } from '../demo/latencyTransport';
 import { ROM_READ_HOLDER } from '../roms/romImage';
 import { WRITE_HOLDER } from '../ecuWrite/writes';
 import {
@@ -9,7 +11,7 @@ import {
   firstSnapshot,
   sessionOver,
 } from '../test-support/ecuSession';
-import type { EcuSession, LinkHolder } from './session';
+import { EcuSession, type LinkHolder } from './session';
 
 /**
  * A transport whose engine speed reads 750 rpm: 7,500,000 / 10,000 µs per
@@ -22,6 +24,35 @@ function idling(periodUs = 10_000): SimulatedTransport {
   transport.memory[MemoryOffset.EngineSpeedFiltered + 1] = periodUs & 0xff;
 
   return transport;
+}
+
+/** Opens only when `finish` is called, rejecting if it is given an error. */
+class SlowToOpen extends SimulatedTransport {
+  private settle: ((error?: Error) => void) | undefined;
+  private readonly opening = new Promise<void>((resolve, reject) => {
+    this.settle = (error) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    };
+  });
+
+  constructor() {
+    super();
+    // Settled before `open` is called, as when the user gives up at once.
+    this.opening.catch(() => undefined);
+  }
+
+  override async open(): Promise<void> {
+    await this.opening;
+    await super.open();
+  }
+
+  finish(error?: Error): void {
+    this.settle?.(error);
+  }
 }
 
 /** Every connection status `session` passes through, in order. */
@@ -112,7 +143,158 @@ describe('EcuSession', () => {
     expect(session.getSnapshot().link).toBeUndefined();
   });
 
+  it('keeps only the last of two connects made together', async () => {
+    const { session, ecus } = sessionOver([idling(), idling()]);
+
+    await Promise.all([
+      session.connect({ kind: 'demo' }),
+      session.connect({ kind: 'demo' }),
+    ]);
+
+    // The first gave way before making its connection.
+    expect(ecus.map((ecu) => ecu.isConnected())).toEqual([true, false]);
+    expect(session.getSnapshot().connection.status).toBe('connected');
+  });
+
+  it('stays disconnected when disconnected while connecting', async () => {
+    const transport = new SlowToOpen();
+    const { session, ecus } = sessionOver([transport]);
+    const connecting = session.connect({ kind: 'demo' });
+    // Closing waits for the port to finish opening.
+    const disconnecting = session.disconnect();
+
+    transport.finish();
+    await Promise.all([connecting, disconnecting]);
+
+    expect(session.getSnapshot()).toMatchObject({
+      connection: { status: 'idle', afterSession: true },
+      link: undefined,
+    });
+    expect(session.getLive().snapshot).toBeUndefined();
+    expect(ecus[0]?.isConnected()).toBe(false);
+  });
+
+  it('reports no failure for a connect the user has already abandoned', async () => {
+    const transport = new SlowToOpen();
+    const { session } = sessionOver([transport]);
+    const connecting = session.connect({ kind: 'demo' });
+    const disconnecting = session.disconnect();
+
+    transport.finish(new DOMException('Busy', 'InvalidStateError'));
+    await Promise.all([connecting, disconnecting]);
+
+    expect(session.getSnapshot().connection).toEqual({
+      status: 'idle',
+      afterSession: true,
+    });
+  });
+
+  it('connects again to the same source, and not at all when idle', async () => {
+    const transport = idling();
+    const { session } = sessionOver([transport, idling()], 0);
+
+    await session.reconnect();
+
+    expect(session.getSnapshot().connection.status).toBe('idle');
+
+    transport.silent = true;
+    await session.connect({ kind: 'demo' });
+    await waitFor(() => {
+      expect(session.getSnapshot().connection.status).toBe('error');
+    });
+    await session.reconnect();
+
+    expect(session.getSnapshot().connection.status).toBe('connected');
+    await firstSnapshot(session);
+    expect(session.getLive().snapshot?.engineRpm).toBe(750);
+  });
+
+  it('connects again even if closing the last connection failed', async () => {
+    const transports = [idling(), idling()];
+    const session = new EcuSession({
+      pollIntervalMs: { demo: 5 },
+      createConnection: (source) => {
+        const transport = transports.shift() ?? idling();
+        const ecu = sessionOver([transport]).ecus[0];
+
+        if (!ecu) {
+          throw new Error('No ECU was made');
+        }
+
+        return {
+          ecu,
+          source,
+          onLost: () => () => undefined,
+          dispose: () => Promise.reject(new Error('The port would not close')),
+        };
+      },
+    });
+
+    onTestFinished(session.dispose);
+    await session.connect({ kind: 'demo' });
+    await session.connect({ kind: 'demo' });
+
+    expect(session.getSnapshot().connection.status).toBe('connected');
+    await firstSnapshot(session);
+  });
+
+  it('gives the ECU only for the link that is connected', async () => {
+    const { session } = sessionOver([idling(), idling()]);
+
+    await session.connect({ kind: 'demo' });
+
+    const first = session.getSnapshot().link;
+
+    expect(first && session.ecuFor(first)).toBeDefined();
+
+    await session.connect({ kind: 'demo' });
+
+    expect(first && session.ecuFor(first)).toBeUndefined();
+  });
+
   describe('holding the link', () => {
+    it('leaves nothing paused when the connection ends while pausing', async () => {
+      // Slow enough that a pass is still running when the lease is taken.
+      const { session } = sessionOver(
+        [new LatencyTransport(idling(), { perReadMs: 20, perByteMs: 0 })],
+        0,
+      );
+
+      await session.connect({ kind: 'demo' });
+
+      const lease = session.acquire(ROM_READ_HOLDER);
+
+      await waitFor(() => {
+        expect(session.getSnapshot().pollingPaused).toBe(true);
+      });
+      await session.disconnect();
+      await lease?.ready;
+      lease?.release();
+
+      expect(session.getSnapshot()).toMatchObject({
+        connection: { status: 'idle' },
+        holder: undefined,
+        pollingPaused: false,
+      });
+      // No gap was marked: the history ends with the connection.
+      expect(session.history.window('engineRpm').values).not.toContain(null);
+    });
+
+    it('stops the recording with the stopper set last', async () => {
+      const { session } = await connectedSession(idling());
+      const first = vi.fn(() => Promise.resolve());
+      const second = vi.fn(() => Promise.resolve());
+      const removeFirst = session.setRecordingStopper(first);
+
+      session.setRecordingStopper(second);
+      // Removing one that was replaced leaves the newer one.
+      removeFirst();
+      await session.acquire(ROM_READ_HOLDER)?.ready;
+
+      expect(first).not.toHaveBeenCalled();
+      expect(second).toHaveBeenCalledOnce();
+    });
+
     it('lets one holder have it at a time', async () => {
       const { session } = await connectedSession(idling());
       const write = session.acquire(WRITE_HOLDER);
