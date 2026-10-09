@@ -24,7 +24,7 @@ test.describe('Fuel map', () => {
     await page.getByRole('tab', { name: 'Fuel map' }).click();
     await expect(page.getByRole('heading', { name: 'Fuel map' })).toBeVisible();
 
-    const table = page.getByRole('table');
+    const table = page.getByRole('table', { name: /^Fuel map \d+$/ });
 
     await expect(reading(page, 'Map in use')).toHaveText('5');
     await expect(reading(page, 'Row scaler')).toHaveText('0xB0');
@@ -67,10 +67,10 @@ test.describe('Fuel map', () => {
       ),
     ).toBe(true);
 
-    // The region is in the tab order after the tab list (and the three info
-    // buttons), so the browser's arrow-key scrolling reaches it.
+    // The region is in the tab order after the tab list, so the browser's
+    // arrow-key scrolling reaches it.
     await page.getByRole('tab', { name: 'Fuel map' }).focus();
-    await tabTo(page, region, tabKey(browserName), 6);
+    await tabTo(page, region, tabKey(browserName));
     await expect(region).toBeFocused();
   });
 });

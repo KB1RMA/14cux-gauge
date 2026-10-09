@@ -126,6 +126,16 @@ export function reading(page: Page, name: string): Locator {
     .locator('xpath=following-sibling::dd[1]');
 }
 
+/** What the connection bar says about the ECU connection. */
+export function connectionStatus(page: Page): Locator {
+  return page.getByRole('region', { name: 'Connection' }).getByRole('status');
+}
+
+/** The app's own notices: offline, or a newer build available. */
+export function appStatus(page: Page): Locator {
+  return page.getByRole('region', { name: 'App status' }).getByRole('status');
+}
+
 /** The notification titled `title`, in the app's notifications region. */
 export function notification(page: Page, title: string): Locator {
   return page

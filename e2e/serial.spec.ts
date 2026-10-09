@@ -4,6 +4,7 @@
 // ECU memory offsets and raw value encodings; written for 14cux-gauge, 2026.
 import { readFile } from 'node:fs/promises';
 import {
+  connectionStatus,
   expect,
   expectNoAxeViolations,
   notification,
@@ -31,7 +32,7 @@ test.describe('Serial ECU over Web Serial', () => {
 
     await page.getByRole('button', { name: 'Connect to ECU' }).click();
 
-    await expect(page.getByRole('status')).toHaveText(
+    await expect(connectionStatus(page)).toHaveText(
       'Serial ECU (7812 baud) · Polling',
     );
     expect(await emulatedSerial.opens()).toEqual([
@@ -46,7 +47,7 @@ test.describe('Serial ECU over Web Serial', () => {
       page
         .getByRole('list', { name: 'Stored fault codes' })
         .getByRole('listitem'),
-    ).toHaveText(['Purge valve leak purgeValveLeak']);
+    ).toHaveText([/^Purge valve leak\b/]);
 
     await page.getByRole('button', { name: 'Clear fault codes' }).click();
     await page
@@ -73,7 +74,7 @@ test.describe('Serial ECU over Web Serial', () => {
       .check();
     await page.getByRole('button', { name: 'Connect to ECU' }).click();
 
-    await expect(page.getByRole('status')).toHaveText(
+    await expect(connectionStatus(page)).toHaveText(
       'Serial ECU (15625 baud) · Polling',
     );
     expect(await emulatedSerial.opens()).toEqual([
@@ -87,7 +88,7 @@ test.describe('Serial ECU over Web Serial', () => {
   }) => {
     await page.goto('./');
     await page.getByRole('button', { name: 'Connect to ECU' }).click();
-    await expect(page.getByRole('status')).toHaveText(
+    await expect(connectionStatus(page)).toHaveText(
       'Serial ECU (7812 baud) · Polling',
     );
 
@@ -104,13 +105,13 @@ test.describe('Serial ECU over Web Serial', () => {
     const reconnect = page.getByRole('button', { name: 'Reconnect' });
 
     await expect(reconnect).toBeFocused();
-    await expect(page.getByRole('status')).toHaveText(
+    await expect(connectionStatus(page)).toHaveText(
       'Disconnected: The serial port could not be opened or was disconnected. Another program may be using it.',
     );
     await expectNoAxeViolations(page);
 
     await reconnect.click();
-    await expect(page.getByRole('status')).toHaveText(
+    await expect(connectionStatus(page)).toHaveText(
       'Serial ECU (7812 baud) · Polling',
     );
     expect(await emulatedSerial.opens()).toHaveLength(2);
@@ -122,7 +123,7 @@ test.describe('Serial ECU over Web Serial', () => {
   }) => {
     await page.goto('./');
     await page.getByRole('button', { name: 'Connect to ECU' }).click();
-    await expect(page.getByRole('status')).toHaveText(
+    await expect(connectionStatus(page)).toHaveText(
       'Serial ECU (7812 baud) · Polling',
     );
 
@@ -136,7 +137,7 @@ test.describe('Serial ECU over Web Serial', () => {
     await expect(failure).toContainText('Error: TimeoutError: ');
     await failure.getByRole('button', { name: 'Close' }).click();
 
-    await expect(page.getByRole('status')).toHaveText(
+    await expect(connectionStatus(page)).toHaveText(
       'Disconnected: The ECU stopped responding. Check the cable, that the ignition is on, and that the baud rate matches the ECU firmware.',
     );
     await expect(page.getByRole('button', { name: 'Reconnect' })).toBeFocused();
@@ -202,7 +203,7 @@ test.describe('Serial ECU over Web Serial', () => {
     await expect(
       page.getByRole('heading', { name: 'Connect to an ECU' }),
     ).toBeVisible();
-    await expect(page.getByRole('status')).toHaveCount(0);
+    await expect(connectionStatus(page)).toHaveCount(0);
     await expect(page.getByRole('alert')).toHaveCount(0);
     expect(await emulatedSerial.opens()).toEqual([]);
   });
@@ -224,6 +225,6 @@ test.describe('Browser without Web Serial', () => {
     await expectNoAxeViolations(page);
 
     await page.getByRole('button', { name: 'Demo mode' }).click();
-    await expect(page.getByRole('status')).toHaveText('Demo ECU · Polling');
+    await expect(connectionStatus(page)).toHaveText('Demo ECU · Polling');
   });
 });

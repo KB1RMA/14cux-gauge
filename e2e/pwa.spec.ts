@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import type { Page } from '@playwright/test';
-import { expect, expectNoAxeViolations, test } from './support/fixtures';
+import {
+  appStatus,
+  expect,
+  expectNoAxeViolations,
+  test,
+} from './support/fixtures';
 
 /**
  * Cuts the network the way a garage without wifi does: nothing is reachable
@@ -94,7 +99,7 @@ test.describe('Progressive web app', () => {
     await expect(
       page.getByRole('heading', { level: 1, name: '14CUX Gauge' }),
     ).toBeVisible();
-    await expect(page.getByRole('status')).toContainText(/^Offline\. Running /);
+    await expect(appStatus(page)).toContainText(/^Offline\. Running /);
     await expectNoAxeViolations(page);
 
     // Demo mode runs wholly in the page.
@@ -108,7 +113,7 @@ test.describe('Progressive web app', () => {
       page.getByRole('region', { name: 'Connection' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('status').filter({ hasText: /^Offline\./ }),
+      appStatus(page).filter({ hasText: /^Offline\./ }),
     ).toBeHidden();
   });
 
@@ -120,9 +125,7 @@ test.describe('Progressive web app', () => {
     );
     await page.goto('./');
 
-    await expect(page.getByRole('status')).toContainText(
-      /^v99\.0\.0 is available/,
-    );
+    await expect(appStatus(page)).toContainText(/^v99\.0\.0 is available/);
     await expectNoAxeViolations(page);
   });
 });

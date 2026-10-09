@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import {
+  connectionStatus,
   expect,
   expectNoAxeViolations,
   reading,
@@ -24,7 +25,7 @@ test.describe('Demo mode', () => {
     await expect(
       page.getByRole('heading', { name: 'Live data' }),
     ).toBeFocused();
-    await expect(page.getByRole('status')).toHaveText('Demo ECU · Polling');
+    await expect(connectionStatus(page)).toHaveText('Demo ECU · Polling');
     await expect(reading(page, 'Engine speed')).toHaveText(/^\d+ rpm$/);
     await expect(
       page.getByRole('region', { name: 'Connection' }),
@@ -38,7 +39,7 @@ test.describe('Demo mode', () => {
     const faults = page.getByRole('list', { name: 'Stored fault codes' });
 
     await expect(faults.getByRole('listitem')).toHaveText([
-      'Purge valve leak purgeValveLeak',
+      /^Purge valve leak\b/,
     ]);
 
     await page.getByRole('button', { name: 'Clear fault codes' }).click();
@@ -61,7 +62,7 @@ test.describe('Demo mode', () => {
     await expect(
       page.getByRole('heading', { name: 'Connect to an ECU' }),
     ).toBeFocused();
-    await expect(page.getByRole('status')).toHaveCount(0);
+    await expect(connectionStatus(page)).toHaveCount(0);
   });
 
   test('cancelling the clear dialog keeps the fault codes', async ({
