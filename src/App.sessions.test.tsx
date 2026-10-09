@@ -5,12 +5,13 @@ import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { IDBFactory } from 'fake-indexeddb';
 import { App } from './App';
 import type { LiveSnapshot } from './model/snapshot';
-import { openSessionStore } from './storage/openSessionStore';
+import { openStorage } from './storage/openStorage';
 import { MemorySessionStore } from './storage/sessionStore';
 import { expectNoAxeViolations, readingFor } from './test-support/a11y';
 import { notification } from './test-support/notifications';
 import { fakeUsageCounter } from './test-support/usageCounter';
 import { snapshotAt } from './test-support/snapshots';
+import { storageWith } from './test-support/storage';
 import { plantRecords } from './test-support/storedRecords';
 
 const START = Date.UTC(2026, 9, 5, 14, 0);
@@ -160,9 +161,7 @@ describe('Recording and browsing sessions', () => {
     await store.update(id, { notes: 'Hunts between 600 and 900 rpm.' });
 
     const { container } = render(
-      <App
-        openSessionStore={() => Promise.resolve({ store, persistent: true })}
-      />,
+      <App openStorage={storageWith({ sessions: store })} />,
     );
 
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
@@ -276,9 +275,7 @@ describe('Recording and browsing sessions', () => {
     await store.finish(id, START + 3000);
 
     const { container } = render(
-      <App
-        openSessionStore={() => Promise.resolve({ store, persistent: true })}
-      />,
+      <App openStorage={storageWith({ sessions: store })} />,
     );
 
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
@@ -528,9 +525,9 @@ describe('Recording and browsing sessions', () => {
   it('keeps sessions in IndexedDB across visits', async () => {
     const user = userEvent.setup();
     const factory = new IDBFactory();
-    const open = () => openSessionStore(factory);
+    const open = () => openStorage(factory);
     const { unmount } = render(
-      <App pollIntervalMs={{ demo: 10 }} openSessionStore={open} />,
+      <App pollIntervalMs={{ demo: 10 }} openStorage={open} />,
     );
 
     await connectDemo(user);
@@ -547,7 +544,7 @@ describe('Recording and browsing sessions', () => {
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
     unmount();
 
-    render(<App openSessionStore={open} />);
+    render(<App openStorage={open} />);
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
 
     expect(
@@ -566,18 +563,16 @@ describe('Recording and browsing sessions', () => {
 
   it('says when a session has no samples, or has been deleted', async () => {
     const user = userEvent.setup();
-    const store = new MemorySessionStore();
-    const empty = await store.create({
+    const factory = new IDBFactory();
+    // Another tab, with its own connection to the same database.
+    const otherTab = await openStorage(factory);
+    const empty = await otherTab.sessions.create({
       name: 'Empty',
       source: 'serial',
       startedAt: Date.UTC(2026, 9, 5),
     });
 
-    render(
-      <App
-        openSessionStore={() => Promise.resolve({ store, persistent: true })}
-      />,
-    );
+    render(<App openStorage={() => openStorage(factory)} />);
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
     await user.click(await screen.findByRole('link', { name: 'Empty' }));
 
@@ -588,9 +583,10 @@ describe('Recording and browsing sessions', () => {
     expect(readingFor('Length')).toHaveTextContent('Unfinished');
     expect(readingFor('Source')).toHaveTextContent('Serial ECU');
 
-    // Deleted elsewhere (another tab); the next change here notices.
+    // Deleted in the other tab, which this one is not told about; the next
+    // change here notices.
     await act(async () => {
-      await store.remove(empty.id);
+      await otherTab.sessions.remove(empty.id);
     });
     await user.type(screen.getByRole('textbox', { name: 'Notes' }), 'x');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
@@ -598,6 +594,7 @@ describe('Recording and browsing sessions', () => {
     expect(
       await screen.findByText('The changes could not be saved.'),
     ).toBeInTheDocument();
+    otherTab.close();
   });
 
   it('stays where the user went while a session is being deleted', async () => {
@@ -622,11 +619,7 @@ describe('Recording and browsing sessions', () => {
       source: 'demo',
       startedAt: START,
     });
-    render(
-      <App
-        openSessionStore={() => Promise.resolve({ store, persistent: true })}
-      />,
-    );
+    render(<App openStorage={storageWith({ sessions: store })} />);
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
     await user.click(await screen.findByRole('link', { name: 'Slow to go' }));
     await user.click(
@@ -669,9 +662,7 @@ describe('Recording and browsing sessions', () => {
     render(
       <App
         pollIntervalMs={{ demo: 10 }}
-        openSessionStore={() =>
-          Promise.resolve({ store: new FullStore(), persistent: true })
-        }
+        openStorage={storageWith({ sessions: new FullStore() })}
         usageCounter={counter}
       />,
     );
@@ -745,7 +736,7 @@ describe('Recording and browsing sessions', () => {
     });
 
     const { container } = render(
-      <App openSessionStore={() => openSessionStore(factory)} />,
+      <App openStorage={() => openStorage(factory)} />,
     );
 
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));

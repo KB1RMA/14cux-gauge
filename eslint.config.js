@@ -147,6 +147,26 @@ export default [
     },
   },
   {
+    // Views read and change stored data only through the providers'
+    // narrow APIs (`useSessions`, `useRoms`) and `useSetting`.
+    files: ['src/components/**/*.{ts,tsx}'],
+    ignores: ['src/components/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/storage/*'],
+              message:
+                'Use useSessions, useRoms or useSetting instead of reaching storage directly.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Tests render ad-hoc components and export nothing to hot-reload.
     files: ['src/**/*.test.{ts,tsx}'],
     rules: { 'react-refresh/only-export-components': 'off' },

@@ -1,22 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { ReadCancelledError } from '@kb1rma/libcomm14cux-ts';
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { recordedSource } from '../ecu/connect';
 import { describeError } from '../ecu/errors';
 import { useEcu } from '../ecu/useEcu';
 import { useRecording } from '../recording/useRecording';
-import { openRomStore } from '../storage/openRomStore';
 import type { UnreadableRecord } from '../model/record';
 import type { RomSummary } from '../model/rom';
 import type { RomStore } from '../storage/romStore';
+import { useStorage } from '../storage/useStorage';
+import { useStoreQuery } from '../storage/useStoreQuery';
 import {
   RomsContext,
   type RomOutcome,
@@ -31,57 +25,35 @@ import {
   sha256Hex,
 } from './romImage';
 
-export interface RomsProviderProps {
-  children: ReactNode;
-  /** Opens the store; tests and the Electron app can supply their own. */
-  open?: () => Promise<{ store: RomStore; persistent: boolean }>;
+/** The saved images; a list that cannot be read is shown as empty. */
+async function readList(store: RomStore) {
+  return {
+    images: await store.list().catch(() => []),
+    unreadable: await store.listUnreadable().catch(() => []),
+  };
 }
+
+const NONE: UnreadableRecord[] = [];
 
 /**
  * Reads the ECU's ROM image on request and keeps the saved images. It lives
  * above the dashboard's tabs, so a read carries on if the user changes view.
  */
-export function RomsProvider({
-  children,
-  open = openRomStore,
-}: RomsProviderProps) {
+export function RomsProvider({ children }: { children: ReactNode }) {
   const { state, ecu, pausePolling } = useEcu();
   const recording = useRecording();
-  const [store, setStore] = useState<RomStore | undefined>(undefined);
-  const [persistent, setPersistent] = useState(false);
-  const [images, setImages] = useState<RomSummary[] | undefined>(undefined);
-  const [unreadable, setUnreadable] = useState<UnreadableRecord[]>([]);
+  const storage = useStorage();
+  const store = storage?.roms;
+  const persistent = storage?.persistent ?? false;
+  const [list, settled] = useStoreQuery(store, readList);
+  const images = list.status === 'loaded' ? list.value.images : undefined;
+  const unreadable = list.status === 'loaded' ? list.value.unreadable : NONE;
   const [progress, setProgress] = useState<RomProgress | undefined>(undefined);
   const [outcome, setOutcome] = useState<RomOutcome | undefined>(undefined);
   const readingRef = useRef(false);
   const cancelledRef = useRef(false);
   const source =
     state.status === 'idle' ? undefined : recordedSource(state.source);
-
-  useEffect(() => {
-    let opened: RomStore | undefined;
-    let unmounted = false;
-
-    void open().then(async (result) => {
-      opened = result.store;
-
-      if (unmounted) {
-        opened.close();
-
-        return;
-      }
-
-      setStore(result.store);
-      setPersistent(result.persistent);
-      setImages(await result.store.list().catch(() => []));
-      setUnreadable(await result.store.listUnreadable().catch(() => []));
-    });
-
-    return () => {
-      unmounted = true;
-      opened?.close();
-    };
-  }, [open]);
 
   const read = useCallback(async () => {
     if (!ecu || !source || readingRef.current) {
@@ -136,7 +108,7 @@ export function RomsProvider({
         try {
           image = await store.save({ ...details, bytes });
           kept = true;
-          setImages(await store.list());
+          await settled();
         } catch {
           // Still download it; the outcome says no copy was kept.
         }
@@ -155,7 +127,7 @@ export function RomsProvider({
       setProgress(undefined);
       resume();
     }
-  }, [ecu, source, store, recording, pausePolling]);
+  }, [ecu, source, store, settled, recording, pausePolling]);
 
   const cancel = useCallback(() => {
     if (!readingRef.current) {
@@ -199,10 +171,9 @@ export function RomsProvider({
       }
 
       await store.remove(id);
-      setImages(await store.list());
-      setUnreadable(await store.listUnreadable());
+      await settled();
     },
-    [store],
+    [store, settled],
   );
 
   const value = useMemo<RomsValue>(

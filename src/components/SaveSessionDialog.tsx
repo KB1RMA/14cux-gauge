@@ -16,7 +16,7 @@ function SaveForm({
   session: SessionSummary;
   onDone(): void;
 }) {
-  const { store } = useSessions();
+  const { edit } = useSessions();
   const [name, setName] = useState(session.name);
   const [notes, setNotes] = useState(session.notes);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -27,20 +27,14 @@ function SaveForm({
       onSubmit={(event) => {
         event.preventDefault();
 
-        if (!store) {
-          return;
-        }
-
         setSaving(true);
         setError(undefined);
-        store
-          .update(session.id, { name: name.trim(), notes })
-          .then(onDone, () => {
-            setSaving(false);
-            setError(
-              'The changes could not be saved. The recording is kept under its original name.',
-            );
-          });
+        edit(session.id, { name: name.trim(), notes }).then(onDone, () => {
+          setSaving(false);
+          setError(
+            'The changes could not be saved. The recording is kept under its original name.',
+          );
+        });
       }}
     >
       <SessionFields

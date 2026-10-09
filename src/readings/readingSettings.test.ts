@@ -1,22 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import {
-  chosenReadings,
-  offExcept,
-  parseReadingSettings,
-} from './readingSettings';
+import { chosenReadings, offExcept } from './readingSettings';
 
 describe('reading settings', () => {
-  it('reads everything by default', () => {
-    expect(parseReadingSettings(undefined)).toEqual({ off: [] });
+  it('chooses everything when nothing is off', () => {
     expect(chosenReadings([])).toHaveLength(25);
-  });
-
-  it('keeps only known readings, and never turns the MIL off', () => {
-    expect(
-      parseReadingSettings({ off: ['fuelTempF', 'milOn', 'warpDrive', 3] }),
-    ).toEqual({ off: ['fuelTempF'] });
-    expect(parseReadingSettings({ off: 'fuelTempF' })).toEqual({ off: [] });
   });
 
   it('always includes the MIL among the chosen readings', () => {

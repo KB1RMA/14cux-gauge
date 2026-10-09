@@ -7,23 +7,19 @@ import {
   type StoredRom,
 } from '../model/rom';
 import { sortRecords, type UnreadableRecord } from '../model/record';
-import {
-  completed,
-  entries,
-  openDatabase,
-  request,
-  ROMS,
-  type DatabaseOptions,
-} from './database';
+import { completed, entries, request, ROMS } from './database';
+import { Listeners } from './listeners';
 import { newestRomFirst, summaryOf, type RomStore } from './romStore';
 
-/** ROM images in IndexedDB, one record each, bytes included. */
+/**
+ * ROM images in IndexedDB, one record each, bytes included. It uses a
+ * connection opened by `openStorage`, which closes it.
+ */
 export class IndexedDbRomStore implements RomStore {
-  private constructor(private readonly db: IDBDatabase) {}
+  private readonly listeners = new Listeners();
+  readonly subscribe = this.listeners.subscribe;
 
-  static async open(options: DatabaseOptions = {}): Promise<IndexedDbRomStore> {
-    return new IndexedDbRomStore(await openDatabase(options));
-  }
+  constructor(private readonly db: IDBDatabase) {}
 
   async save(rom: NewRom): Promise<RomSummary> {
     const summary = summaryOf(rom, crypto.randomUUID());
@@ -32,6 +28,7 @@ export class IndexedDbRomStore implements RomStore {
 
     tx.objectStore(ROMS).add(record);
     await completed(tx);
+    this.listeners.notify();
 
     return summary;
   }
@@ -58,10 +55,7 @@ export class IndexedDbRomStore implements RomStore {
 
     tx.objectStore(ROMS).delete(id);
     await completed(tx);
-  }
-
-  close(): void {
-    this.db.close();
+    this.listeners.notify();
   }
 
   private async readAll() {

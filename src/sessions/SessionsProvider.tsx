@@ -1,50 +1,71 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { useEffect, useState, type ReactNode } from 'react';
-import { ObservableSessionStore } from '../storage/observableSessionStore';
-import { openSessionStore } from '../storage/openSessionStore';
+import { useMemo, type ReactNode } from 'react';
 import type { SessionStore } from '../storage/sessionStore';
+import { useStorage } from '../storage/useStorage';
+import { useStoreQuery } from '../storage/useStoreQuery';
 import { SessionsContext, type SessionsValue } from './context';
 
-export interface SessionsProviderProps {
-  children: ReactNode;
-  /** Opens the store; tests and the Electron app can supply their own. */
-  open?: () => Promise<{ store: SessionStore; persistent: boolean }>;
+async function readList(store: SessionStore) {
+  const [sessions, unreadable] = await Promise.all([
+    store.list(),
+    store.listUnreadable(),
+  ]);
+
+  return { sessions, unreadable };
 }
 
-const OPENING: SessionsValue = { store: undefined, persistent: false };
+function notOpen(): Promise<never> {
+  return Promise.reject(new Error('Storage is still being opened.'));
+}
 
-/** Opens the recorded-sessions store once, and closes it on unmount. */
-export function SessionsProvider({
-  children,
-  open = openSessionStore,
-}: SessionsProviderProps) {
-  const [value, setValue] = useState<SessionsValue>(OPENING);
+/** The recorded sessions, for views to list, read, rename and delete. */
+export function SessionsProvider({ children }: { children: ReactNode }) {
+  const storage = useStorage();
+  const store = storage?.sessions;
+  const [query, settled] = useStoreQuery(store, readList);
 
-  useEffect(() => {
-    let store: SessionStore | undefined;
-    let unmounted = false;
+  // Kept apart from the list, so reading a session's samples does not
+  // start again each time the list changes.
+  const actions = useMemo<Pick<SessionsValue, 'edit' | 'remove' | 'read'>>(
+    () => ({
+      // Each resolves once the list shows the change, so a view acting on
+      // it next (moving focus, say) sees the list as it now is.
+      edit: async (id, changes) => {
+        await (store ? store.update(id, changes) : notOpen());
+        await settled();
+      },
+      remove: async (id) => {
+        await (store ? store.remove(id) : notOpen());
+        await settled();
+      },
+      read: async (id) => {
+        if (!store) {
+          return notOpen();
+        }
 
-    void open().then((opened) => {
-      store = opened.store;
+        const [samples, writes] = await Promise.all([
+          store.readSamples(id),
+          store.readWrites(id),
+        ]);
 
-      if (unmounted) {
-        store.close();
-
-        return;
-      }
-
-      setValue({
-        store: new ObservableSessionStore(opened.store),
-        persistent: opened.persistent,
-      });
-    });
-
-    return () => {
-      unmounted = true;
-      store?.close();
-    };
-  }, [open]);
+        return { samples, writes };
+      },
+    }),
+    [store, settled],
+  );
+  const persistent = storage?.persistent;
+  const value = useMemo<SessionsValue>(
+    () => ({
+      list:
+        query.status === 'loaded'
+          ? { status: 'loaded', ...query.value }
+          : query,
+      persistent,
+      ...actions,
+    }),
+    [query, persistent, actions],
+  );
 
   return <SessionsContext value={value}>{children}</SessionsContext>;
 }

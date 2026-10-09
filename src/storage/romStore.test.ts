@@ -3,17 +3,32 @@
 import { IDBFactory } from 'fake-indexeddb';
 import { InvalidRecordError } from '../model/record';
 import { plantRecords } from '../test-support/storedRecords';
+import { openDatabase } from './database';
 import { IndexedDbRomStore } from './indexedDbRomStore';
-import { IndexedDbSessionStore } from './indexedDbSessionStore';
-import { openRomStore } from './openRomStore';
 import { MemoryRomStore, type RomStore } from './romStore';
 
-const backends: [string, () => Promise<RomStore>][] = [
-  ['MemoryRomStore', () => Promise.resolve(new MemoryRomStore())],
+type Opened = RomStore & { close(): void };
+
+/** ROM images in IndexedDB over `factory`; `close` closes the database. */
+async function openIndexedDb(factory: IDBFactory): Promise<Opened> {
+  const db = await openDatabase({ factory });
+
+  return Object.assign(new IndexedDbRomStore(db), {
+    close: () => {
+      db.close();
+    },
+  });
+}
+
+const backends: [string, () => Promise<Opened>][] = [
   [
-    'IndexedDbRomStore',
-    () => IndexedDbRomStore.open({ factory: new IDBFactory() }),
+    'MemoryRomStore',
+    () =>
+      Promise.resolve(
+        Object.assign(new MemoryRomStore(), { close: () => undefined }),
+      ),
   ],
+  ['IndexedDbRomStore', () => openIndexedDb(new IDBFactory())],
 ];
 
 const BYTES = Uint8Array.from([0x00, 0x7f, 0x80, 0xff]);
@@ -30,7 +45,7 @@ function rom(readAt: number, bytes = BYTES) {
 }
 
 describe.each(backends)('%s', (_name, open) => {
-  let store: RomStore;
+  let store: Opened;
 
   beforeEach(async () => {
     store = await open();
@@ -85,33 +100,34 @@ describe.each(backends)('%s', (_name, open) => {
     expect(await store.list()).toEqual([]);
     expect(await store.read(saved.id)).toBeUndefined();
   });
-});
 
-describe('IndexedDbRomStore', () => {
-  it('shares its database with recorded sessions', async () => {
-    const factory = new IDBFactory();
-    const roms = await IndexedDbRomStore.open({ factory });
-    const sessions = await IndexedDbSessionStore.open({ factory });
+  it('reports each save and remove to subscribers', async () => {
+    const listener = vi.fn();
+    const unsubscribe = store.subscribe(listener);
+    const saved = await store.save(rom(1000));
 
-    const saved = await roms.save(rom(1000));
-    const session = await sessions.create({
-      name: 'Idle',
-      source: 'demo',
-      startedAt: 5,
-    });
+    expect(listener).toHaveBeenCalledTimes(1);
 
-    expect(await roms.list()).toHaveLength(1);
-    expect((await sessions.list()).map(({ id }) => id)).toEqual([session.id]);
-    expect(saved.size).toBe(4);
-    roms.close();
-    sessions.close();
+    await store.read(saved.id);
+    await store.list();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    await store.remove(saved.id);
+
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    unsubscribe();
+    await store.save(rom(2000));
+
+    expect(listener).toHaveBeenCalledTimes(2);
   });
 });
 
 describe('IndexedDbRomStore stored records', () => {
   it('lists a damaged image apart, rejects reading it, and deletes it', async () => {
     const factory = new IDBFactory();
-    const roms = await IndexedDbRomStore.open({ factory });
+    const roms = await openIndexedDb(factory);
     const saved = await roms.save(rom(1000));
 
     roms.close();
@@ -120,7 +136,7 @@ describe('IndexedDbRomStore stored records', () => {
       roms: [{ ...saved, id: 'damaged', bytes: 'not bytes' }],
     });
 
-    const reopened = await IndexedDbRomStore.open({ factory });
+    const reopened = await openIndexedDb(factory);
 
     expect(await reopened.list()).toEqual([saved]);
     expect(await reopened.listUnreadable()).toEqual([
@@ -132,21 +148,5 @@ describe('IndexedDbRomStore stored records', () => {
 
     expect(await reopened.listUnreadable()).toEqual([]);
     reopened.close();
-  });
-});
-
-describe('openRomStore', () => {
-  it('opens IndexedDB when it is there', async () => {
-    const { store, persistent } = await openRomStore(new IDBFactory());
-
-    expect(persistent).toBe(true);
-    store.close();
-  });
-
-  it('falls back to memory without IndexedDB', async () => {
-    const { store, persistent } = await openRomStore(undefined);
-
-    expect(persistent).toBe(false);
-    expect(store).toBeInstanceOf(MemoryRomStore);
   });
 });

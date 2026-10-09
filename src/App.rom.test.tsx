@@ -6,9 +6,10 @@ import { IDBFactory } from 'fake-indexeddb';
 import { App } from './App';
 import type * as demoEngine from './demo/demoEngine';
 import { buildSyntheticRom } from './demo/syntheticRom';
-import { openRomStore } from './storage/openRomStore';
+import { openStorage } from './storage/openStorage';
 import { MemoryRomStore } from './storage/romStore';
 import { expectNoAxeViolations } from './test-support/a11y';
+import { storageWith } from './test-support/storage';
 import { plantRecords } from './test-support/storedRecords';
 import { fakeUsageCounter } from './test-support/usageCounter';
 
@@ -71,7 +72,7 @@ function renderApp(store = new MemoryRomStore()) {
     <App
       pollIntervalMs={{ demo: 10 }}
       usageCounter={fakeUsageCounter()}
-      openRomStore={() => Promise.resolve({ store, persistent: true })}
+      openStorage={storageWith({ roms: store })}
     />,
   );
 }
@@ -287,7 +288,7 @@ describe('Saving the ROM image', () => {
       <App
         pollIntervalMs={{ demo: 10 }}
         usageCounter={fakeUsageCounter()}
-        openRomStore={() => openRomStore(factory)}
+        openStorage={() => openStorage(factory)}
       />,
     );
 

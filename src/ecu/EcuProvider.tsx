@@ -21,13 +21,8 @@ import { SampleHistory } from '../history/sampleHistory';
 import { METRIC_KEYS, readingsFor, type MetricKey } from '../metrics';
 import type { LiveSnapshot } from '../model/snapshot';
 import { ReadingsContext } from '../readings/context';
-import {
-  ALWAYS_READ,
-  chosenReadings,
-  parseReadingSettings,
-  READINGS_KEY,
-} from '../readings/readingSettings';
-import { useStoredState } from '../storage/useStoredState';
+import { ALWAYS_READ, chosenReadings } from '../readings/readingSettings';
+import { useSetting } from '../settings/useSetting';
 import {
   createEcuConnection,
   type EcuConnection,
@@ -93,10 +88,7 @@ export function EcuProvider({
   const [snapshotListeners] = useState(
     () => new Set<(snapshot: LiveSnapshot) => void>(),
   );
-  const [readingSettings, setReadingSettings] = useStoredState(
-    READINGS_KEY,
-    parseReadingSettings,
-  );
+  const [readingSettings, setReadingSettings] = useSetting('readings');
   // How many views have asked for each reading (see `request`).
   const [requested, setRequested] = useState<ReadonlyMap<MetricKey, number>>(
     () => new Map(),

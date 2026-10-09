@@ -16,7 +16,7 @@ import styles from './Sessions.module.css';
  * has just come back from; its link gets focus, or else the heading.
  */
 export function SessionList({ returnTo }: { returnTo: string | undefined }) {
-  const { store, persistent } = useSessions();
+  const { persistent, remove } = useSessions();
   const { active } = useRecording();
   const list = useSessionList();
   const [deleting, setDeleting] = useState<DeleteTarget | undefined>(undefined);
@@ -48,7 +48,7 @@ export function SessionList({ returnTo }: { returnTo: string | undefined }) {
         Recorded sessions
       </h2>
 
-      {store && !persistent ? (
+      {persistent === false ? (
         <p className={styles['notice']}>
           This browser is not letting the app keep data, so recordings last only
           until the page is closed or reloaded.
@@ -147,7 +147,7 @@ export function SessionList({ returnTo }: { returnTo: string | undefined }) {
         onConfirm={(session) => {
           setDeleting(undefined);
           setDeleteFailed(false);
-          store?.remove(session.id).then(
+          remove(session.id).then(
             () => {
               // Its Delete button is about to go; start again at the top.
               headingRef.current?.focus();
