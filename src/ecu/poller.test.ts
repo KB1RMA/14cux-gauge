@@ -393,6 +393,23 @@ describe('startPoller', () => {
     expect(sink.errors).toEqual([]);
   });
 
+  it('discards a pass whose last read finishes after it was stopped', async () => {
+    const { transport, ecu } = await plantedEcu();
+    const sink = collect();
+    const sent = transport.written.length;
+    const poller = startPoller(ecu, {
+      readings: () => new Set(['engineRpm']),
+      ...sink,
+    });
+
+    poller.stop(); // while the pass's only read is under way
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(transport.written.length).toBeGreaterThan(sent);
+    expect(sink.snapshots).toEqual([]);
+    expect(sink.errors).toEqual([]);
+  });
+
   it('gives up after three consecutive failed passes when the ECU goes silent', async () => {
     const { transport, ecu } = await plantedEcu();
     const sink = collect();
