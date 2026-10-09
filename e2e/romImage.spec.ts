@@ -54,10 +54,35 @@ test.describe('Saving the ROM image', () => {
     await page.reload();
     await emulatedSerial.choosePort('grant');
     await page.getByRole('button', { name: 'Connect to ECU' }).click();
+    const saved = page.getByRole('list', { name: 'Saved ROM images' });
+
+    await expect(saved.getByText('Tune 1234, ident 0xDE70')).toBeVisible();
+    await expectNoAxeViolations(page);
+
+    // The kept copy downloads again, byte for byte, without reading the ECU.
+    const again = page.waitForEvent('download');
+
+    await saved
+      .getByRole('button', { name: /^Download Tune 1234, ident 0xDE70, / })
+      .click();
+
+    const copy = await again;
+
+    expect(copy.suggestedFilename()).toBe('14cux-tune-R1234-ident-0xDE70.bin');
+    expect(new Uint8Array(await readFile(await copy.path()))).toEqual(expected);
+
+    await saved
+      .getByRole('button', { name: /^Delete Tune 1234, ident 0xDE70, / })
+      .click();
+
+    const remove = page.getByRole('alertdialog', {
+      name: 'Delete this ROM image?',
+    });
+
+    await expectNoAxeViolations(page, { within: '[role="alertdialog"]' });
+    await remove.getByRole('button', { name: 'Delete image' }).click();
     await expect(
-      page
-        .getByRole('list', { name: 'Saved ROM images' })
-        .getByText('Tune 1234, ident 0xDE70'),
+      page.getByText('No images are kept in this browser yet.'),
     ).toBeVisible();
   });
 

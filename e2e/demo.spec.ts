@@ -3,6 +3,7 @@
 import {
   expect,
   expectNoAxeViolations,
+  notification,
   reading,
   tabKey,
   tabTo,
@@ -121,5 +122,18 @@ test.describe('Demo mode', () => {
     await page.keyboard.press(tab);
     await page.keyboard.press('Enter');
     await expect(page.getByText('No fault codes stored.')).toBeVisible();
+
+    // F8 jumps to the notifications, where the result can be dismissed.
+    const notices = page.getByRole('region', { name: 'Notifications (F8)' });
+    const cleared = notification(page, 'Clear fault codes');
+    const dismiss = cleared.getByRole('button', { name: 'Dismiss' });
+
+    await expect(cleared).toContainText('Fault codes cleared.');
+    await page.keyboard.press('F8');
+    await expect(notices.getByRole('list')).toBeFocused();
+    await tabTo(page, dismiss, tab, 5);
+    await expect(dismiss).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(cleared).toHaveCount(0);
   });
 });
