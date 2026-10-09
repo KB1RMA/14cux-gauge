@@ -185,6 +185,50 @@ describe('useEcuRead', () => {
     expect(result.current).toMatchObject({ value: 1234, error: undefined });
   });
 
+  it('waits for a ROM read to finish before reading for a view opened during it', async () => {
+    const { session } = sessionOver([onDemoRom()]);
+    let calls = 0;
+
+    const counted: EcuRead<number> = (ecu) => {
+      calls++;
+
+      return tuneNumber(ecu);
+    };
+
+    await session.connect({ kind: 'demo' });
+
+    const romRead = session.acquire(ROM_READ_HOLDER);
+
+    await romRead?.ready;
+
+    // The view opens part-way through the ROM read, as after changing view.
+    const { result } = renderRead(session, counted, { onConnect: true });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(calls).toBe(0);
+    expect(result.current).toMatchObject({
+      value: undefined,
+      error: undefined,
+    });
+
+    act(() => {
+      romRead?.release();
+    });
+    await waitFor(() => {
+      expect(result.current.value).toBe(1234);
+    });
+
+    // Once per connection: letting go of a later write reads nothing more.
+    act(() => {
+      session.acquire(WRITE_HOLDER)?.release();
+    });
+
+    expect(calls).toBe(1);
+  });
+
   it('reads beside a write, as polling does', async () => {
     const { session } = sessionOver([onDemoRom()]);
     const { result } = renderRead(session, tuneNumber);

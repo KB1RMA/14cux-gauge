@@ -71,8 +71,10 @@ export interface Lease {
    */
   readonly ready: Promise<void>;
   /**
-   * Gives the link back, and carries on polling if it was paused. Later
-   * calls do nothing, and so does a call after the connection has ended.
+   * Gives the link back, and carries on polling if it was paused. Called
+   * while polling is still pausing, it takes effect once the pause has.
+   * Later calls do nothing, and so does a call after the connection has
+   * ended.
    */
   release(): void;
 }
@@ -368,9 +370,26 @@ export class EcuSession {
       return undefined;
     }
 
-    const held = { released: false, resume: () => undefined as void };
+    const held = {
+      released: false,
+      pausing: false,
+      resume: () => undefined as void,
+    };
     // Set by `release`, which may run before `ready` settles.
     const released = () => held.released;
+
+    // Frees the link and carries on polling. A holder released while its
+    // pause is still taking effect keeps the link until the pause settles:
+    // a new holder must not take it only for this one's pause to finish and
+    // resume polling under it.
+    const free = () => {
+      if (this.lease === held) {
+        this.lease = undefined;
+        this.update({ holder: undefined });
+      }
+
+      held.resume();
+    };
 
     this.lease = held;
     this.update({ holder });
@@ -381,12 +400,16 @@ export class EcuSession {
       }
 
       if (holder.pausesPolling && !released() && this.active === active) {
-        const resume = await this.pausePolling(active);
+        held.pausing = true;
 
-        if (released()) {
-          resume();
-        } else {
-          held.resume = resume;
+        try {
+          held.resume = await this.pausePolling(active);
+        } finally {
+          held.pausing = false;
+
+          if (released()) {
+            free();
+          }
         }
       }
     })();
@@ -402,12 +425,9 @@ export class EcuSession {
 
         held.released = true;
 
-        if (this.lease === held) {
-          this.lease = undefined;
-          this.update({ holder: undefined });
+        if (!held.pausing) {
+          free();
         }
-
-        held.resume();
       },
     };
   };

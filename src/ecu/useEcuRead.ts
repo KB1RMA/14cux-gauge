@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { describeError } from './errors';
 import type { EcuRead } from './reads';
 import type { EcuLink } from './session';
@@ -50,14 +50,21 @@ export interface EcuReadResult<T> {
  * connection starts with none, and a read that finishes on an old one is
  * dropped.
  *
- * @param options.onConnect - Read once on each connection, without being asked.
+ * @param options.onConnect - Read once on each connection, without being
+ *   asked. While a ROM read has the link to itself, the read waits for it.
  */
 export function useEcuRead<T>(
   ecuRead: EcuRead<T>,
   { onConnect = false }: { onConnect?: boolean } = {},
 ): EcuReadResult<T> {
   const session = useEcuSession();
-  const { link } = useEcu();
+  const { link, holder } = useEcu();
+  // A holder that pauses polling (the ROM read) has the link to itself. A
+  // read beside a write is like a polling pass, so it goes ahead.
+  const busy = holder?.pausesPolling === true;
+  // The link the read on connect was made on, so it is made once per link,
+  // however often the view re-renders or the link is held and let go.
+  const readOnConnectRef = useRef<EcuLink | undefined>(undefined);
   const [outcome, setOutcome] = useState<Outcome<T> | undefined>(undefined);
   const [readingOn, setReadingOn] = useState<EcuLink | undefined>(undefined);
   const current = link && outcome?.link === link ? outcome : undefined;
@@ -86,20 +93,22 @@ export function useEcuRead<T>(
     [session, ecuRead],
   );
 
+  // A view can open part-way through a ROM read (the read carries on when the
+  // user changes view), so wait for it to let go.
   useEffect(() => {
-    if (onConnect && link) {
+    if (onConnect && link && !busy && readOnConnectRef.current !== link) {
+      readOnConnectRef.current = link;
       void settle(link);
     }
-  }, [onConnect, link, settle]);
+  }, [onConnect, link, busy, settle]);
 
   const read = useCallback(async () => {
     if (!link) {
       return;
     }
 
-    // A holder that pauses polling (the ROM read) has the link to itself. A
-    // read beside a write is like a polling pass, so it goes ahead. A read on
-    // connect never meets such a holder: a new link starts free.
+    // Asked from the snapshot, not `busy`, so a holder that took the link
+    // since this render is seen.
     if (session.getSnapshot().holder?.pausesPolling) {
       setOutcome((previous) => failedOn(previous, link, BUSY));
 

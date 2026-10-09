@@ -447,6 +447,43 @@ describe('EcuSession', () => {
       });
       await firstSnapshot(session);
     });
+
+    it('keeps a lease released early until its pause settles, so the next holder stays paused', async () => {
+      // Slow enough that a pass is still running when the lease is taken.
+      const { session } = sessionOver(
+        [new LatencyTransport(idling(), { perReadMs: 20, perByteMs: 0 })],
+        0,
+      );
+
+      await session.connect({ kind: 'demo' });
+      await firstSnapshot(session);
+
+      const pausing: LinkHolder = { ...ROM_READ_HOLDER, stopsRecording: false };
+      const early = session.acquire(pausing);
+
+      early?.release();
+
+      // The first holder's pause is still taking effect, so the link is not
+      // free yet…
+      expect(session.getSnapshot().holder).toBe(pausing);
+      expect(session.acquire(pausing)).toBeUndefined();
+
+      await early?.ready;
+
+      // …and once it is, the next holder's pause holds.
+      const next = session.acquire(pausing);
+
+      expect(next).toBeDefined();
+      await next?.ready;
+
+      expect(session.getSnapshot()).toMatchObject({
+        holder: pausing,
+        pollingPaused: true,
+      });
+      expect(session.getLive().snapshot).toBeUndefined();
+
+      next?.release();
+    });
   });
 
   describe('snapshot listeners', () => {
