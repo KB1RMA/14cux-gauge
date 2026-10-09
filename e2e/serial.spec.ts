@@ -126,6 +126,7 @@ test.describe('Serial ECU over Web Serial', () => {
     await expect(connectionStatus(page)).toHaveText(
       'Serial ECU (7812 baud) · Polling',
     );
+    await expect(reading(page, 'Engine speed')).toHaveCount(1);
 
     await emulatedSerial.setSilent(true);
 
@@ -141,6 +142,11 @@ test.describe('Serial ECU over Web Serial', () => {
       'Disconnected: The ECU stopped responding. Check the cable, that the ignition is on, and that the baud rate matches the ECU firmware.',
     );
     await expect(page.getByRole('button', { name: 'Reconnect' })).toBeFocused();
+    // The last readings are not left on screen looking live.
+    await expect(page.getByRole('region', { name: 'Live data' })).toHaveCount(
+      0,
+    );
+    await expect(reading(page, 'Engine speed')).toHaveCount(0);
   });
 
   test('saves a diagnostic log of the serial traffic for remote debugging', async ({

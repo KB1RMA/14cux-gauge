@@ -158,6 +158,43 @@ test.describe('Recorded sessions', () => {
     ).toBeFocused();
   });
 
+  test('renames a session and edits its notes after saving it', async ({
+    page,
+  }) => {
+    const dialog = await recordDemo(page);
+
+    await dialog.getByRole('button', { name: 'Skip' }).click();
+    await nav(page).getByRole('link', { name: 'Sessions' }).click();
+    await page.getByRole('link', { name: /^Demo ECU, / }).click();
+
+    const details = page.getByRole('region', { name: 'Name and notes' });
+    const save = details.getByRole('button', { name: 'Save changes' });
+
+    // Nothing to save until something changes.
+    await expect(save).toBeDisabled();
+    await details.getByRole('textbox', { name: 'Name' }).fill('Cold start');
+    await details.getByRole('textbox', { name: 'Notes' }).fill('Choke smell.');
+    await save.click();
+    await expect(details.getByText('Changes saved.')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Cold start' }),
+    ).toBeVisible();
+    await expect(save).toBeDisabled();
+    await expectNoAxeViolations(page);
+
+    await page.reload();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Cold start' }),
+    ).toBeVisible();
+    await expect(details.getByRole('textbox', { name: 'Notes' })).toHaveValue(
+      'Choke smell.',
+    );
+    await nav(page).getByRole('link', { name: 'Sessions' }).click();
+    await expect(
+      page.getByRole('link', { name: 'Cold start', exact: true }),
+    ).toBeVisible();
+  });
+
   test('exports a session as a CSV file', async ({ page }) => {
     const dialog = await recordDemo(page);
 

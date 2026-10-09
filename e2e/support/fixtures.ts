@@ -112,15 +112,18 @@ export const test = base.extend<Fixtures>({
 
 export { expect };
 
-/** The value shown for a name/value reading, found by its visible name. */
-export function reading(page: Page, name: string): Locator {
+/**
+ * The value shown for a name/value reading, found by its visible name, on the
+ * page or within `scope`, such as one graph or panel.
+ */
+export function reading(scope: Page | Locator, name: string): Locator {
   const exactName = new RegExp(
     `^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
   );
 
   // A <dd> is tied to its <dt> by position only; no role expresses that.
   // eslint-disable-next-line playwright/no-raw-locators -- see above
-  return page
+  return scope
     .getByRole('term')
     .filter({ hasText: exactName })
     .locator('xpath=following-sibling::dd[1]');
