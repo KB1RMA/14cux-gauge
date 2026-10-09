@@ -87,7 +87,10 @@ export function App({
   usageCounter?: UsageCounter | undefined;
 }) {
   return (
-    <HashRouter>
+    // Not as a transition: every poll re-renders the live views, and that
+    // urgent update would restart a view switch each time, holding it back
+    // for seconds when a view takes longer to render than a poll takes.
+    <HashRouter useTransitions={false}>
       <PreferencesProvider>
         <AppStatusProvider {...(appStatus ? { options: appStatus } : {})}>
           <NotificationsProvider>
