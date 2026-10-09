@@ -10,11 +10,7 @@ import { pushSnapshot } from '../history/pushSnapshot';
 import { SampleHistory } from '../history/sampleHistory';
 import { METRIC_KEYS, type MetricKey } from '../metrics';
 import type { LiveSnapshot, ReadingKey } from '../model/snapshot';
-import {
-  createEcuConnection,
-  type EcuConnection,
-  type EcuSource,
-} from './connect';
+import type { EcuConnection, EcuSource } from './connect';
 import { connectionReducer, type ConnectionState } from './connectionState';
 import { describeError, errorReason } from './errors';
 import {
@@ -109,8 +105,11 @@ export interface EcuSessionOptions {
   pollIntervalMs?: Partial<Record<EcuSource['kind'], number>> | undefined;
   /** Where serial traffic and connection events are recorded. */
   diagnostics?: DiagnosticLog | undefined;
-  /** Makes the connection for a source; defaults to Web Serial or the demo. */
-  createConnection?: (source: EcuSource, log: DiagnosticLog) => EcuConnection;
+  /**
+   * Makes the connection for a source: `ecuConnections` over the platform's
+   * serial ports, or a test's own.
+   */
+  createConnection: (source: EcuSource, log: DiagnosticLog) => EcuConnection;
 }
 
 const NO_LIVE_DATA: LiveData = {
@@ -183,7 +182,7 @@ export class EcuSession {
   // new connection never opens the port while the last one still holds it.
   private disposed: Promise<void> = Promise.resolve();
 
-  constructor(private readonly options: EcuSessionOptions = {}) {
+  constructor(private readonly options: EcuSessionOptions) {
     this.log = options.diagnostics ?? createDefaultLog();
   }
 
@@ -268,10 +267,7 @@ export class EcuSession {
         : `Connecting to a serial ECU${source.doubleSpeed ? ' (double-speed firmware)' : ''}`,
     );
 
-    const connection = (this.options.createConnection ?? createEcuConnection)(
-      source,
-      this.log,
-    );
+    const connection = this.options.createConnection(source, this.log);
     const active: Active = { link: { id: ++this.links }, connection };
 
     this.active = active;

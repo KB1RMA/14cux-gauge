@@ -1,30 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { useEffect, useState, type ReactNode } from 'react';
-import { BUILD_INFO } from '../buildInfo';
-import { AppStatusStore, type AppStatusStoreOptions } from './appStatusStore';
+import { useEffect, type ReactNode } from 'react';
+import type { AppStatusStore } from './appStatusStore';
 import { AppStatusContext } from './context';
-import { defaultOptions } from './defaultOptions';
 
 /**
- * Provides the offline and update status. `options` replaces the defaults,
- * which switch the checks on only in a production build (see
- * `defaultOptions`); without them the app reports online and up to date.
+ * Provides the offline and update status from `store`, which runs its checks
+ * while mounted if `checks` is set; without them it reports online and up
+ * to date (see `createAppServices`).
  */
 export function AppStatusProvider({
-  options,
+  store,
+  checks,
   children,
 }: {
-  options?: AppStatusStoreOptions;
+  store: AppStatusStore;
+  checks: boolean;
   children: ReactNode;
 }) {
-  const [config] = useState(() => options ?? defaultOptions());
-  const [store] = useState(
-    () => new AppStatusStore(config ?? { build: BUILD_INFO, versionUrl: '' }),
-  );
-  const enabled = config !== undefined;
-
-  useEffect(() => (enabled ? store.start() : undefined), [enabled, store]);
+  useEffect(() => (checks ? store.start() : undefined), [checks, store]);
 
   return <AppStatusContext value={store}>{children}</AppStatusContext>;
 }

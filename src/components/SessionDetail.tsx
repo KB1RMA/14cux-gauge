@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { ArrowLeftIcon, DownloadIcon } from '@radix-ui/react-icons';
 import { useEffect, useRef, useState } from 'react';
-import { downloadText } from '../diagnostics/report';
+import { usePlatform } from '../platform/usePlatform';
 import { usePreferences } from '../preferences/usePreferences';
 import { useRecording } from '../recording/useRecording';
 import { sessionCsv, sessionCsvFileName } from '../sessions/exportCsv';
@@ -80,6 +80,7 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
   const list = useSessionList();
   const samples = useSessionSamples(id);
   const { temperatureUnit, speedUnit } = usePreferences();
+  const { files } = usePlatform();
   const [deleting, setDeleting] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -194,7 +195,7 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
               }
               onClick={() => {
                 if (samples.status === 'loaded') {
-                  downloadText(
+                  void files.save(
                     sessionCsvFileName(session.name, session.startedAt),
                     sessionCsv(samples.samples, { temperatureUnit, speedUnit }),
                     'text/csv',

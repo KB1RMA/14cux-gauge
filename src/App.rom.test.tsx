@@ -4,6 +4,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { IDBFactory } from 'fake-indexeddb';
 import { App } from './App';
+import { browserPlatform } from './platform/browser';
 import type * as demoEngine from './demo/demoEngine';
 import { buildSyntheticRom } from './demo/syntheticRom';
 import { openStorage } from './storage/openStorage';
@@ -74,7 +75,9 @@ function renderApp(store = new MemoryRomStore()) {
     <App
       pollIntervalMs={{ demo: 10 }}
       usageCounter={fakeUsageCounter()}
-      openStorage={storageWith({ roms: store })}
+      platform={browserPlatform({
+        storage: { open: storageWith({ roms: store }) },
+      })}
     />,
   );
 }
@@ -352,7 +355,9 @@ describe('Saving the ROM image', () => {
       <App
         pollIntervalMs={{ demo: 10 }}
         usageCounter={fakeUsageCounter()}
-        openStorage={() => openStorage(factory)}
+        platform={browserPlatform({
+          storage: { open: () => openStorage(factory) },
+        })}
       />,
     );
 

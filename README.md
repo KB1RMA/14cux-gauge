@@ -144,4 +144,4 @@ Add `--bundle <file>.sigstore.json` to verify against the attached bundle instea
 - Move from the `0.1.0-beta` library to its stable `0.1.0` release once it is published.
 - Raw memory read/write, fuel pump and idle-motor tests.
 - CSV logging, charts and sparklines.
-- Electron packaging. The renderer is plain web code; the main process will need `session.on('select-serial-port')` plus `setPermissionCheckHandler` / `setDevicePermissionHandler` to let the user choose a port.
+- Electron packaging. The renderer is plain web code, and everything it needs from where it runs (serial ports, saving files, storage, settings) goes through one `Platform` (`src/platform/platform.ts`), passed to `createAppServices`. With the browser platform unchanged, the main process will need `session.on('select-serial-port')` plus `setPermissionCheckHandler` / `setDevicePermissionHandler` to let the user choose a port; a desktop platform can instead open ports in the main process over IPC and save files through a native Save dialog.

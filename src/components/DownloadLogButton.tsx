@@ -2,14 +2,11 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { DownloadIcon } from '@radix-ui/react-icons';
 import { BUILD_INFO } from '../buildInfo';
-import {
-  downloadText,
-  formatReport,
-  reportFileName,
-} from '../diagnostics/report';
+import { formatReport, reportFileName } from '../diagnostics/report';
 import { useDiagnostics } from '../diagnostics/useDiagnostics';
 import type { ConnectionState } from '../ecu/connectionState';
 import { useEcu } from '../ecu/useEcu';
+import { usePlatform } from '../platform/usePlatform';
 import styles from './DownloadLogButton.module.css';
 
 function describeConnection(state: ConnectionState): string {
@@ -28,6 +25,7 @@ function describeConnection(state: ConnectionState): string {
 export function DownloadLogButton({ primary = false }: { primary?: boolean }) {
   const log = useDiagnostics();
   const { state } = useEcu();
+  const { files, serial } = usePlatform();
 
   return (
     <button
@@ -36,15 +34,16 @@ export function DownloadLogButton({ primary = false }: { primary?: boolean }) {
       onClick={() => {
         const generatedAt = Date.now();
 
-        downloadText(
+        void files.save(
           reportFileName(generatedAt),
           formatReport(log.snapshot(), {
             generatedAt,
             build: BUILD_INFO,
             userAgent: navigator.userAgent,
-            webSerial: 'serial' in navigator,
+            webSerial: serial.available(),
             connection: describeConnection(state),
           }),
+          'text/plain',
         );
       }}
     >

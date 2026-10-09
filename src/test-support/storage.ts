@@ -6,7 +6,7 @@ import { MemorySessionStore, type SessionStore } from '../storage/sessionStore';
 
 /**
  * Opens storage holding the given stores (memory ones for any left out), as
- * the `openStorage` prop of `App`. Reported as persistent unless said.
+ * the `storage` of a platform given to `App`. Reported as persistent unless said.
  */
 export function storageWith({
   sessions = new MemorySessionStore(),

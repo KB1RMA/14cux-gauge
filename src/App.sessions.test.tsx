@@ -4,6 +4,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { IDBFactory } from 'fake-indexeddb';
 import { App } from './App';
+import { browserPlatform } from './platform/browser';
 import type { SessionSummary } from './model/session';
 import type { LiveSnapshot } from './model/snapshot';
 import { openStorage } from './storage/openStorage';
@@ -164,7 +165,11 @@ describe('Recording and browsing sessions', () => {
     await store.update(id, { notes: 'Hunts between 600 and 900 rpm.' });
 
     const { container } = render(
-      <App openStorage={storageWith({ sessions: store })} />,
+      <App
+        platform={browserPlatform({
+          storage: { open: storageWith({ sessions: store }) },
+        })}
+      />,
     );
 
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
@@ -278,7 +283,11 @@ describe('Recording and browsing sessions', () => {
     await store.finish(id, START + 3000);
 
     const { container } = render(
-      <App openStorage={storageWith({ sessions: store })} />,
+      <App
+        platform={browserPlatform({
+          storage: { open: storageWith({ sessions: store }) },
+        })}
+      />,
     );
 
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
@@ -530,7 +539,10 @@ describe('Recording and browsing sessions', () => {
     const factory = new IDBFactory();
     const open = () => openStorage(factory);
     const { unmount } = render(
-      <App pollIntervalMs={{ demo: 10 }} openStorage={open} />,
+      <App
+        pollIntervalMs={{ demo: 10 }}
+        platform={browserPlatform({ storage: { open: open } })}
+      />,
     );
 
     await connectDemo(user);
@@ -547,7 +559,7 @@ describe('Recording and browsing sessions', () => {
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
     unmount();
 
-    render(<App openStorage={open} />);
+    render(<App platform={browserPlatform({ storage: { open: open } })} />);
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
 
     expect(
@@ -575,7 +587,13 @@ describe('Recording and browsing sessions', () => {
       startedAt: Date.UTC(2026, 9, 5),
     });
 
-    render(<App openStorage={() => openStorage(factory)} />);
+    render(
+      <App
+        platform={browserPlatform({
+          storage: { open: () => openStorage(factory) },
+        })}
+      />,
+    );
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
     await user.click(await screen.findByRole('link', { name: 'Empty' }));
 
@@ -612,7 +630,9 @@ describe('Recording and browsing sessions', () => {
     render(
       <App
         pollIntervalMs={{ demo: 10 }}
-        openStorage={storageWith({ sessions: new NoRenames() })}
+        platform={browserPlatform({
+          storage: { open: storageWith({ sessions: new NoRenames() }) },
+        })}
       />,
     );
     await connectDemo(user);
@@ -642,7 +662,13 @@ describe('Recording and browsing sessions', () => {
       }
     }
 
-    render(<App openStorage={storageWith({ sessions: new NoList() })} />);
+    render(
+      <App
+        platform={browserPlatform({
+          storage: { open: storageWith({ sessions: new NoList() }) },
+        })}
+      />,
+    );
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -672,7 +698,13 @@ describe('Recording and browsing sessions', () => {
       source: 'demo',
       startedAt: START,
     });
-    render(<App openStorage={storageWith({ sessions: store })} />);
+    render(
+      <App
+        platform={browserPlatform({
+          storage: { open: storageWith({ sessions: store }) },
+        })}
+      />,
+    );
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
     await user.click(await screen.findByRole('link', { name: 'Slow to go' }));
     await user.click(
@@ -715,7 +747,9 @@ describe('Recording and browsing sessions', () => {
     render(
       <App
         pollIntervalMs={{ demo: 10 }}
-        openStorage={storageWith({ sessions: new FullStore() })}
+        platform={browserPlatform({
+          storage: { open: storageWith({ sessions: new FullStore() }) },
+        })}
         usageCounter={counter}
       />,
     );
@@ -789,7 +823,11 @@ describe('Recording and browsing sessions', () => {
     });
 
     const { container } = render(
-      <App openStorage={() => openStorage(factory)} />,
+      <App
+        platform={browserPlatform({
+          storage: { open: () => openStorage(factory) },
+        })}
+      />,
     );
 
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));

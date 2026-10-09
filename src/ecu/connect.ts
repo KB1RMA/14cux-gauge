@@ -1,19 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import {
-  BAUD,
-  BAUD_DOUBLE_SPEED,
-  Ecu,
-  WebSerialTransport,
-} from '@kb1rma/libcomm14cux-ts';
+import { BAUD, BAUD_DOUBLE_SPEED, Ecu } from '@kb1rma/libcomm14cux-ts';
 import { createDemoEngine } from '../demo/demoEngine';
 import type { RecordedSource } from '../model/source';
 import type { DiagnosticLog } from '../diagnostics/diagnosticLog';
 import { TracingTransport } from '../diagnostics/tracingTransport';
+import type { SerialPlatform, SerialPortHandle } from '../platform/platform';
 
 /** Where an ECU connection comes from; kept so the app can reconnect. */
 export type EcuSource =
-  { kind: 'serial'; port: SerialPort; doubleSpeed: boolean } | { kind: 'demo' };
+  | { kind: 'serial'; port: SerialPortHandle; doubleSpeed: boolean }
+  | { kind: 'demo' };
 
 /**
  * How a recording or ROM image read from `source` names it in storage. A new
@@ -41,43 +38,39 @@ export interface EcuConnection {
   dispose(): Promise<void>;
 }
 
-/** The USB IDs of a port, which identify the adapter chip (FTDI, CH340…). */
-export function describePort(port: SerialPort): string {
-  // Test doubles and some platforms have no getInfo().
-  const info = typeof port.getInfo === 'function' ? port.getInfo() : {};
-  const hex = (id: number | undefined) =>
-    id === undefined ? 'unknown' : `0x${id.toString(16).padStart(4, '0')}`;
-
-  return `USB vendor ${hex(info.usbVendorId)}, product ${hex(info.usbProductId)}`;
+/**
+ * Makes connections over `serial` for serial sources, and to the simulated
+ * ECU for demo mode: the `createConnection` an `EcuSession` takes.
+ */
+export function ecuConnections(
+  serial: SerialPlatform,
+): (source: EcuSource, log?: DiagnosticLog) => EcuConnection {
+  return (source, log) =>
+    source.kind === 'demo'
+      ? createDemoEcu()
+      : createSerialEcu(serial, source, log);
 }
 
-export function createWebSerialEcu(
+function createSerialEcu(
+  serial: SerialPlatform,
   source: Extract<EcuSource, { kind: 'serial' }>,
   log?: DiagnosticLog,
 ): EcuConnection {
   const baudRate = source.doubleSpeed ? BAUD_DOUBLE_SPEED : BAUD;
-  const serial = new WebSerialTransport(source.port, { baudRate });
-  const ecu = new Ecu(log ? new TracingTransport(serial, log) : serial);
+  const link = serial.open(source.port, { baudRate });
+  const ecu = new Ecu(
+    log ? new TracingTransport(link.transport, log) : link.transport,
+  );
 
   log?.record(
     'event',
-    `Serial port: ${describePort(source.port)}; ${String(baudRate)} baud, 8N1, no flow control`,
+    `Serial port: ${source.port.description}; ${String(baudRate)} baud, 8N1, no flow control`,
   );
 
   return {
     ecu,
     source,
-    onLost(listener) {
-      const handler = () => {
-        listener();
-      };
-
-      source.port.addEventListener('disconnect', handler);
-
-      return () => {
-        source.port.removeEventListener('disconnect', handler);
-      };
-    },
+    onLost: (listener) => link.onLost(listener),
     async dispose() {
       // The port may already be gone (unplugged); there is nothing to recover.
       await ecu.disconnect().catch(() => undefined);
@@ -85,7 +78,7 @@ export function createWebSerialEcu(
   };
 }
 
-export function createDemoEcu(): EcuConnection {
+function createDemoEcu(): EcuConnection {
   const engine = createDemoEngine();
   const ecu = new Ecu(engine.link);
 
@@ -98,13 +91,4 @@ export function createDemoEcu(): EcuConnection {
       await ecu.disconnect();
     },
   };
-}
-
-export function createEcuConnection(
-  source: EcuSource,
-  log?: DiagnosticLog,
-): EcuConnection {
-  return source.kind === 'demo'
-    ? createDemoEcu()
-    : createWebSerialEcu(source, log);
 }

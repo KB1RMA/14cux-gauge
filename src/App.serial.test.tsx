@@ -283,7 +283,7 @@ describe('App with a serial ECU', () => {
     expect(text).toContain(
       'Connection:  error (serial): The serial port could not be opened',
     );
-    expect(text).toContain('Asking the browser for a serial port');
+    expect(text).toContain('Asking for a serial port');
     expect(text).toContain(
       'Serial port: USB vendor unknown, product unknown; 7812 baud, 8N1, no flow control',
     );

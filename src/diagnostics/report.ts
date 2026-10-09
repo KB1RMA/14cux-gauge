@@ -88,23 +88,3 @@ export function reportFileName(generatedAt: number): string {
 
   return `14cux-gauge-log-${stamp}.txt`;
 }
-
-/** Saves `text` as a file through the browser's normal download. */
-export function downloadText(
-  fileName: string,
-  text: string,
-  type = 'text/plain',
-): void {
-  const url = URL.createObjectURL(
-    new Blob([text], { type: `${type};charset=utf-8` }),
-  );
-  const link = document.createElement('a');
-
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  // Give the browser a moment to start the download before revoking.
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-  }, 1_000);
-}

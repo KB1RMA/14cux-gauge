@@ -3,26 +3,37 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EcuProvider } from '../ecu/EcuProvider';
+import { browserPlatform } from '../platform/browser';
+import { PlatformContext } from '../platform/context';
 import { expectNoAxeViolations } from '../test-support/a11y';
 import { ConnectScreen } from './ConnectScreen';
 
-function renderScreen() {
+/** Where serial ports can be used, or not; never asked for one here. */
+function platform(serial: boolean) {
+  return browserPlatform({
+    serial: {
+      available: () => serial,
+      requestPort: () => Promise.reject(new Error('Not offered in this test')),
+      open: () => {
+        throw new Error('Not opened in this test');
+      },
+    },
+  });
+}
+
+function renderScreen({ serial = true } = {}) {
   return render(
-    <EcuProvider>
-      <ConnectScreen />
-    </EcuProvider>,
+    <PlatformContext value={platform(serial)}>
+      <EcuProvider>
+        <ConnectScreen />
+      </EcuProvider>
+    </PlatformContext>,
   );
 }
 
 describe('ConnectScreen', () => {
-  afterEach(() => {
-    Reflect.deleteProperty(navigator, 'serial');
-  });
-
   it('explains when the browser has no Web Serial, and still offers demo mode', () => {
-    expect('serial' in navigator).toBe(false);
-
-    renderScreen();
+    renderScreen({ serial: false });
 
     expect(screen.getByRole('note')).toHaveTextContent(
       /Web Serial needs Chrome, Edge or Opera on a desktop computer, or Firefox 151 or later/,
@@ -34,14 +45,10 @@ describe('ConnectScreen', () => {
   });
 
   it('has no detectable accessibility violations, with or without Web Serial', async () => {
-    const { container, unmount } = renderScreen();
+    const { container, unmount } = renderScreen({ serial: false });
 
     await expectNoAxeViolations(container);
     unmount();
-    Object.defineProperty(navigator, 'serial', {
-      value: {},
-      configurable: true,
-    });
 
     const supported = renderScreen();
 
@@ -49,11 +56,6 @@ describe('ConnectScreen', () => {
   });
 
   it('offers a serial connection when Web Serial is available', () => {
-    Object.defineProperty(navigator, 'serial', {
-      value: {},
-      configurable: true,
-    });
-
     renderScreen();
 
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
@@ -67,11 +69,6 @@ describe('ConnectScreen', () => {
 
   it('remembers the double-speed choice for the next visit', async () => {
     const user = userEvent.setup();
-
-    Object.defineProperty(navigator, 'serial', {
-      value: {},
-      configurable: true,
-    });
 
     const first = renderScreen();
 

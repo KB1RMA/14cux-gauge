@@ -1,12 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import {
-  affectsSetting,
-  parseRawSetting,
-  readRawSetting,
-  writeSetting,
-  type SettingParser,
-} from '../storage/settings';
+import type { SettingsBackend } from '../platform/platform';
+import { parseRawSetting, type SettingParser } from '../storage/settings';
 import { SETTINGS, type SettingKey, type SettingValue } from './registry';
 
 const UNREAD = Symbol('unread');
@@ -23,13 +18,15 @@ const UNREAD = Symbol('unread');
 export class SettingStore<T> {
   private readonly listeners = new Set<() => void>();
   /**
-   * The JSON the value was parsed from, as {@link readRawSetting} gave it,
+   * The JSON the value was parsed from, as the backend's `read` gave it,
    * or {@link UNREAD} if the value must be read from storage again.
    */
   private raw: string | null | undefined | typeof UNREAD = UNREAD;
   private value: T | undefined;
+  private unwatch: (() => void) | undefined;
 
   constructor(
+    private readonly backend: SettingsBackend,
     private readonly key: string,
     private readonly parse: SettingParser<T>,
   ) {}
@@ -41,7 +38,7 @@ export class SettingStore<T> {
    */
   readonly get = (): T => {
     if (this.raw === UNREAD) {
-      this.raw = readRawSetting(this.key);
+      this.raw = this.backend.read(this.key);
       this.value = parseRawSetting(this.raw, this.parse);
     }
 
@@ -57,14 +54,14 @@ export class SettingStore<T> {
         : next;
 
     // If it is not stored, keep it until storage holds something else.
-    this.raw = writeSetting(this.key, value) ?? this.raw;
+    this.raw = this.backend.write(this.key, value) ?? this.raw;
     this.value = value;
     this.notify();
   };
 
   readonly subscribe = (listener: () => void): (() => void) => {
     if (this.listeners.size === 0) {
-      window.addEventListener('storage', this.onStorage);
+      this.unwatch = this.backend.watch(this.key, this.onChange);
       // Storage may have changed while nothing was listening.
       this.refresh();
     }
@@ -75,16 +72,17 @@ export class SettingStore<T> {
       this.listeners.delete(listener);
 
       if (this.listeners.size === 0) {
-        window.removeEventListener('storage', this.onStorage);
+        this.unwatch?.();
+        this.unwatch = undefined;
         // Nothing shows a value storage did not keep any more.
         this.raw = UNREAD;
       }
     };
   };
 
-  /** Another window changed storage. */
-  private readonly onStorage = (event: StorageEvent): void => {
-    if (affectsSetting(event, this.key) && this.refresh()) {
+  /** Something else, such as another window, may have changed the setting. */
+  private readonly onChange = (): void => {
+    if (this.refresh()) {
       this.notify();
     }
   };
@@ -94,7 +92,7 @@ export class SettingStore<T> {
    * keeps the value in use. Returns whether the value changed.
    */
   private refresh(): boolean {
-    const raw = readRawSetting(this.key);
+    const raw = this.backend.read(this.key);
 
     if (this.raw === UNREAD || raw === undefined || raw === this.raw) {
       return false;
@@ -113,16 +111,27 @@ export class SettingStore<T> {
   }
 }
 
-const stores = new Map<SettingKey, SettingStore<unknown>>();
+const registries = new WeakMap<
+  SettingsBackend,
+  Map<SettingKey, SettingStore<unknown>>
+>();
 
-/** The one store for the setting `key`. */
+/** The one store for the setting `key` kept in `backend`. */
 export function settingStore<K extends SettingKey>(
+  backend: SettingsBackend,
   key: K,
 ): SettingStore<SettingValue<K>> {
+  let stores = registries.get(backend);
+
+  if (!stores) {
+    stores = new Map();
+    registries.set(backend, stores);
+  }
+
   let store = stores.get(key);
 
   if (!store) {
-    store = new SettingStore<unknown>(key, SETTINGS[key]);
+    store = new SettingStore<unknown>(backend, key, SETTINGS[key]);
     stores.set(key, store);
   }
 

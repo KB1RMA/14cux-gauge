@@ -124,19 +124,3 @@ export async function sha256Hex(
     return undefined;
   }
 }
-
-/** Saves `bytes` as a file through the browser's download. */
-export function downloadBytes(fileName: string, bytes: Uint8Array): void {
-  const url = URL.createObjectURL(
-    new Blob([bytes.slice()], { type: 'application/octet-stream' }),
-  );
-  const link = document.createElement('a');
-
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  // Give the browser a moment to start the download before revoking.
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-  }, 1_000);
-}

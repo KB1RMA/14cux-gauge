@@ -7,22 +7,21 @@ import { describeError, isPortPickerCancelled } from '../ecu/errors';
 import { describeRawError } from '../diagnostics/diagnosticLog';
 import { useDiagnostics } from '../diagnostics/useDiagnostics';
 import { useEcu } from '../ecu/useEcu';
+import { usePlatform } from '../platform/usePlatform';
+import type { SerialPortHandle } from '../platform/platform';
 import { useSetting } from '../settings/useSetting';
 import { ExternalLink } from './ExternalLink';
 import styles from './ConnectScreen.module.css';
 
 const LIBRARY_HARDWARE_URL = 'https://github.com/KB1RMA/comm14cux-ts#hardware';
 
-function isWebSerialSupported(): boolean {
-  return 'serial' in navigator;
-}
-
 export function ConnectScreen() {
   const { state, connect } = useEcu();
   const log = useDiagnostics();
+  const { serial } = usePlatform();
   const [doubleSpeed, setDoubleSpeed] = useSetting('doubleSpeed');
   const [pickerError, setPickerError] = useState<string | undefined>(undefined);
-  const supported = isWebSerialSupported();
+  const supported = serial.available();
   const busy = state.status === 'connecting';
   const doubleSpeedId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -39,12 +38,12 @@ export function ConnectScreen() {
   const connectSerial = async () => {
     setPickerError(undefined);
 
-    let port: SerialPort;
+    let port: SerialPortHandle;
 
-    log.record('event', 'Asking the browser for a serial port');
+    log.record('event', 'Asking for a serial port');
 
     try {
-      port = await navigator.serial.requestPort();
+      port = await serial.requestPort();
     } catch (error) {
       if (isPortPickerCancelled(error)) {
         log.record('event', 'The port picker was dismissed');
