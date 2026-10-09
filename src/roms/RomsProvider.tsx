@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { ReadCancelledError } from '@kb1rma/libcomm14cux-ts';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { recordedSource } from '../ecu/connect';
 import { describeError } from '../ecu/errors';
+import type { Lease } from '../ecu/session';
 import { useEcu } from '../ecu/useEcu';
-import { useRecording } from '../recording/useRecording';
+import { useEcuSession } from '../ecu/useEcuSession';
 import type { UnreadableRecord } from '../model/record';
 import type { RomSummary } from '../model/rom';
 import type { RomStore } from '../storage/romStore';
@@ -18,8 +18,11 @@ import {
   type RomsValue,
 } from './context';
 import {
+  cancelRomRead,
   downloadBytes,
-  readRomImage,
+  isRomReadCancelled,
+  readRom,
+  ROM_READ_HOLDER,
   ROM_SIZE,
   romFileName,
   sha256Hex,
@@ -38,10 +41,12 @@ const NONE: UnreadableRecord[] = [];
 /**
  * Reads the ECU's ROM image on request and keeps the saved images. It lives
  * above the dashboard's tabs, so a read carries on if the user changes view.
+ * A read holds the ECU session's link, so it cannot start while a write
+ * runs, and no write can start until it ends.
  */
 export function RomsProvider({ children }: { children: ReactNode }) {
-  const { state, ecu, pausePolling } = useEcu();
-  const recording = useRecording();
+  const session = useEcuSession();
+  const { state } = useEcu();
   const storage = useStorage();
   const store = storage?.roms;
   const persistent = storage?.persistent ?? false;
@@ -50,17 +55,24 @@ export function RomsProvider({ children }: { children: ReactNode }) {
   const unreadable = list.status === 'loaded' ? list.value.unreadable : NONE;
   const [progress, setProgress] = useState<RomProgress | undefined>(undefined);
   const [outcome, setOutcome] = useState<RomOutcome | undefined>(undefined);
-  const readingRef = useRef(false);
+  // The link, while a read holds it.
+  const leaseRef = useRef<Lease | undefined>(undefined);
   const cancelledRef = useRef(false);
   const source =
     state.status === 'idle' ? undefined : recordedSource(state.source);
 
   const read = useCallback(async () => {
-    if (!ecu || !source || readingRef.current) {
+    if (!source) {
       return;
     }
 
-    readingRef.current = true;
+    const lease = session.acquire(ROM_READ_HOLDER);
+
+    if (!lease) {
+      return;
+    }
+
+    leaseRef.current = lease;
     cancelledRef.current = false;
     setOutcome(undefined);
 
@@ -73,15 +85,10 @@ export function RomsProvider({ children }: { children: ReactNode }) {
       cancelling: false,
     });
 
-    let resume = () => undefined as void;
-
     try {
-      // Samples recorded while polling is paused would leave a gap that
-      // replay could draw across, so the recording ends here.
-      await recording.interrupt();
-      resume = await pausePolling();
-      const tune = await ecu.getTuneRevision();
-      const bytes = await readRomImage(ecu, {
+      await lease.ready;
+
+      const { tuneNumber, tuneIdent, bytes } = await readRom(lease.ecu, {
         onProgress: (bytesRead, total) => {
           setProgress({
             bytesRead,
@@ -92,13 +99,13 @@ export function RomsProvider({ children }: { children: ReactNode }) {
         },
         isCancelled: () => cancelledRef.current,
       });
-      const fileName = romFileName(source, tune.tuneNumber, tune.tuneIdent);
+      const fileName = romFileName(source, tuneNumber, tuneIdent);
       const sha256 = await sha256Hex(bytes);
       const details = {
         source,
         readAt: Date.now(),
-        tuneNumber: tune.tuneNumber,
-        tuneIdent: tune.tuneIdent,
+        tuneNumber,
+        tuneIdent,
         sha256,
       };
       let image: RomSummary = { ...details, id: '', size: bytes.length };
@@ -118,19 +125,21 @@ export function RomsProvider({ children }: { children: ReactNode }) {
       setOutcome({ kind: 'saved', fileName, image, kept });
     } catch (error) {
       setOutcome(
-        error instanceof ReadCancelledError
+        isRomReadCancelled(error)
           ? { kind: 'cancelled' }
           : { kind: 'failed', message: describeError(error) },
       );
     } finally {
-      readingRef.current = false;
+      leaseRef.current = undefined;
       setProgress(undefined);
-      resume();
+      lease.release();
     }
-  }, [ecu, source, store, settled, recording, pausePolling]);
+  }, [session, source, store, settled]);
 
   const cancel = useCallback(() => {
-    if (!readingRef.current) {
+    const lease = leaseRef.current;
+
+    if (!lease) {
       return;
     }
 
@@ -138,8 +147,8 @@ export function RomsProvider({ children }: { children: ReactNode }) {
     setProgress((previous) =>
       previous ? { ...previous, cancelling: true } : previous,
     );
-    ecu?.cancelRead();
-  }, [ecu]);
+    cancelRomRead(lease.ecu);
+  }, []);
 
   const dismissOutcome = useCallback(() => {
     setOutcome(undefined);

@@ -2,16 +2,15 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { RadioGroup } from 'radix-ui';
 import { useId, useState } from 'react';
-import type { LiveSnapshot } from '../model/snapshot';
+import { useLiveSample } from '../ecu/useLiveData';
 import { useEcuWrite } from '../ecuWrite/useEcuWrite';
-import { formatSample, METRICS, sampleOf } from '../metrics';
+import type { IdleAirDirection } from '../ecuWrite/writes';
+import { formatSample, METRICS } from '../metrics';
 import { usePreferences } from '../preferences/usePreferences';
 import { ConfirmDialog } from './ConfirmDialog';
 import styles from './Panel.module.css';
 import testStyles from './IdleAirControlTest.module.css';
 import { WriteBlocked, WriteResult } from './WriteStatus';
-
-type Direction = 'open' | 'close';
 
 /** The library accepts 0 to 255 steps. */
 const MIN_STEPS = 1;
@@ -35,24 +34,19 @@ function parseSteps(text: string): number | undefined {
  * press, and shows the idle bypass position beside the control. It writes to
  * the ECU, so it sits behind a confirmation. It is never repeated.
  */
-export function IdleAirControlTest({
-  snapshot,
-}: {
-  snapshot: LiveSnapshot | undefined;
-}) {
+export function IdleAirControlTest() {
   const units = usePreferences();
   const writes = useEcuWrite();
   const stepsId = useId();
   const blockedId = useId();
-  const [direction, setDirection] = useState<Direction>('open');
+  const [direction, setDirection] = useState<IdleAirDirection>('open');
   const [stepsText, setStepsText] = useState('10');
   const [confirming, setConfirming] = useState(false);
   const running = writes.running === 'idleAirControl';
   const blocked = writes.running !== undefined && !running;
 
   const steps = parseSteps(stepsText);
-  const sample =
-    BYPASS && snapshot ? sampleOf(snapshot, BYPASS.key) : undefined;
+  const sample = useLiveSample('idleBypass');
 
   const run = () => {
     setConfirming(false);
@@ -61,13 +55,7 @@ export function IdleAirControlTest({
       return;
     }
 
-    // The library writes the direction bit before the step count, so a
-    // failure part-way through can leave the ECU changed.
-    void writes.run('idleAirControl', async (ecu) => {
-      await ecu.driveIdleAirControlMotor(direction === 'open' ? 0 : 1, steps);
-
-      return `Commanded ${steps} ${steps === 1 ? 'step' : 'steps'} ${direction}.`;
-    });
+    void writes.run({ id: 'idleAirControl', direction, steps });
   };
 
   return (

@@ -8,7 +8,7 @@ export function useReadings(): ReadingsContextValue {
   const value = use(ReadingsContext);
 
   if (!value) {
-    throw new Error('useReadings must be used inside <EcuProvider>');
+    throw new Error('useReadings must be used inside <ReadingsProvider>');
   }
 
   return value;

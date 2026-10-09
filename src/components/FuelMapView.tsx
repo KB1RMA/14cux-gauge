@@ -1,33 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
+import { VisuallyHidden } from 'radix-ui';
+import { memo, useEffect, useId, type CSSProperties } from 'react';
 import {
   FUEL_MAP_COLUMNS,
   FUEL_MAP_ROWS,
-  type Ecu,
+  readFuelMapInUse,
   type FuelMap,
-} from '@kb1rma/libcomm14cux-ts';
-import { VisuallyHidden } from 'radix-ui';
-import { memo, useEffect, useId, useState, type CSSProperties } from 'react';
-import { describeError } from '../ecu/errors';
-import type { LiveSnapshot } from '../model/snapshot';
+} from '../ecu/reads';
+import { useEcuRead } from '../ecu/useEcuRead';
+import { useLiveSelect } from '../ecu/useLiveData';
 import { hex, hexDigits } from '../hex';
 import { useReadings } from '../readings/useReadings';
 import { InfoPopover } from './InfoPopover';
 import panel from './Panel.module.css';
 import styles from './FuelMapView.module.css';
-
-interface LoadedMap {
-  id: number;
-  map: FuelMap;
-  /** Engine speed at the start of each column, lowest first. */
-  rpm: number[];
-}
-
-interface Outcome {
-  ecu: Ecu;
-  loaded?: LoadedMap;
-  error?: string;
-}
 
 const ROWS = Array.from({ length: FUEL_MAP_ROWS }, (_, row) => row);
 const COLUMNS = Array.from({ length: FUEL_MAP_COLUMNS }, (_, col) => col);
@@ -41,54 +28,18 @@ function cellOf(position: number | null | undefined): number | undefined {
  * The fuel map the ECU is using, read once, with the cell it is using now
  * marked from the live data.
  */
-export function FuelMapView({
-  ecu,
-  snapshot,
-}: {
-  ecu: Ecu;
-  snapshot: LiveSnapshot | undefined;
-}) {
-  // Keyed by the ECU it was read from, so a new ECU never shows an old map or
-  // error.
-  const [outcome, setOutcome] = useState<Outcome | undefined>(undefined);
+export function FuelMapView() {
+  const { value: loaded, error } = useEcuRead(readFuelMapInUse, {
+    onConnect: true,
+  });
   const captionId = useId();
   const { request } = useReadings();
+  // Only the cell in use, so the view does not change with every sample.
+  const row = useLiveSelect((snapshot) => cellOf(snapshot?.fuelMapRow));
+  const column = useLiveSelect((snapshot) => cellOf(snapshot?.fuelMapColumn));
 
   // Read the position in the map while it is shown, even if not chosen.
   useEffect(() => request(['fuelMapRow', 'fuelMapColumn']), [request]);
-
-  useEffect(() => {
-    let current = true;
-
-    const load = async (): Promise<LoadedMap> => {
-      const id = await ecu.getCurrentFuelMap();
-
-      return {
-        id,
-        map: await ecu.getFuelMap(id),
-        rpm: await ecu.getRpmTable(),
-      };
-    };
-
-    load().then(
-      (result) => {
-        if (current) {
-          setOutcome({ ecu, loaded: result });
-        }
-      },
-      (e: unknown) => {
-        if (current) {
-          setOutcome({ ecu, error: describeError(e) });
-        }
-      },
-    );
-
-    return () => {
-      current = false;
-    };
-  }, [ecu]);
-
-  const { loaded, error } = outcome?.ecu === ecu ? outcome : {};
 
   if (error) {
     return (
@@ -103,8 +54,6 @@ export function FuelMapView({
   }
 
   const { id, map, rpm } = loaded;
-  const row = cellOf(snapshot?.fuelMapRow);
-  const column = cellOf(snapshot?.fuelMapColumn);
   const inUse = row !== undefined && column !== undefined;
 
   return (
@@ -177,8 +126,7 @@ interface MapTableProps {
   column: number | undefined;
 }
 
-// Memoised: the live snapshot arrives every pass, but the table only changes
-// when the cell in use moves.
+// Memoised: the table only changes when the cell in use moves.
 const MapTable = memo(function MapTable({
   id,
   map,

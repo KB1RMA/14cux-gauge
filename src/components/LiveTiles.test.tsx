@@ -6,7 +6,7 @@ import { Gear } from '@kb1rma/libcomm14cux-ts';
 import type { LiveSnapshot } from '../model/snapshot';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { expectNoAxeViolations, readingFor } from '../test-support/a11y';
-import { LiveTiles } from './LiveTiles';
+import { SnapshotTiles } from './LiveTiles';
 
 const SNAPSHOT: LiveSnapshot = {
   timestamp: 0,
@@ -45,7 +45,7 @@ function meterFill(reading: HTMLElement): Element | null {
 function renderTiles(snapshot: LiveSnapshot | undefined) {
   return render(
     <PreferencesProvider>
-      <LiveTiles snapshot={snapshot} />
+      <SnapshotTiles snapshot={snapshot} />
     </PreferencesProvider>,
   );
 }
@@ -83,7 +83,7 @@ describe('LiveTiles', () => {
 
     rerender(
       <PreferencesProvider>
-        <LiveTiles
+        <SnapshotTiles
           snapshot={{ ...SNAPSHOT, engineRpm: 6000, injectorPulseUs: 10500 }}
         />
       </PreferencesProvider>,
@@ -112,7 +112,7 @@ describe('LiveTiles', () => {
   it('shows only the readings asked for, without empty groups', () => {
     render(
       <PreferencesProvider>
-        <LiveTiles snapshot={SNAPSHOT} keys={['coolantTempF', 'milOn']} />
+        <SnapshotTiles snapshot={SNAPSHOT} keys={['coolantTempF', 'milOn']} />
       </PreferencesProvider>,
     );
 

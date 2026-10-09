@@ -9,7 +9,7 @@ import type { RecordedWrite } from '../model/write';
 import { recordedKeys } from '../metrics';
 import { useReplay } from '../replay/useReplay';
 import { writeMarks } from '../sessions/writeLog';
-import { LiveTiles } from './LiveTiles';
+import { SnapshotTiles } from './LiveTiles';
 import { ReplayControls } from './ReplayControls';
 import { ReplayGraphs } from './ReplayGraphs';
 import { WriteLog } from './WriteLog';
@@ -70,7 +70,7 @@ export function SessionReplay({
           </Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="readings">
-          <LiveTiles snapshot={replay.snapshot} keys={keys} />
+          <SnapshotTiles snapshot={replay.snapshot} keys={keys} />
         </Tabs.Content>
         <Tabs.Content value="graphs">
           <ReplayGraphs

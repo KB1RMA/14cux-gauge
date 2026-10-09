@@ -1,30 +1,30 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { Ecu, MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
+import { MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { EcuSession } from '../ecu/session';
 import { expectNoAxeViolations } from '../test-support/a11y';
+import { connectedSession } from '../test-support/ecuSession';
 import { notification } from '../test-support/notifications';
 import { WriteHarness } from '../test-support/WriteHarness';
 import { FuelPumpTest } from './FuelPumpTest';
 
 const PORT1_IDLE = 0xff;
 
-async function connectedEcu() {
+async function pumpSession() {
   const transport = new SimulatedTransport();
 
   transport.memory[MemoryOffset.Port1] = PORT1_IDLE;
 
-  const ecu = new Ecu(transport);
+  const { session } = await connectedSession(transport);
 
-  await ecu.connect();
-
-  return { transport, ecu };
+  return { transport, session };
 }
 
-function Harness({ ecu }: { ecu: Ecu }) {
+function Harness({ session }: { session: EcuSession }) {
   return (
-    <WriteHarness ecu={ecu}>
+    <WriteHarness session={session}>
       <FuelPumpTest />
     </WriteHarness>
   );
@@ -83,8 +83,8 @@ function announcement(): string | null {
 describe('FuelPumpTest accessibility', () => {
   it('has no violations, with the confirmation open or closed', async () => {
     const user = userEvent.setup();
-    const { ecu } = await connectedEcu();
-    const { container } = render(<Harness ecu={ecu} />);
+    const { session } = await pumpSession();
+    const { container } = render(<Harness session={session} />);
 
     await expectNoAxeViolations(container);
     await user.click(
@@ -104,10 +104,10 @@ describe('FuelPumpTest', () => {
   });
 
   it('writes nothing until the risk is confirmed, and nothing if cancelled', async () => {
-    const { transport, ecu } = await connectedEcu();
+    const { transport, session } = await pumpSession();
     setup();
 
-    render(<Harness ecu={ecu} />);
+    render(<Harness session={session} />);
     await click(screen.getByRole('button', { name: 'Run pump (once)' }));
 
     const dialog = screen.getByRole('alertdialog', {
@@ -128,10 +128,10 @@ describe('FuelPumpTest', () => {
   });
 
   it('runs the pump once: writes the timer and relay bit, then reports it stopped', async () => {
-    const { transport, ecu } = await connectedEcu();
+    const { transport, session } = await pumpSession();
     setup();
 
-    render(<Harness ecu={ecu} />);
+    render(<Harness session={session} />);
     await confirm('Run pump (once)', 'Run the fuel pump once?');
     await advance(10);
 
@@ -146,7 +146,9 @@ describe('FuelPumpTest', () => {
     ).toBeDisabled();
 
     clearPump(transport);
-    await advance(10_000);
+    // Past a renewal (1.5 s) and the run's end (2 s), and short of the 8 s a
+    // success notification stays.
+    await advance(5_000);
 
     // One run only: it was not renewed.
     expect(pumpWritten(transport)).toBe(false);
@@ -166,10 +168,10 @@ describe('FuelPumpTest', () => {
   });
 
   it('keeps renewing the pump until Stop is pressed', async () => {
-    const { transport, ecu } = await connectedEcu();
+    const { transport, session } = await pumpSession();
     setup();
 
-    render(<Harness ecu={ecu} />);
+    render(<Harness session={session} />);
     await confirm('Run pump (continuous)', 'Run the fuel pump continuously?');
     await advance(10);
     expect(pumpWritten(transport)).toBe(true);
@@ -201,10 +203,10 @@ describe('FuelPumpTest', () => {
   });
 
   it('stops by itself after two minutes', async () => {
-    const { transport, ecu } = await connectedEcu();
+    const { transport, session } = await pumpSession();
     setup();
 
-    render(<Harness ecu={ecu} />);
+    render(<Harness session={session} />);
     await confirm('Run pump (continuous)', 'Run the fuel pump continuously?');
     await advance(119_000);
     expect(running()).toBe('fuelPump');
@@ -224,10 +226,10 @@ describe('FuelPumpTest', () => {
   });
 
   it('stops when the connection goes', async () => {
-    const { transport, ecu } = await connectedEcu();
+    const { transport, session } = await pumpSession();
     setup();
 
-    render(<Harness ecu={ecu} />);
+    render(<Harness session={session} />);
     await confirm('Run pump (continuous)', 'Run the fuel pump continuously?');
     await advance(10);
     await click(screen.getByRole('button', { name: 'Drop link' }));
@@ -245,15 +247,17 @@ describe('FuelPumpTest', () => {
   });
 
   it('stops when the user leaves the view', async () => {
-    const { transport, ecu } = await connectedEcu();
+    const { transport, session } = await pumpSession();
     setup();
 
-    render(<Harness ecu={ecu} />);
+    render(<Harness session={session} />);
     await confirm('Run pump (continuous)', 'Run the fuel pump continuously?');
     await advance(10);
     await click(screen.getByRole('button', { name: 'Leave view' }));
     clearPump(transport);
-    await advance(10_000);
+    // Past a renewal and the last run's end, and short of the 8 s a success
+    // notification stays.
+    await advance(5_000);
 
     expect(pumpWritten(transport)).toBe(false);
     expect(announcement()).toBe('Fuel pump stopped when you left the view.');
@@ -263,10 +267,10 @@ describe('FuelPumpTest', () => {
   });
 
   it('stops and says why when the ECU stops answering', async () => {
-    const { transport, ecu } = await connectedEcu();
+    const { transport, session } = await pumpSession();
     setup();
 
-    render(<Harness ecu={ecu} />);
+    render(<Harness session={session} />);
     await confirm('Run pump (continuous)', 'Run the fuel pump continuously?');
     await advance(10);
     transport.silent = true;

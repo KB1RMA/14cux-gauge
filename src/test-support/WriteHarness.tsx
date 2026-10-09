@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { Ecu } from '@kb1rma/libcomm14cux-ts';
-import { useMemo, useState, type ReactNode } from 'react';
-import { EcuContext } from '../ecu/contexts';
+import { useState, type ReactNode } from 'react';
+import { EcuProvider } from '../ecu/EcuProvider';
+import type { EcuSession } from '../ecu/session';
 import { EcuWriteProvider } from '../ecuWrite/EcuWriteProvider';
 import { useEcuWrite } from '../ecuWrite/useEcuWrite';
 import { describeOutcome } from '../ecuWrite/writes';
 import { NotificationsProvider } from '../notifications/NotificationsProvider';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
-import { ecuContextValue } from './ecuContext';
+import { ReadingsProvider } from '../readings/ReadingsProvider';
 
 /** The latest write's state, as the provider holds it. */
 function WriteAnnouncement() {
@@ -25,50 +25,55 @@ function WriteAnnouncement() {
   );
 }
 
+/** Views that read from the ECU, on `session`'s connection. */
+export function SessionHarness({
+  session,
+  children,
+}: {
+  session: EcuSession;
+  children: ReactNode;
+}) {
+  return (
+    <PreferencesProvider>
+      <EcuProvider session={session}>
+        <ReadingsProvider>{children}</ReadingsProvider>
+      </EcuProvider>
+    </PreferencesProvider>
+  );
+}
+
 /**
- * Write panels connected to `ecu`, with buttons to drop the connection or
+ * Write panels on `session`'s connection, with buttons to disconnect or
  * leave the view (unmount `children`, as switching tab does) and come back.
  */
 export function WriteHarness({
-  ecu,
+  session,
   children,
 }: {
-  ecu: Ecu;
+  session: EcuSession;
   children: ReactNode;
 }) {
-  const [connected, setConnected] = useState(true);
   const [shown, setShown] = useState(true);
-  const value = useMemo(
-    () => ecuContextValue(connected ? ecu : undefined),
-    [connected, ecu],
-  );
 
   return (
-    <PreferencesProvider>
+    <SessionHarness session={session}>
       <NotificationsProvider>
-        <EcuContext value={value}>
-          <EcuWriteProvider>
-            <WriteAnnouncement />
-            <button
-              type="button"
-              onClick={() => {
-                setConnected(false);
-              }}
-            >
-              Drop link
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShown((previous) => !previous);
-              }}
-            >
-              {shown ? 'Leave view' : 'Return to view'}
-            </button>
-            {shown ? children : null}
-          </EcuWriteProvider>
-        </EcuContext>
+        <EcuWriteProvider>
+          <WriteAnnouncement />
+          <button type="button" onClick={() => void session.disconnect()}>
+            Drop link
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShown((previous) => !previous);
+            }}
+          >
+            {shown ? 'Leave view' : 'Return to view'}
+          </button>
+          {shown ? children : null}
+        </EcuWriteProvider>
       </NotificationsProvider>
-    </PreferencesProvider>
+    </SessionHarness>
   );
 }

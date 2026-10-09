@@ -2,37 +2,49 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Ecu, MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
+import { MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { buildSyntheticRom } from '../demo/syntheticRom';
-import { EcuProvider } from '../ecu/EcuProvider';
 import { expectNoAxeViolations, readingFor } from '../test-support/a11y';
-import { snapshotAt } from '../test-support/snapshots';
+import { connectedSession } from '../test-support/ecuSession';
+import { SessionHarness } from '../test-support/WriteHarness';
 import { FuelMapView } from './FuelMapView';
 
-/** An ECU on the demo ROM (fuel map 5 in the newer layout) using map 5. */
-async function ecuOnMap5() {
+/**
+ * Index bytes the ECU reports its position in the map with: the row or
+ * column in the high nibble and the weighting towards the next, in 16ths, in
+ * the low one. A row of 8 is past the last of the map's 8 rows: an invalid
+ * position, which marks no cell.
+ */
+const INVALID_ROW = 0x80;
+
+/**
+ * The view on an ECU on the demo ROM (fuel map 5 in the newer layout) using
+ * map 5, at the position in the map that `row` and `column` encode.
+ */
+async function renderOnMap5(row = INVALID_ROW, column = 0x00) {
   const transport = new SimulatedTransport();
 
   transport.loadRom(buildSyntheticRom());
   transport.memory[MemoryOffset.CurrentFuelMapId] = 5;
+  transport.memory[MemoryOffset.FuelMapRowIndex] = row;
+  transport.memory[MemoryOffset.FuelMapColumnIndex] = column;
 
-  const ecu = new Ecu(transport);
-
-  await ecu.connect();
-
-  return { transport, ecu };
+  return renderView(transport);
 }
 
-/** Renders inside `EcuProvider`, which the view asks for its readings. */
-function renderView(view: React.ReactElement) {
-  return render(<EcuProvider>{view}</EcuProvider>);
+async function renderView(transport: SimulatedTransport) {
+  const { session } = await connectedSession(transport);
+
+  return render(
+    <SessionHarness session={session}>
+      <FuelMapView />
+    </SessionHarness>,
+  );
 }
 
 describe('FuelMapView', () => {
   it('shows the map in use, its factors and its values by row and rpm', async () => {
-    const { ecu } = await ecuOnMap5();
-
-    renderView(<FuelMapView ecu={ecu} snapshot={undefined} />);
+    await renderOnMap5();
 
     expect(screen.getByText('Reading the fuel map…')).toBeInTheDocument();
 
@@ -82,14 +94,8 @@ describe('FuelMapView', () => {
   });
 
   it('outlines the cell the ECU is using and says which it is', async () => {
-    const { ecu } = await ecuOnMap5();
-
-    renderView(
-      <FuelMapView
-        ecu={ecu}
-        snapshot={snapshotAt(0, { fuelMapRow: 1.5, fuelMapColumn: 6.75 })}
-      />,
-    );
+    // Row 1 + 8/16 and column 6 + 12/16: the second row, seventh column.
+    await renderOnMap5(0x18, 0x6c);
 
     const table = await screen.findByRole('table');
     const inUse = within(table).getByText(', in use now').closest('td');
@@ -102,9 +108,7 @@ describe('FuelMapView', () => {
   });
 
   it('names the scrolling region after the table caption', async () => {
-    const { ecu } = await ecuOnMap5();
-
-    renderView(<FuelMapView ecu={ecu} snapshot={undefined} />);
+    await renderOnMap5();
 
     expect(
       await screen.findByRole('region', { name: /^Fuel map 5 values, in hex/ }),
@@ -116,22 +120,14 @@ describe('FuelMapView', () => {
 
     transport.memory[MemoryOffset.CurrentFuelMapId] = 9;
 
-    const ecu = new Ecu(transport);
-
-    await ecu.connect();
-    renderView(<FuelMapView ecu={ecu} snapshot={undefined} />);
+    await renderView(transport);
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
   it('has no detectable accessibility violations', async () => {
-    const { ecu } = await ecuOnMap5();
-    const { container } = renderView(
-      <FuelMapView
-        ecu={ecu}
-        snapshot={snapshotAt(0, { fuelMapRow: 0, fuelMapColumn: 4 })}
-      />,
-    );
+    // Row 0 and column 4, weighted 0 towards the next.
+    const { container } = await renderOnMap5(0x00, 0x40);
 
     await screen.findByRole('table');
     await expectNoAxeViolations(container);
@@ -139,9 +135,7 @@ describe('FuelMapView', () => {
 
   it('explains the map in use and its factors on demand', async () => {
     const user = userEvent.setup();
-    const { ecu } = await ecuOnMap5();
-
-    renderView(<FuelMapView ecu={ecu} snapshot={undefined} />);
+    await renderOnMap5();
     await screen.findByRole('table');
 
     expect(

@@ -2,30 +2,34 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Ecu, MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
+import { MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { buildSyntheticRom } from '../demo/syntheticRom';
 import { expectNoAxeViolations, readingFor } from '../test-support/a11y';
+import { connectedSession } from '../test-support/ecuSession';
+import { SessionHarness } from '../test-support/WriteHarness';
 import { EcuInfo } from './EcuInfo';
 
-async function ecuWithRpmLimitPeriod(period: number) {
+async function infoWithRpmLimitPeriod(period: number) {
   const transport = new SimulatedTransport();
 
   transport.loadRom(buildSyntheticRom());
   transport.memory[MemoryOffset.RPMLimit] = period >> 8;
   transport.memory[MemoryOffset.RPMLimit + 1] = period & 0xff;
 
-  const ecu = new Ecu(transport);
+  const { session } = await connectedSession(transport);
 
-  await ecu.connect();
-
-  return ecu;
+  return (
+    <SessionHarness session={session}>
+      <EcuInfo />
+    </SessionHarness>
+  );
 }
 
 describe('EcuInfo', () => {
   it('shows the tune revision and the rev limit', async () => {
-    const ecu = await ecuWithRpmLimitPeriod(1500); // 7,500,000 / 1500 rpm
+    const view = await infoWithRpmLimitPeriod(1500); // 7,500,000 / 1500 rpm
 
-    const { container } = render(<EcuInfo ecu={ecu} />);
+    const { container } = render(view);
 
     expect(await screen.findByText('5000 rpm')).toBeInTheDocument();
     expect(readingFor('Tune number')).toHaveTextContent('1234');
@@ -36,9 +40,9 @@ describe('EcuInfo', () => {
   });
 
   it('says so when the rev limit is not valid', async () => {
-    const ecu = await ecuWithRpmLimitPeriod(0);
+    const view = await infoWithRpmLimitPeriod(0);
 
-    render(<EcuInfo ecu={ecu} />);
+    render(view);
 
     expect(await screen.findByText('Not valid')).toBeInTheDocument();
     expect(readingFor('Tune number')).toHaveTextContent('1234');
@@ -46,9 +50,9 @@ describe('EcuInfo', () => {
 
   it('explains each fact on demand', async () => {
     const user = userEvent.setup();
-    const ecu = await ecuWithRpmLimitPeriod(1500);
+    const view = await infoWithRpmLimitPeriod(1500);
 
-    render(<EcuInfo ecu={ecu} />);
+    render(view);
     await screen.findByText('5000 rpm');
 
     for (const label of [

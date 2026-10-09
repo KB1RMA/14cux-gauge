@@ -208,6 +208,45 @@ describe('Saving the ROM image', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Demo ECU · Polling');
   });
 
+  it('cannot be read while a write to the ECU runs, and says why', async () => {
+    const user = userEvent.setup();
+    const downloads = captureDownloads();
+
+    renderApp();
+    await connectDemo(user);
+
+    const pump = within(screen.getByRole('region', { name: 'Fuel pump test' }));
+
+    await user.click(
+      pump.getByRole('button', { name: 'Run pump (continuous)' }),
+    );
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', {
+        name: 'Run fuel pump',
+      }),
+    );
+
+    const save = within(
+      screen.getByRole('region', { name: 'ROM image' }),
+    ).getByRole('button', { name: 'Save ROM image' });
+
+    expect(save).toBeDisabled();
+    expect(save).toHaveAccessibleDescription(
+      'Disabled while a write to the ECU runs: Fuel pump test.',
+    );
+
+    await user.click(pump.getByRole('button', { name: 'Stop fuel pump' }));
+    // The pump runs on for up to two seconds, and holds the link until then.
+    await waitFor(
+      () => {
+        expect(save).toBeEnabled();
+      },
+      { timeout: 5_000 },
+    );
+    expect(save).not.toHaveAccessibleDescription();
+    expect(downloads.names).toEqual([]);
+  });
+
   it('stops when cancelled, saves nothing and resumes polling', async () => {
     const user = userEvent.setup();
     const downloads = captureDownloads();

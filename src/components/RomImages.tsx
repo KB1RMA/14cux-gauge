@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { DownloadIcon } from '@radix-ui/react-icons';
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useEcu } from '../ecu/useEcu';
+import { useEcuWrite } from '../ecuWrite/useEcuWrite';
 import { hex } from '../hex';
 import { useRecording } from '../recording/useRecording';
 import type { RomOutcome } from '../roms/context';
@@ -14,6 +15,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import styles from './RomImages.module.css';
 import panel from './Panel.module.css';
 import { RomProgressDialog } from './RomProgressDialog';
+import { WriteBlocked } from './WriteStatus';
 
 const SYNTHETIC = 'Demo ECU: a synthetic image, not real ROM data.';
 
@@ -76,6 +78,9 @@ export function RomImages() {
   const demo = state.status !== 'idle' && state.source.kind === 'demo';
   const roms = useRoms();
   const { active: recording } = useRecording();
+  // A write holds the link, so the ROM cannot be read until it ends.
+  const { running } = useEcuWrite();
+  const blockedId = useId();
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState<
     RomSummary | UnreadableRecord | undefined
@@ -96,11 +101,13 @@ export function RomImages() {
         <Outcome outcome={roms.outcome} onDismiss={roms.dismissOutcome} />
       ) : null}
 
+      <WriteBlocked noteId={blockedId} />
       <div className={panel['actions']}>
         <button
           ref={saveRef}
           type="button"
-          disabled={reading}
+          disabled={reading || running !== undefined}
+          aria-describedby={running === undefined ? undefined : blockedId}
           onClick={() => {
             setConfirming(true);
           }}
