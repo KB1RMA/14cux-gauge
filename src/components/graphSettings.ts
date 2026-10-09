@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { METRIC_KEYS, type MetricKey } from '../metrics';
-import { asRecord, oneOf } from '../storage/settings';
-
-export const GRAPH_SETTINGS_KEY = 'graphs';
+import type { MetricKey } from '../metrics';
 
 /**
  * The live graphs' time windows: a number of seconds back from the newest
@@ -33,20 +30,4 @@ export interface GraphSettings {
    * later version shows up by default.
    */
   hidden: MetricKey[];
-}
-
-export function parseGraphSettings(stored: unknown): GraphSettings {
-  const s = asRecord(stored);
-  const hidden = Array.isArray(s['hidden']) ? (s['hidden'] as unknown[]) : [];
-
-  return {
-    // Earlier versions stored the window as `windowSeconds`.
-    window: oneOf<GraphWindow>(
-      s['window'] ?? s['windowSeconds'],
-      WINDOW_OPTIONS.map((o) => o.value),
-      60,
-    ),
-    layout: oneOf<GraphLayout>(s['layout'], LAYOUT_OPTIONS, 'grid'),
-    hidden: METRIC_KEYS.filter((key) => hidden.includes(key)),
-  };
 }

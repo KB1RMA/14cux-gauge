@@ -8,6 +8,7 @@ import {
   expectNoAxeViolations,
   reading,
   test,
+  USAGE_COUNTER_HOSTS,
   type EmulatedSerial,
 } from './support/fixtures';
 
@@ -113,6 +114,40 @@ test.describe('Reading values', () => {
     await expect(reading(live, 'Coolant')).toHaveText('-25 °C');
     await chooseUnits(page, 'Fahrenheit', 'Miles per hour');
     await expect(reading(live, 'Coolant')).toHaveText('-13 °F');
+  });
+
+  test('follows the units chosen in another window of the app', async ({
+    page,
+    emulatedSerial,
+  }) => {
+    await page.goto('./');
+    await plantEngine(emulatedSerial);
+    await connectSerial(page);
+
+    const live = page.getByRole('region', { name: 'Live data' });
+
+    await expect(reading(live, 'Coolant')).toHaveText('105 °F');
+    await expect(reading(live, 'Road speed')).toHaveText('62 mph');
+
+    // A second tab of the app, in the same browser.
+    const other = await page.context().newPage();
+
+    await other.route(USAGE_COUNTER_HOSTS, (route) => route.abort());
+    await other.goto('./');
+    await chooseUnits(other, 'Celsius', 'Kilometres per hour');
+
+    // This window follows without a reload, and keeps polling.
+    await expect(reading(live, 'Coolant')).toHaveText('41 °C');
+    await expect(reading(live, 'Road speed')).toHaveText('100 km/h');
+    await expect(reading(live, 'Engine speed')).toHaveText('750 rpm');
+    await expect(
+      page.getByRole('region', { name: 'Connection' }).getByRole('status'),
+    ).toHaveText('Serial ECU (7812 baud) · Polling');
+
+    await chooseUnits(other, 'Fahrenheit', 'Miles per hour');
+    await expect(reading(live, 'Coolant')).toHaveText('105 °F');
+    await expect(reading(live, 'Road speed')).toHaveText('62 mph');
+    await other.close();
   });
 
   test('reads the same on the overview, the graphs and the idle air control panel', async ({

@@ -25,11 +25,12 @@ import {
   SESSIONS_PATH,
   type LiveTab,
 } from './routing/paths';
-import { RomsProvider, type RomsProviderProps } from './roms/RomsProvider';
+import { RomsProvider } from './roms/RomsProvider';
+import { SessionsProvider } from './sessions/SessionsProvider';
 import {
-  SessionsProvider,
-  type SessionsProviderProps,
-} from './sessions/SessionsProvider';
+  StorageProvider,
+  type StorageProviderProps,
+} from './storage/StorageProvider';
 import styles from './App.module.css';
 
 const VIEWS: readonly { label: string; to: string }[] = [
@@ -74,13 +75,12 @@ function Main({ usageCounter }: { usageCounter: UsageCounter | undefined }) {
 
 export function App({
   pollIntervalMs,
-  openSessionStore,
-  openRomStore,
+  openStorage,
   appStatus,
   usageCounter = DEFAULT_USAGE_COUNTER,
 }: Pick<EcuProviderProps, 'pollIntervalMs'> & {
-  openSessionStore?: SessionsProviderProps['open'];
-  openRomStore?: RomsProviderProps['open'];
+  /** Opens where sessions and ROM images are kept; defaults to IndexedDB. */
+  openStorage?: StorageProviderProps['open'];
   /** Overrides the offline and update checks; they are off outside a production build. */
   appStatus?: AppStatusStoreOptions;
   /** Counts usage anonymously; only set on the published site by default. */
@@ -93,38 +93,38 @@ export function App({
           <NotificationsProvider>
             <EcuProvider {...(pollIntervalMs ? { pollIntervalMs } : {})}>
               <EcuWriteProvider>
-                <SessionsProvider
-                  {...(openSessionStore ? { open: openSessionStore } : {})}
+                <StorageProvider
+                  {...(openStorage ? { open: openStorage } : {})}
                 >
-                  <RecordingProvider>
-                    <RomsProvider
-                      {...(openRomStore ? { open: openRomStore } : {})}
-                    >
-                      <div className={styles['app']}>
-                        <header className={styles['appBar']}>
-                          <h1 className={styles['brand']}>14CUX Gauge</h1>
-                          <nav aria-label="Views" className={styles['nav']}>
-                            {VIEWS.map(({ label, to }) => (
-                              <NavLink
-                                key={to}
-                                to={to}
-                                className={styles['navItem'] ?? ''}
-                              >
-                                {label}
-                              </NavLink>
-                            ))}
-                          </nav>
-                          <PreferencesMenu
-                            offerUsageCounts={usageCounter !== undefined}
-                          />
-                        </header>
-                        <AppNotices />
-                        <Main usageCounter={usageCounter} />
-                        <Footer countsUsage={usageCounter !== undefined} />
-                      </div>
-                    </RomsProvider>
-                  </RecordingProvider>
-                </SessionsProvider>
+                  <SessionsProvider>
+                    <RecordingProvider>
+                      <RomsProvider>
+                        <div className={styles['app']}>
+                          <header className={styles['appBar']}>
+                            <h1 className={styles['brand']}>14CUX Gauge</h1>
+                            <nav aria-label="Views" className={styles['nav']}>
+                              {VIEWS.map(({ label, to }) => (
+                                <NavLink
+                                  key={to}
+                                  to={to}
+                                  className={styles['navItem'] ?? ''}
+                                >
+                                  {label}
+                                </NavLink>
+                              ))}
+                            </nav>
+                            <PreferencesMenu
+                              offerUsageCounts={usageCounter !== undefined}
+                            />
+                          </header>
+                          <AppNotices />
+                          <Main usageCounter={usageCounter} />
+                          <Footer countsUsage={usageCounter !== undefined} />
+                        </div>
+                      </RomsProvider>
+                    </RecordingProvider>
+                  </SessionsProvider>
+                </StorageProvider>
               </EcuWriteProvider>
             </EcuProvider>
           </NotificationsProvider>

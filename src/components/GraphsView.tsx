@@ -6,12 +6,10 @@ import { useHistory } from '../history/useHistory';
 import { METRIC_KEYS } from '../metrics';
 import { useReadings } from '../readings/useReadings';
 import { formatDuration } from '../sessions/format';
-import { useStoredState } from '../storage/useStoredState';
+import { useSetting } from '../settings/useSetting';
 import { GraphGroups } from './GraphGroups';
 import { ReadingsPicker } from './ReadingsPicker';
 import {
-  GRAPH_SETTINGS_KEY,
-  parseGraphSettings,
   WINDOW_OPTIONS,
   type GraphLayout,
   type GraphWindow,
@@ -117,10 +115,7 @@ function TruncatedNote() {
 
 /** Live graphs of the chosen readings over the chosen time window. */
 export function GraphsView() {
-  const [settings, setSettings] = useStoredState(
-    GRAPH_SETTINGS_KEY,
-    parseGraphSettings,
-  );
+  const [settings, setSettings] = useSetting('graphs');
   const { chosen } = useReadings();
   const notChosen = METRIC_KEYS.filter((key) => !chosen.includes(key));
 

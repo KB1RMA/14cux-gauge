@@ -4,13 +4,15 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { IDBFactory } from 'fake-indexeddb';
 import { App } from './App';
+import type { SessionSummary } from './model/session';
 import type { LiveSnapshot } from './model/snapshot';
-import { openSessionStore } from './storage/openSessionStore';
+import { openStorage } from './storage/openStorage';
 import { MemorySessionStore } from './storage/sessionStore';
 import { expectNoAxeViolations, readingFor } from './test-support/a11y';
 import { notification } from './test-support/notifications';
 import { fakeUsageCounter } from './test-support/usageCounter';
 import { snapshotAt } from './test-support/snapshots';
+import { storageWith } from './test-support/storage';
 import { plantRecords } from './test-support/storedRecords';
 
 const START = Date.UTC(2026, 9, 5, 14, 0);
@@ -59,6 +61,8 @@ describe('Recording and browsing sessions', () => {
 
     await connectDemo(user);
     await user.click(screen.getByRole('button', { name: 'Record' }));
+    // Recording starts once its session is created in storage.
+    await screen.findByRole('button', { name: 'Stop recording' });
 
     expect(screen.getByRole('status')).toHaveTextContent(
       'Demo ECU · Polling · Recording',
@@ -160,9 +164,7 @@ describe('Recording and browsing sessions', () => {
     await store.update(id, { notes: 'Hunts between 600 and 900 rpm.' });
 
     const { container } = render(
-      <App
-        openSessionStore={() => Promise.resolve({ store, persistent: true })}
-      />,
+      <App openStorage={storageWith({ sessions: store })} />,
     );
 
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
@@ -276,9 +278,7 @@ describe('Recording and browsing sessions', () => {
     await store.finish(id, START + 3000);
 
     const { container } = render(
-      <App
-        openSessionStore={() => Promise.resolve({ store, persistent: true })}
-      />,
+      <App openStorage={storageWith({ sessions: store })} />,
     );
 
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
@@ -528,9 +528,9 @@ describe('Recording and browsing sessions', () => {
   it('keeps sessions in IndexedDB across visits', async () => {
     const user = userEvent.setup();
     const factory = new IDBFactory();
-    const open = () => openSessionStore(factory);
+    const open = () => openStorage(factory);
     const { unmount } = render(
-      <App pollIntervalMs={{ demo: 10 }} openSessionStore={open} />,
+      <App pollIntervalMs={{ demo: 10 }} openStorage={open} />,
     );
 
     await connectDemo(user);
@@ -547,7 +547,7 @@ describe('Recording and browsing sessions', () => {
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
     unmount();
 
-    render(<App openSessionStore={open} />);
+    render(<App openStorage={open} />);
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
 
     expect(
@@ -566,18 +566,16 @@ describe('Recording and browsing sessions', () => {
 
   it('says when a session has no samples, or has been deleted', async () => {
     const user = userEvent.setup();
-    const store = new MemorySessionStore();
-    const empty = await store.create({
+    const factory = new IDBFactory();
+    // Another tab, with its own connection to the same database.
+    const otherTab = await openStorage(factory);
+    const empty = await otherTab.sessions.create({
       name: 'Empty',
       source: 'serial',
       startedAt: Date.UTC(2026, 9, 5),
     });
 
-    render(
-      <App
-        openSessionStore={() => Promise.resolve({ store, persistent: true })}
-      />,
-    );
+    render(<App openStorage={() => openStorage(factory)} />);
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
     await user.click(await screen.findByRole('link', { name: 'Empty' }));
 
@@ -588,9 +586,10 @@ describe('Recording and browsing sessions', () => {
     expect(readingFor('Length')).toHaveTextContent('Unfinished');
     expect(readingFor('Source')).toHaveTextContent('Serial ECU');
 
-    // Deleted elsewhere (another tab); the next change here notices.
+    // Deleted in the other tab, which this one is not told about; the next
+    // change here notices.
     await act(async () => {
-      await store.remove(empty.id);
+      await otherTab.sessions.remove(empty.id);
     });
     await user.type(screen.getByRole('textbox', { name: 'Notes' }), 'x');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
@@ -598,6 +597,57 @@ describe('Recording and browsing sessions', () => {
     expect(
       await screen.findByText('The changes could not be saved.'),
     ).toBeInTheDocument();
+    otherTab.close();
+  });
+
+  it('keeps a recording under its default name when the new one cannot be saved', async () => {
+    const user = userEvent.setup();
+
+    class NoRenames extends MemorySessionStore {
+      override update(): Promise<SessionSummary> {
+        return Promise.reject(new DOMException('Gone', 'UnknownError'));
+      }
+    }
+
+    render(
+      <App
+        pollIntervalMs={{ demo: 10 }}
+        openStorage={storageWith({ sessions: new NoRenames() })}
+      />,
+    );
+    await connectDemo(user);
+
+    const dialog = await recordAndStop(user);
+
+    await user.type(
+      within(dialog).getByRole('textbox', { name: 'Notes' }),
+      'Cold start',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'The changes could not be saved. The recording is kept under its original name.',
+    );
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled();
+    await user.click(within(dialog).getByRole('button', { name: 'Skip' }));
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  });
+
+  it('says when the recorded sessions cannot be listed', async () => {
+    const user = userEvent.setup();
+
+    class NoList extends MemorySessionStore {
+      override list(): Promise<SessionSummary[]> {
+        return Promise.reject(new DOMException('Gone', 'UnknownError'));
+      }
+    }
+
+    render(<App openStorage={storageWith({ sessions: new NoList() })} />);
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The recorded sessions could not be read.',
+    );
   });
 
   it('stays where the user went while a session is being deleted', async () => {
@@ -622,11 +672,7 @@ describe('Recording and browsing sessions', () => {
       source: 'demo',
       startedAt: START,
     });
-    render(
-      <App
-        openSessionStore={() => Promise.resolve({ store, persistent: true })}
-      />,
-    );
+    render(<App openStorage={storageWith({ sessions: store })} />);
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
     await user.click(await screen.findByRole('link', { name: 'Slow to go' }));
     await user.click(
@@ -669,9 +715,7 @@ describe('Recording and browsing sessions', () => {
     render(
       <App
         pollIntervalMs={{ demo: 10 }}
-        openSessionStore={() =>
-          Promise.resolve({ store: new FullStore(), persistent: true })
-        }
+        openStorage={storageWith({ sessions: new FullStore() })}
         usageCounter={counter}
       />,
     );
@@ -745,7 +789,7 @@ describe('Recording and browsing sessions', () => {
     });
 
     const { container } = render(
-      <App openSessionStore={() => openSessionStore(factory)} />,
+      <App openStorage={() => openStorage(factory)} />,
     );
 
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));

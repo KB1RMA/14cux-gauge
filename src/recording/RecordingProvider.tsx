@@ -12,8 +12,8 @@ import { recordedSource } from '../ecu/connect';
 import { useEcu } from '../ecu/useEcu';
 import { useEcuWrite } from '../ecuWrite/useEcuWrite';
 import { defaultSessionName, describeStorageError } from '../sessions/format';
-import { useSessions } from '../sessions/useSessions';
 import type { SessionSummary } from '../model/session';
+import { useStorage } from '../storage/useStorage';
 import { RecordingContext } from './context';
 import { SessionRecorder } from './sessionRecorder';
 
@@ -30,7 +30,7 @@ interface Active {
 export function RecordingProvider({ children }: { children: ReactNode }) {
   const { state, onSnapshot } = useEcu();
   const { watch } = useEcuWrite();
-  const { store } = useSessions();
+  const store = useStorage()?.sessions;
   const [active, setActive] = useState<SessionSummary | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
   const [finished, setFinished] = useState<SessionSummary | undefined>(

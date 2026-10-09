@@ -5,10 +5,9 @@ import type { TimelineMark } from '../charts/timelinePlugins';
 import type { LiveSnapshot } from '../model/snapshot';
 import { METRIC_KEYS, METRICS, sampleOf, type MetricKey } from '../metrics';
 import type { Replay } from '../replay/useReplay';
-import { useStoredState } from '../storage/useStoredState';
+import { useSetting } from '../settings/useSetting';
 import { GraphGroups } from './GraphGroups';
 import { GraphPicker } from './GraphPicker';
-import { GRAPH_SETTINGS_KEY, parseGraphSettings } from './graphSettings';
 import { TimelineChart } from './TimelineChart';
 import { TimelineOverview } from './TimelineOverview';
 import styles from './GraphsView.module.css';
@@ -36,10 +35,7 @@ export function ReplayGraphs({
   recorded?: readonly MetricKey[];
   writes?: readonly TimelineMark[];
 }) {
-  const [settings, setSettings] = useStoredState(
-    GRAPH_SETTINGS_KEY,
-    parseGraphSettings,
-  );
+  const [settings, setSettings] = useSetting('graphs');
   const syncId = useId();
   // Every sample, in columns, once: the charts slice these as they zoom.
   const [{ times, columns }] = useState(() => {

@@ -15,21 +15,21 @@ export type SessionSamples =
  * being recorded gives what has been saved so far.
  */
 export function useSessionSamples(id: string): SessionSamples {
-  const { store } = useSessions();
+  const { opened, read } = useSessions();
   const [result, setResult] = useState<{
     id: string;
     samples: SessionSamples;
   }>({ id, samples: { status: 'loading' } });
 
   useEffect(() => {
-    if (!store) {
+    if (!opened) {
       return undefined;
     }
 
     let stale = false;
 
-    Promise.all([store.readSamples(id), store.readWrites(id)]).then(
-      ([samples, writes]) => {
+    read(id).then(
+      ({ samples, writes }) => {
         if (!stale) {
           setResult({ id, samples: { status: 'loaded', samples, writes } });
         }
@@ -44,7 +44,7 @@ export function useSessionSamples(id: string): SessionSamples {
     return () => {
       stale = true;
     };
-  }, [store, id]);
+  }, [opened, read, id]);
 
   return result.id === id ? result.samples : { status: 'loading' };
 }

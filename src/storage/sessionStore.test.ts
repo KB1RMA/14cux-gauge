@@ -7,19 +7,36 @@ import { snapshotAt } from '../test-support/snapshots';
 import { plantRecords } from '../test-support/storedRecords';
 import { openDatabase } from './database';
 import { IndexedDbSessionStore } from './indexedDbSessionStore';
-import { openSessionStore } from './openSessionStore';
+import { MemoryRomStore } from './romStore';
+import { openStorage } from './openStorage';
 import {
   MemorySessionStore,
   UnknownSessionError,
   type SessionStore,
 } from './sessionStore';
 
-const backends: [string, () => Promise<SessionStore>][] = [
-  ['MemorySessionStore', () => Promise.resolve(new MemorySessionStore())],
+type Opened = SessionStore & { close(): void };
+
+/** Sessions in IndexedDB over `factory`; `close` closes the database. */
+async function openIndexedDb(factory: IDBFactory): Promise<Opened> {
+  const db = await openDatabase({ factory });
+
+  return Object.assign(new IndexedDbSessionStore(db), {
+    close: () => {
+      db.close();
+    },
+  });
+}
+
+const backends: [string, () => Promise<Opened>][] = [
   [
-    'IndexedDbSessionStore',
-    () => IndexedDbSessionStore.open({ factory: new IDBFactory() }),
+    'MemorySessionStore',
+    () =>
+      Promise.resolve(
+        Object.assign(new MemorySessionStore(), { close: () => undefined }),
+      ),
   ],
+  ['IndexedDbSessionStore', () => openIndexedDb(new IDBFactory())],
 ];
 
 const PUMP_RUNNING: WriteLogEntry = {
@@ -46,7 +63,7 @@ const CLEARED: WriteLogEntry = {
 };
 
 describe.each(backends)('%s', (_name, open) => {
-  let store: SessionStore;
+  let store: Opened;
 
   beforeEach(async () => {
     store = await open();
@@ -243,7 +260,7 @@ describe.each(backends)('%s', (_name, open) => {
 describe('IndexedDbSessionStore persistence', () => {
   it('keeps sessions after the database is closed and opened again', async () => {
     const factory = new IDBFactory();
-    const first = await IndexedDbSessionStore.open({ factory });
+    const first = await openIndexedDb(factory);
     const { id } = await first.create({
       name: 'Saved',
       source: 'serial',
@@ -253,7 +270,7 @@ describe('IndexedDbSessionStore persistence', () => {
     await first.append(id, [snapshotAt(10)]);
     first.close();
 
-    const second = await IndexedDbSessionStore.open({ factory });
+    const second = await openIndexedDb(factory);
 
     expect((await second.get(id))?.sampleCount).toBe(1);
     expect(await second.readSamples(id)).toEqual([snapshotAt(10)]);
@@ -307,7 +324,7 @@ describe('IndexedDbSessionStore upgrades', () => {
     });
     old.close();
 
-    const store = await IndexedDbSessionStore.open({ factory });
+    const store = await openIndexedDb(factory);
 
     expect(await store.list()).toEqual([
       {
@@ -348,14 +365,14 @@ describe('IndexedDbSessionStore failures', () => {
 
     (await rawOpen(factory, 5)).close();
 
-    await expect(IndexedDbSessionStore.open({ factory })).rejects.toThrow(
+    await expect(openIndexedDb(factory)).rejects.toThrow(
       expect.objectContaining({ name: 'VersionError' }) as Error,
     );
   });
 
   it('steps aside when another tab upgrades the database', async () => {
     const factory = new IDBFactory();
-    const store = await IndexedDbSessionStore.open({ factory });
+    const store = await openIndexedDb(factory);
 
     // Would block forever if the open store did not close itself.
     const newer = await rawOpen(factory, 5);
@@ -366,9 +383,7 @@ describe('IndexedDbSessionStore failures', () => {
   });
 
   it('rejects when a write fails', async () => {
-    const store = await IndexedDbSessionStore.open({
-      factory: new IDBFactory(),
-    });
+    const store = await openIndexedDb(new IDBFactory());
     const session = { name: 'A', source: 'demo', startedAt: 0 } as const;
     const uuid = vi
       .spyOn(crypto, 'randomUUID')
@@ -383,20 +398,45 @@ describe('IndexedDbSessionStore failures', () => {
   });
 });
 
-describe('openSessionStore', () => {
-  it('uses IndexedDB when it is available', async () => {
-    const { store, persistent } = await openSessionStore(new IDBFactory());
+describe('openStorage', () => {
+  it('keeps sessions and ROM images in one IndexedDB database', async () => {
+    const factory = new IDBFactory();
+    const storage = await openStorage(factory);
 
-    expect(persistent).toBe(true);
-    expect(store).toBeInstanceOf(IndexedDbSessionStore);
-    store.close();
+    expect(storage.persistent).toBe(true);
+    expect(storage.sessions).toBeInstanceOf(IndexedDbSessionStore);
+
+    const session = await storage.sessions.create({
+      name: 'Idle',
+      source: 'demo',
+      startedAt: 5,
+    });
+
+    await storage.roms.save({
+      source: 'serial',
+      readAt: 1000,
+      tuneNumber: 3652,
+      tuneIdent: 0x23,
+      sha256: 'ab12',
+      bytes: Uint8Array.from([0x00, 0xff]),
+    });
+    storage.close();
+
+    const again = await openStorage(factory);
+
+    expect((await again.sessions.list()).map(({ id }) => id)).toEqual([
+      session.id,
+    ]);
+    expect(await again.roms.list()).toHaveLength(1);
+    again.close();
   });
 
-  it('falls back to memory without IndexedDB, or when it will not open', async () => {
-    const missing = await openSessionStore(undefined);
+  it('falls back to memory for both without IndexedDB, or when it will not open', async () => {
+    const missing = await openStorage(undefined);
 
     expect(missing.persistent).toBe(false);
-    expect(missing.store).toBeInstanceOf(MemorySessionStore);
+    expect(missing.sessions).toBeInstanceOf(MemorySessionStore);
+    expect(missing.roms).toBeInstanceOf(MemoryRomStore);
 
     const factory = new IDBFactory();
 
@@ -404,9 +444,65 @@ describe('openSessionStore', () => {
       throw new DOMException('blocked', 'SecurityError');
     });
 
-    const blocked = await openSessionStore(factory);
+    const blocked = await openStorage(factory);
 
-    expect(blocked.store).toBeInstanceOf(MemorySessionStore);
+    expect(blocked.persistent).toBe(false);
+    expect(blocked.sessions).toBeInstanceOf(MemorySessionStore);
+    expect(blocked.roms).toBeInstanceOf(MemoryRomStore);
+  });
+});
+
+describe.each(backends)('%s changes', (_name, open) => {
+  let store: Opened;
+
+  beforeEach(async () => {
+    store = await open();
+  });
+
+  afterEach(() => {
+    store.close();
+  });
+
+  it('reports changes to the list of sessions, but not appends or writes', async () => {
+    const listener = vi.fn();
+    const unsubscribe = store.subscribe(listener);
+    const { id } = await store.create({
+      name: 'A',
+      source: 'demo',
+      startedAt: 0,
+    });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    await store.append(id, [snapshotAt(0), snapshotAt(100)]);
+    await store.putWrite(id, PUMP_RUNNING);
+
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    await store.finish(id, 100);
+    await store.update(id, { notes: 'Cold start' });
+    await store.remove(id);
+
+    expect(listener).toHaveBeenCalledTimes(4);
+
+    unsubscribe();
+    await store.create({ name: 'B', source: 'demo', startedAt: 1 });
+
+    expect(listener).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not report a change that failed', async () => {
+    const listener = vi.fn();
+
+    store.subscribe(listener);
+
+    await expect(store.update('missing', { name: 'A' })).rejects.toThrow(
+      UnknownSessionError,
+    );
+    await expect(store.finish('missing', 1)).rejects.toThrow(
+      UnknownSessionError,
+    );
+    expect(listener).not.toHaveBeenCalled();
   });
 });
 
@@ -457,7 +553,7 @@ describe('IndexedDbSessionStore stored records', () => {
       sessions: [GOOD, { ...GOOD, id: 'damaged', name: 42 }],
     });
 
-    const store = await IndexedDbSessionStore.open({ factory });
+    const store = await openIndexedDb(factory);
 
     expect((await store.list()).map(({ id }) => id)).toEqual(['good']);
     expect(await store.listUnreadable()).toEqual([
@@ -484,7 +580,7 @@ describe('IndexedDbSessionStore stored records', () => {
       sessions: [GOOD, { ...GOOD, id: 'newer', formatVersion: 4 }],
     });
 
-    const store = await IndexedDbSessionStore.open({ factory });
+    const store = await openIndexedDb(factory);
 
     expect((await store.list()).map(({ id }) => id)).toEqual(['good']);
     expect(await store.listUnreadable()).toEqual([
@@ -508,7 +604,7 @@ describe('IndexedDbSessionStore stored records', () => {
       writes: [{ ...PUMP_RUNNING, startedAt: '2000', sessionId: 'good' }],
     });
 
-    const store = await IndexedDbSessionStore.open({ factory });
+    const store = await openIndexedDb(factory);
 
     await expect(store.readSamples('good')).rejects.toThrow(InvalidRecordError);
     await expect(store.readWrites('good')).rejects.toThrow(InvalidRecordError);
@@ -540,7 +636,7 @@ describe('IndexedDbSessionStore stored records', () => {
       ],
     });
 
-    const store = await IndexedDbSessionStore.open({ factory });
+    const store = await openIndexedDb(factory);
 
     expect(await store.readWrites('good')).toEqual([
       PUMP_STOPPED,
@@ -560,7 +656,7 @@ describe('IndexedDbSessionStore stored records', () => {
       ],
     });
 
-    const store = await IndexedDbSessionStore.open({ factory });
+    const store = await openIndexedDb(factory);
 
     await expect(store.readWrites('good')).rejects.toThrow(InvalidRecordError);
     store.close();
@@ -572,7 +668,7 @@ describe('IndexedDbSessionStore stored records', () => {
 
     await plantRecords(factory, { sessions: [format1] });
 
-    const store = await IndexedDbSessionStore.open({ factory });
+    const store = await openIndexedDb(factory);
 
     await store.update('good', { name: 'Renamed' });
     store.close();

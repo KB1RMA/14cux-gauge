@@ -24,12 +24,11 @@ import {
   CHUNKS,
   completed,
   entries,
-  openDatabase,
   request,
   SESSIONS,
   WRITES,
-  type DatabaseOptions,
 } from './database';
+import { Listeners } from './listeners';
 import {
   applyChanges,
   byStart,
@@ -66,19 +65,16 @@ function samplesOf(raw: unknown): LiveSnapshot[] {
   return samples;
 }
 
-export type OpenOptions = DatabaseOptions;
-
 /**
  * Sessions in IndexedDB, which (unlike `localStorage`) holds hours of
- * samples without blocking the page.
+ * samples without blocking the page. It uses a connection opened by
+ * `openStorage`, which closes it.
  */
 export class IndexedDbSessionStore implements SessionStore {
-  private constructor(private readonly db: IDBDatabase) {}
+  private readonly listeners = new Listeners();
+  readonly subscribe = this.listeners.subscribe;
 
-  /** Opens (creating or upgrading if needed) the sessions database. */
-  static async open(options: OpenOptions = {}): Promise<IndexedDbSessionStore> {
-    return new IndexedDbSessionStore(await openDatabase(options));
-  }
+  constructor(private readonly db: IDBDatabase) {}
 
   async create(session: NewSession): Promise<SessionSummary> {
     const summary = emptySummary(session);
@@ -86,6 +82,7 @@ export class IndexedDbSessionStore implements SessionStore {
 
     tx.objectStore(SESSIONS).add(summary);
     await completed(tx);
+    this.listeners.notify();
 
     return summary;
   }
@@ -118,6 +115,7 @@ export class IndexedDbSessionStore implements SessionStore {
 
     sessions.put(finished);
     await done;
+    this.listeners.notify();
 
     return finished;
   }
@@ -133,6 +131,7 @@ export class IndexedDbSessionStore implements SessionStore {
 
     sessions.put(updated);
     await done;
+    this.listeners.notify();
 
     return updated;
   }
@@ -213,10 +212,7 @@ export class IndexedDbSessionStore implements SessionStore {
 
     tx.objectStore(SESSIONS).delete(id);
     await done;
-  }
-
-  close(): void {
-    this.db.close();
+    this.listeners.notify();
   }
 
   private async readAll() {

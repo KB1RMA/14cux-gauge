@@ -2,12 +2,14 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import type { UnreadableRecord } from '../model/record';
 import type { NewRom, RomSummary } from '../model/rom';
+import { Listeners } from './listeners';
 
 /**
  * Where saved ROM images (see `src/model/rom.ts`) are kept.
  *
  * `RomStore` is the contract every backend meets: IndexedDB in the browser,
- * memory when storage is unavailable.
+ * memory when storage is unavailable. The stores are opened together by
+ * `openStorage`, which also closes them.
  */
 
 export interface RomStore {
@@ -20,7 +22,12 @@ export interface RomStore {
   read(id: string): Promise<Uint8Array | undefined>;
   /** Deletes an image. Unknown ids are ignored. */
   remove(id: string): Promise<void>;
-  close(): void;
+  /**
+   * Calls `listener` whenever the list of images may have changed: after
+   * every save or remove, including (for a backend that can tell) ones made
+   * elsewhere. Returns a function that unsubscribes.
+   */
+  subscribe(listener: () => void): () => void;
 }
 
 export function summaryOf(rom: NewRom, id: string): RomSummary {
@@ -39,11 +46,14 @@ export class MemoryRomStore implements RomStore {
     string,
     { summary: RomSummary; bytes: Uint8Array }
   >();
+  private readonly listeners = new Listeners();
+  readonly subscribe = this.listeners.subscribe;
 
   async save(rom: NewRom): Promise<RomSummary> {
     const summary = summaryOf(rom, crypto.randomUUID());
 
     this.roms.set(summary.id, { summary, bytes: rom.bytes.slice() });
+    this.listeners.notify();
 
     return { ...summary };
   }
@@ -65,9 +75,6 @@ export class MemoryRomStore implements RomStore {
 
   async remove(id: string): Promise<void> {
     this.roms.delete(id);
-  }
-
-  close(): void {
-    // Nothing to release.
+    this.listeners.notify();
   }
 }

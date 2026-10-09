@@ -50,7 +50,10 @@ describe('App usage counts', () => {
     await user.click(screen.getByRole('button', { name: 'Demo mode' }));
     await screen.findByRole('heading', { name: 'Live data' });
     await user.click(screen.getByRole('button', { name: 'Record' }));
-    await user.click(screen.getByRole('button', { name: 'Stop recording' }));
+    // Recording starts once its session is created in storage.
+    await user.click(
+      await screen.findByRole('button', { name: 'Stop recording' }),
+    );
 
     const dialog = await screen.findByRole('dialog', {
       name: 'Save recording',

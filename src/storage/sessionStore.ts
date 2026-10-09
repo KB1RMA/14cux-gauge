@@ -9,6 +9,7 @@ import {
 import type { UnreadableRecord } from '../model/record';
 import type { LiveSnapshot } from '../model/snapshot';
 import type { RecordedWrite, WriteLogEntry } from '../model/write';
+import { Listeners } from './listeners';
 
 /**
  * Recorded debug sessions (see `src/model/session.ts`) and where they are
@@ -20,6 +21,8 @@ import type { RecordedWrite, WriteLogEntry } from '../model/write';
  * cloneable so a backend can live in another process. A backend that reads
  * stored summaries back runs them through `readSession`, which migrates
  * older formats and rejects records it cannot read.
+ *
+ * The stores are opened together by `openStorage`, which also closes them.
  */
 
 export interface SessionStore {
@@ -50,7 +53,14 @@ export interface SessionStore {
   readWrites(id: string): Promise<RecordedWrite[]>;
   /** Deletes a session, its samples and its writes. Unknown ids are ignored. */
   remove(id: string): Promise<void>;
-  close(): void;
+  /**
+   * Calls `listener` whenever the list of sessions may have changed: after
+   * every create, finish, update or remove, including (for a backend that
+   * can tell) ones made elsewhere, such as in another window. Appends and
+   * writes are not reported; a session's samples and writes are read when
+   * it is opened rather than watched. Returns a function that unsubscribes.
+   */
+  subscribe(listener: () => void): () => void;
 }
 
 export class UnknownSessionError extends Error {
@@ -114,11 +124,14 @@ export class MemorySessionStore implements SessionStore {
       writes: Map<string, WriteLogEntry>;
     }
   >();
+  private readonly listeners = new Listeners();
+  readonly subscribe = this.listeners.subscribe;
 
   async create(session: NewSession): Promise<SessionSummary> {
     const summary = emptySummary(session);
 
     this.sessions.set(summary.id, { summary, samples: [], writes: new Map() });
+    this.listeners.notify();
 
     return { ...summary };
   }
@@ -137,6 +150,7 @@ export class MemorySessionStore implements SessionStore {
     const entry = this.entry(id);
 
     entry.summary = { ...entry.summary, endedAt };
+    this.listeners.notify();
 
     return { ...entry.summary };
   }
@@ -145,6 +159,7 @@ export class MemorySessionStore implements SessionStore {
     const entry = this.entry(id);
 
     entry.summary = applyChanges(entry.summary, changes);
+    this.listeners.notify();
 
     return { ...entry.summary };
   }
@@ -180,10 +195,7 @@ export class MemorySessionStore implements SessionStore {
 
   async remove(id: string): Promise<void> {
     this.sessions.delete(id);
-  }
-
-  close(): void {
-    // Nothing to release.
+    this.listeners.notify();
   }
 
   private entry(id: string) {

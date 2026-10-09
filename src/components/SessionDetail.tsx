@@ -21,7 +21,7 @@ import styles from './Sessions.module.css';
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed';
 
 function DetailsForm({ session }: { session: SessionSummary }) {
-  const { store } = useSessions();
+  const { edit } = useSessions();
   const [name, setName] = useState(session.name);
   const [notes, setNotes] = useState(session.notes);
   const [saveState, setSaveState] = useState<SaveState>('idle');
@@ -33,7 +33,7 @@ function DetailsForm({ session }: { session: SessionSummary }) {
       onSubmit={(event) => {
         event.preventDefault();
         setSaveState('saving');
-        store?.update(session.id, { name: name.trim(), notes }).then(
+        edit(session.id, { name: name.trim(), notes }).then(
           () => {
             setSaveState('saved');
           },
@@ -75,7 +75,7 @@ function DetailsForm({ session }: { session: SessionSummary }) {
 /** One recorded session: replay it, rename it, keep notes, or delete it. */
 export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
   const navigate = useNavigate();
-  const { store } = useSessions();
+  const { remove } = useSessions();
   const { active } = useRecording();
   const list = useSessionList();
   const samples = useSessionSamples(id);
@@ -243,7 +243,7 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
         onConfirm={(target) => {
           setDeleting(false);
           setDeleteFailed(false);
-          store?.remove(target.id).then(
+          remove(target.id).then(
             () => {
               // The user may have moved on while it was deleting; only leave
               // the session if it is still showing.
