@@ -479,6 +479,45 @@ describe('Recording and browsing sessions', () => {
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
   });
 
+  it('says when a CSV export could not be saved', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <App
+        pollIntervalMs={{ demo: 10 }}
+        platform={browserPlatform({
+          files: { save: () => Promise.reject(new Error('Disk full')) },
+        })}
+      />,
+    );
+    await connectDemo(user);
+    await recordAndStop(user);
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Save recording' })).getByRole(
+        'button',
+        { name: 'Skip' },
+      ),
+    );
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: /^Demo ECU, / }));
+
+    const exportButton = screen.getByRole('button', { name: 'Export CSV' });
+
+    await waitFor(() => {
+      expect(exportButton).toBeEnabled();
+    });
+    await user.click(exportButton);
+
+    expect(
+      await within(screen.getByRole('region', { name: 'Export' })).findByRole(
+        'alert',
+      ),
+    ).toHaveTextContent(
+      /^Demo-ECU-\S+\.csv could not be saved: Error: Disk full\.$/,
+    );
+  });
+
   it('shows a recording in progress, which cannot be deleted', async () => {
     const user = userEvent.setup();
     const { container } = render(<App pollIntervalMs={{ demo: 10 }} />);

@@ -10,7 +10,8 @@ import { buildSyntheticRom } from './demo/syntheticRom';
 import { openStorage } from './storage/openStorage';
 import type { UnreadableRecord } from './model/record';
 import type { RomSummary } from './model/rom';
-import { MemoryRomStore } from './storage/romStore';
+import type { FilePlatform } from './platform/platform';
+import { MemoryRomStore, type RomStore } from './storage/romStore';
 import { expectNoAxeViolations } from './test-support/a11y';
 import { storageWith } from './test-support/storage';
 import { plantRecords } from './test-support/storedRecords';
@@ -70,17 +71,51 @@ async function connectDemo(user: UserEvent) {
   await screen.findByRole('heading', { name: 'Live data' });
 }
 
-function renderApp(store = new MemoryRomStore()) {
+function renderApp(
+  store: RomStore = new MemoryRomStore(),
+  files?: FilePlatform,
+) {
   return render(
     <App
       pollIntervalMs={{ demo: 10 }}
       usageCounter={fakeUsageCounter()}
       platform={browserPlatform({
         storage: { open: storageWith({ roms: store }) },
+        ...(files ? { files } : {}),
       })}
     />,
   );
 }
+
+/** Reads the demo ECU's ROM image, and waits for the read to end. */
+async function readDemoRom(user: UserEvent) {
+  await connectDemo(user);
+  await user.click(screen.getByRole('button', { name: 'Save ROM image' }));
+  await user.click(
+    await screen.findByRole('button', { name: 'Read ROM image' }),
+  );
+
+  const progress = await screen.findByRole('alertdialog', {
+    name: 'Reading the ROM image',
+  });
+
+  await waitFor(
+    () => {
+      expect(progress).not.toBeInTheDocument();
+    },
+    { timeout: 10_000 },
+  );
+}
+
+/** Where every save is cancelled, as when a Save dialog is dismissed. */
+const CANCELLED_SAVES: FilePlatform = {
+  save: () => Promise.resolve('cancelled'),
+};
+
+/** Where every save fails, as on a full disk. */
+const FAILING_SAVES: FilePlatform = {
+  save: () => Promise.reject(new Error('Disk full')),
+};
 
 describe('Saving the ROM image', () => {
   afterEach(() => {
@@ -193,6 +228,62 @@ describe('Saving the ROM image', () => {
     expect(
       await screen.findByText('No images are kept in this browser yet.'),
     ).toBeInTheDocument();
+  });
+
+  it('says the image was read but not saved when the save is cancelled, and keeps a copy', async () => {
+    const user = userEvent.setup();
+    const { container } = renderApp(new MemoryRomStore(), CANCELLED_SAVES);
+
+    await readDemoRom(user);
+
+    expect(
+      await screen.findByText(/^The ROM image was read, but /),
+    ).toHaveTextContent(
+      `The ROM image was read, but ${DEMO_FILE} was not saved: the save was cancelled. A copy is kept in this browser; download it from the list below.`,
+    );
+    expect(screen.queryByText(/^Downloaded /)).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'Saved ROM images' })).getByText(
+        'Tune 1234, ident 0xDE70',
+      ),
+    ).toBeInTheDocument();
+    await expectNoAxeViolations(container);
+  });
+
+  it('says when the image could not be saved, nor kept', async () => {
+    const user = userEvent.setup();
+
+    class FullRoms extends MemoryRomStore {
+      override save(): Promise<RomSummary> {
+        return Promise.reject(new Error('Quota exceeded'));
+      }
+    }
+
+    renderApp(new FullRoms(), FAILING_SAVES);
+    await readDemoRom(user);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      `The ROM image was read, but ${DEMO_FILE} could not be saved: Error: Disk full. A copy could not be kept in this browser either, so nothing was saved.`,
+    );
+  });
+
+  it('says when a kept image could not be saved again', async () => {
+    const user = userEvent.setup();
+
+    renderApp(new MemoryRomStore(), FAILING_SAVES);
+    await readDemoRom(user);
+    await user.click(
+      within(await screen.findByRole('alert')).getByRole('button', {
+        name: 'Dismiss',
+      }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: /^Download Tune 1234, ident 0xDE70/ }),
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      `${DEMO_FILE} could not be saved: Error: Disk full. Nothing was saved.`,
+    );
   });
 
   it('does not read anything if the user backs out of the confirmation', async () => {

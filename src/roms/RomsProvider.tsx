@@ -6,6 +6,7 @@ import { describeError } from '../ecu/errors';
 import type { Lease } from '../ecu/session';
 import { useEcu } from '../ecu/useEcu';
 import { useEcuSession } from '../ecu/useEcuSession';
+import { saveFile } from '../platform/saveFile';
 import { usePlatform } from '../platform/usePlatform';
 import type { UnreadableRecord } from '../model/record';
 import type { RomSummary } from '../model/rom';
@@ -131,12 +132,14 @@ export function RomsProvider({ children }: { children: ReactNode }) {
           kept = true;
           await settled();
         } catch {
-          // Still download it; the outcome says no copy was kept.
+          // Still save the file; the outcome says no copy was kept.
         }
       }
 
-      await files.save(fileName, bytes, ROM_FILE_TYPE);
-      setOutcome({ kind: 'saved', fileName, image, kept });
+      // Never rejects: a file that was not saved is not a failed read.
+      const notSaved = await saveFile(files, fileName, bytes, ROM_FILE_TYPE);
+
+      setOutcome({ kind: 'read', fileName, image, kept, notSaved });
     } catch (error) {
       setOutcome(
         isRomReadCancelled(error)
@@ -173,11 +176,17 @@ export function RomsProvider({ children }: { children: ReactNode }) {
       const bytes = await store?.read(image.id);
 
       if (bytes) {
-        await files.save(
+        const notSaved = await saveFile(
+          files,
           romFileName(image.source, image.tuneNumber, image.tuneIdent),
           bytes,
           ROM_FILE_TYPE,
         );
+
+        // Dismissing a Save dialog needs no message: the user chose it.
+        if (notSaved?.kind === 'failed') {
+          setOutcome({ kind: 'failed', message: notSaved.message });
+        }
       } else {
         setOutcome({
           kind: 'failed',

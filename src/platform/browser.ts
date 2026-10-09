@@ -82,7 +82,8 @@ export const browserDownloads: FilePlatform = {
       URL.revokeObjectURL(url);
     }, 1_000);
 
-    return Promise.resolve();
+    // A browser download has no Save dialog the page can see.
+    return Promise.resolve('saved');
   },
 };
 

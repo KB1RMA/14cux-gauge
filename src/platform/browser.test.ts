@@ -41,7 +41,9 @@ describe('browserPlatform', () => {
 
     const { blobs, revoked, click } = captureDownloads();
 
-    await browserPlatform().files.save('log.txt', 'hello', 'text/plain');
+    expect(
+      await browserPlatform().files.save('log.txt', 'hello', 'text/plain'),
+    ).toBe('saved');
 
     expect(click).toHaveBeenCalledOnce();
     expect(click.mock.contexts[0]).toMatchObject({

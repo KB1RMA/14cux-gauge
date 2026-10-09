@@ -3,6 +3,7 @@
 import { createContext } from 'react';
 import type { UnreadableRecord } from '../model/record';
 import type { RomSummary } from '../model/rom';
+import type { SaveFeedback } from '../platform/saveFile';
 
 export interface RomProgress {
   bytesRead: number;
@@ -15,11 +16,13 @@ export interface RomProgress {
 
 export type RomOutcome =
   | {
-      kind: 'saved';
+      kind: 'read';
       fileName: string;
       image: RomSummary;
       /** Whether a copy was kept in the browser; `false` if storage failed. */
       kept: boolean;
+      /** Why the file was not saved; `undefined` once it was. */
+      notSaved: SaveFeedback | undefined;
     }
   | { kind: 'cancelled' }
   | { kind: 'failed'; message: string };
@@ -37,13 +40,13 @@ export interface RomsValue {
   outcome: RomOutcome | undefined;
   /**
    * Pauses live polling, stops any recording, reads the ROM image, keeps a
-   * copy in the browser and downloads it.
+   * copy in the browser and saves it as a file.
    */
   read(): Promise<void>;
   /** Stops a read in progress. */
   cancel(): void;
   dismissOutcome(): void;
-  /** Downloads a saved image again. */
+  /** Saves a kept image as a file again; says so only if that fails. */
   download(image: RomSummary): Promise<void>;
   /** Deletes a saved image, readable or not, by its `id`. */
   remove(id: string): Promise<void>;

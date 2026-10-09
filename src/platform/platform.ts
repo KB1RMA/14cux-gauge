@@ -51,13 +51,23 @@ export interface SerialPlatform {
   open(port: SerialPortHandle, options: { baudRate: number }): SerialLink;
 }
 
+/**
+ * How a save ended: `saved` once the file has been handed over (a browser
+ * download has started), `cancelled` if the user dismissed a Save dialog.
+ */
+export type SaveResult = 'saved' | 'cancelled';
+
 export interface FilePlatform {
   /**
    * Offers `data` to the user as a file named `name`, of MIME type `type`;
-   * text is saved as UTF-8. Resolves once the file has been handed over, or
-   * the user has dismissed a Save dialog; rejects if it could not be saved.
+   * text is saved as UTF-8. Rejects if the file could not be saved. Callers
+   * must tell the user when it was not saved, either way.
    */
-  save(name: string, data: string | Uint8Array, type: string): Promise<void>;
+  save(
+    name: string,
+    data: string | Uint8Array,
+    type: string,
+  ): Promise<SaveResult>;
 }
 
 export interface StoragePlatform {

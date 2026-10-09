@@ -6,7 +6,11 @@ import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { createAppServices } from './appServices';
 import { buildSyntheticRom } from './demo/syntheticRom';
-import type { Platform, SettingsBackend } from './platform/platform';
+import type {
+  FilePlatform,
+  Platform,
+  SettingsBackend,
+} from './platform/platform';
 import { storageWith } from './test-support/storage';
 import { fakeUsageCounter } from './test-support/usageCounter';
 
@@ -61,7 +65,7 @@ function desktopPlatform() {
       save: (name, data, type) => {
         saved.push({ name, data, type });
 
-        return Promise.resolve();
+        return Promise.resolve('saved');
       },
     },
     storage: { open: storageWith() },
@@ -170,5 +174,42 @@ describe('App on another platform', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       'Disconnected: The serial port could not be opened or was disconnected.',
     );
+  });
+
+  it('says when the diagnostic log could not be saved, but not when the user cancelled', async () => {
+    const user = userEvent.setup();
+    const { platform } = desktopPlatform();
+    const save = vi.fn<FilePlatform['save']>();
+
+    render(
+      <App
+        platform={{ ...platform, files: { save } }}
+        usageCounter={undefined}
+      />,
+    );
+
+    const footer = within(screen.getByRole('contentinfo'));
+
+    save.mockResolvedValueOnce('cancelled');
+    await user.click(
+      footer.getByRole('button', { name: 'Download diagnostic log' }),
+    );
+    expect(save).toHaveBeenCalledOnce();
+    expect(footer.queryByRole('alert')).not.toBeInTheDocument();
+
+    save.mockRejectedValueOnce(new Error('Disk full.'));
+    await user.click(
+      footer.getByRole('button', { name: 'Download diagnostic log' }),
+    );
+    expect(await footer.findByRole('alert')).toHaveTextContent(
+      /^14cux-gauge-log-[\dT-]+\.txt could not be saved: Error: Disk full\.$/,
+    );
+
+    // Trying again clears the message, and saving works this time.
+    save.mockResolvedValueOnce('saved');
+    await user.click(
+      footer.getByRole('button', { name: 'Download diagnostic log' }),
+    );
+    expect(footer.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
