@@ -2,7 +2,9 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { App } from './App';
+import { buildSyntheticRom } from './demo/syntheticRom';
 import { expectNoAxeViolations } from './test-support/a11y';
 import { fakeUsageCounter } from './test-support/usageCounter';
 
@@ -33,6 +35,59 @@ class FakeSerialPort extends EventTarget {
 
   close(): Promise<void> {
     return Promise.resolve();
+  }
+}
+
+/**
+ * A port whose far end is comm14cux-ts's emulation of the ECU, so the link
+ * stays up for as long as a test needs it, however slow the machine.
+ */
+class AnsweringSerialPort extends FakeSerialPort {
+  readonly ecu = new SimulatedTransport();
+  #toHost: ReadableStreamDefaultController<Uint8Array> | undefined;
+
+  constructor() {
+    super();
+    this.ecu.loadRom(buildSyntheticRom());
+  }
+
+  override async open(): Promise<void> {
+    this.opens++;
+    await this.ecu.open();
+    this.readable = new ReadableStream<Uint8Array>({
+      start: (controller) => {
+        this.#toHost = controller;
+      },
+    });
+    this.writable = new WritableStream<Uint8Array>({
+      write: async (chunk) => {
+        await this.ecu.write(chunk);
+        await this.#deliverReply();
+      },
+    });
+  }
+
+  override async close(): Promise<void> {
+    this.#toHost = undefined;
+    await this.ecu.close();
+  }
+
+  /** Moves the emulated ECU's reply onto the readable stream. */
+  async #deliverReply(): Promise<void> {
+    const reply: number[] = [];
+
+    for (;;) {
+      try {
+        // Rejects once nothing is queued; the emulation never waits.
+        reply.push(...(await this.ecu.read(1, 0)));
+      } catch {
+        break;
+      }
+    }
+
+    if (reply.length > 0) {
+      this.#toHost?.enqueue(Uint8Array.from(reply));
+    }
   }
 }
 
@@ -125,11 +180,13 @@ describe('App with a serial ECU', () => {
 
   it('stops and offers to reconnect when the port is unplugged', async () => {
     const user = userEvent.setup();
-    const port = new FakeSerialPort();
+    // Answers, so the link lasts until it is unplugged.
+    const port = new AnsweringSerialPort();
     const counter = fakeUsageCounter();
 
     installSerial(port);
-    render(<App usageCounter={counter} />);
+    // The emulation answers at once; pace polling as a real link would.
+    render(<App pollIntervalMs={{ serial: 20 }} usageCounter={counter} />);
     await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent(
