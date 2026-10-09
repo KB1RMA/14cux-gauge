@@ -85,7 +85,11 @@ export function pickReadings(
 }
 
 export interface PollerStats {
-  /** Completed passes per second, averaged over the last few passes. */
+  /**
+   * Completed passes per second, averaged over the last few passes that read
+   * the same readings since polling last started or resumed; 0 until there
+   * are two such passes.
+   */
   sampleRateHz: number;
 }
 
@@ -145,6 +149,9 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
   const controller = new AbortController();
   const { signal } = controller;
   const finishTimes: number[] = [];
+  // The readings the passes in `finishTimes` read, so the rate is only ever
+  // measured over passes like the next one.
+  let ratedKeys: string | undefined;
   let previous: LiveSnapshot | undefined;
   let pass = 0;
   let consecutiveErrors = 0;
@@ -180,7 +187,10 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
     }
   };
 
-  const readPass = async (): Promise<LiveSnapshot> => {
+  const readPass = async (): Promise<{
+    snapshot: LiveSnapshot;
+    keys: string;
+  }> => {
     const wanted = options.readings?.() ?? ALL_READINGS;
     const keys = READING_ORDER.filter((key) => wanted.has(key));
     const watched = options.watched?.() ?? wanted;
@@ -200,7 +210,10 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
           : await read<unknown>(() => READERS[key](ecu));
     }
 
-    return { timestamp: Date.now(), ...(values as Partial<LiveReadings>) };
+    return {
+      snapshot: { timestamp: Date.now(), ...(values as Partial<LiveReadings>) },
+      keys: keys.join(),
+    };
   };
 
   const sampleRate = (): number => {
@@ -222,7 +235,7 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
   // Takes one pass; false if polling has ended.
   const runPass = async (): Promise<boolean> => {
     try {
-      const snapshot = await readPass();
+      const { snapshot, keys } = await readPass();
 
       if (signal.aborted) {
         return false;
@@ -231,6 +244,14 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
       pass++;
       consecutiveErrors = 0;
       previous = snapshot;
+
+      // A pass reading other values takes another time: the rate of the
+      // readings before would not be the rate of these.
+      if (keys !== ratedKeys) {
+        finishTimes.length = 0;
+        ratedKeys = keys;
+      }
+
       finishTimes.push(snapshot.timestamp);
 
       if (finishTimes.length > RATE_WINDOW) {
@@ -301,8 +322,10 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
     resume() {
       paused = false;
       // Slow readings kept from before the pause would be old by now, so
-      // the first pass back reads every value afresh.
+      // the first pass back reads every value afresh. The rate starts again
+      // too, rather than count the pause.
       previous = undefined;
+      finishTimes.length = 0;
 
       if (!passing && timer === undefined && !signal.aborted) {
         void tick();

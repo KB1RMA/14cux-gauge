@@ -357,6 +357,55 @@ describe('startPoller', () => {
     expect(sink.stats.at(-1)?.sampleRateHz).toBe(4);
   });
 
+  it('measures the rate afresh when the readings change', async () => {
+    const { ecu } = await plantedEcu();
+    const sink = collect();
+    let wanted: ReadonlySet<ReadingKey> = new Set(['engineRpm', 'milOn']);
+    const poller = startPoller(ecu, {
+      intervalMs: 250,
+      readings: () => wanted,
+      ...sink,
+    });
+
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const before = sink.stats.length;
+
+    expect(sink.stats.at(-1)?.sampleRateHz).toBe(4);
+
+    // The first pass of the new readings has no rate of its own yet, rather
+    // than the rate of the readings before.
+    wanted = new Set(['roadSpeedMph']);
+    await vi.advanceTimersByTimeAsync(2000);
+    poller.stop();
+
+    expect(sink.stats.slice(before, before + 2)).toEqual([
+      { sampleRateHz: 0 },
+      { sampleRateHz: 4 },
+    ]);
+  });
+
+  it('measures the rate afresh after a pause, rather than count it', async () => {
+    const { ecu } = await plantedEcu();
+    const sink = collect();
+    const poller = startPoller(ecu, { intervalMs: 250, ...sink });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await poller.pause();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    const before = sink.stats.length;
+
+    poller.resume();
+    await vi.advanceTimersByTimeAsync(250);
+    poller.stop();
+
+    expect(sink.stats.slice(before)).toEqual([
+      { sampleRateHz: 0 },
+      { sampleRateHz: 4 },
+    ]);
+  });
+
   it('stops reading from the ECU once stopped', async () => {
     const { transport, ecu } = await plantedEcu();
     const sink = collect();
