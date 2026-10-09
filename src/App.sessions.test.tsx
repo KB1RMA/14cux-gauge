@@ -60,6 +60,8 @@ describe('Recording and browsing sessions', () => {
 
     await connectDemo(user);
     await user.click(screen.getByRole('button', { name: 'Record' }));
+    // Recording starts once its session is created in storage.
+    await screen.findByRole('button', { name: 'Stop recording' });
 
     expect(screen.getByRole('status')).toHaveTextContent(
       'Demo ECU · Polling · Recording',

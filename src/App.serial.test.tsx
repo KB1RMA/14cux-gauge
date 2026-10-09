@@ -137,6 +137,8 @@ describe('App with a serial ECU', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Record' }));
+    // Recording starts once its session is created in storage.
+    await screen.findByRole('button', { name: 'Stop recording' });
 
     expect(screen.getByRole('status')).toHaveTextContent(
       'Serial ECU (7812 baud) · Polling · Recording',

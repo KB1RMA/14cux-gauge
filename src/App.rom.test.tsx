@@ -244,6 +244,8 @@ describe('Saving the ROM image', () => {
     renderApp();
     await connectDemo(user);
     await user.click(screen.getByRole('button', { name: 'Record' }));
+    // Recording starts once its session is created in storage.
+    await screen.findByRole('button', { name: 'Stop recording' });
     await user.click(screen.getByRole('button', { name: 'Save ROM image' }));
 
     const confirm = await screen.findByRole('alertdialog', {
