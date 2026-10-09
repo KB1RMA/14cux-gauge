@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.6.0...v0.7.0) (2026-10-09)
+
+
+### Features
+
+* keep settings in step across windows ([#72](https://github.com/KB1RMA/14cux-gauge/issues/72)) ([914daa9](https://github.com/KB1RMA/14cux-gauge/commit/914daa9aa8965d756e97c278c394db7dbfab004b))
+
+
+### Bug Fixes
+
+* check stored recordings and ROM images, and list ones that can't be read ([#70](https://github.com/KB1RMA/14cux-gauge/issues/70)) ([f316657](https://github.com/KB1RMA/14cux-gauge/commit/f3166575af73c1995f18431e4db08d64fa92379b))
+* show the sample rate of the readings now chosen, not of those before a change or a pause ([#74](https://github.com/KB1RMA/14cux-gauge/issues/74)) ([83a545b](https://github.com/KB1RMA/14cux-gauge/commit/83a545b512a2db4ce5b2999a49d53406013374a8))
+* stop a ROM read and writes to the ECU from running at the same time ([#67](https://github.com/KB1RMA/14cux-gauge/issues/67)) ([#73](https://github.com/KB1RMA/14cux-gauge/issues/73)) ([25f41cd](https://github.com/KB1RMA/14cux-gauge/commit/25f41cd4a954004acdfa28454c2849fe63615191))
+
 ## [0.6.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.5.0...v0.6.0) (2026-10-07)
 
 
