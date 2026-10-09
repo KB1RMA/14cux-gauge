@@ -9,7 +9,7 @@ import {
 import { VisuallyHidden } from 'radix-ui';
 import { memo, useEffect, useId, useState, type CSSProperties } from 'react';
 import { describeError } from '../ecu/errors';
-import type { LiveSnapshot } from '../ecu/poller';
+import type { LiveSnapshot } from '../model/snapshot';
 import { hex, hexDigits } from '../hex';
 import { useReadings } from '../readings/useReadings';
 import { InfoPopover } from './InfoPopover';

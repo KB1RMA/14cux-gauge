@@ -2,7 +2,8 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import type { TimelineMark } from '../charts/timelinePlugins';
 import { formatTimelineTick } from '../charts/plotOptions';
-import { WRITES, type WriteLogEntry } from '../ecuWrite/writes';
+import { WRITES } from '../ecuWrite/writes';
+import type { WriteLogEntry } from '../model/write';
 
 /** A write's name, or its id if this version of the app does not know it. */
 export function writeName(entry: WriteLogEntry): string {

@@ -2,11 +2,14 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
+import { IDBFactory } from 'fake-indexeddb';
 import { App } from './App';
 import type * as demoEngine from './demo/demoEngine';
 import { buildSyntheticRom } from './demo/syntheticRom';
+import { openRomStore } from './storage/openRomStore';
 import { MemoryRomStore } from './storage/romStore';
 import { expectNoAxeViolations } from './test-support/a11y';
+import { plantRecords } from './test-support/storedRecords';
 import { fakeUsageCounter } from './test-support/usageCounter';
 
 // The demo link takes about 20 seconds to send a ROM; here it takes about one.
@@ -260,5 +263,61 @@ describe('Saving the ROM image', () => {
       { timeout: 10_000 },
     );
     expect(screen.getByRole('button', { name: 'Record' })).toBeInTheDocument();
+  });
+
+  it('shows an image that cannot be read, and deletes it', async () => {
+    const user = userEvent.setup();
+    const factory = new IDBFactory();
+
+    await plantRecords(factory, {
+      roms: [
+        {
+          id: 'damaged',
+          source: 'serial',
+          readAt: 1000,
+          tuneNumber: 3652,
+          tuneIdent: 0x23,
+          size: 4,
+          sha256: undefined,
+        },
+      ],
+    });
+
+    const { container } = render(
+      <App
+        pollIntervalMs={{ demo: 10 }}
+        usageCounter={fakeUsageCounter()}
+        openRomStore={() => openRomStore(factory)}
+      />,
+    );
+
+    await connectDemo(user);
+
+    const list = await screen.findByRole('list', { name: 'Saved ROM images' });
+
+    expect(list).toHaveTextContent(
+      'Image that can’t be readbytes: Invalid input. Its ID is damaged.',
+    );
+    await expectNoAxeViolations(container);
+
+    await user.click(
+      within(list).getByRole('button', {
+        name: 'Delete image that can’t be read, damaged',
+      }),
+    );
+
+    const confirm = screen.getByRole('alertdialog', {
+      name: 'Delete this ROM image?',
+    });
+
+    expect(confirm).toHaveTextContent(
+      'This image, which cannot be read, will be deleted from this browser.',
+    );
+    await user.click(
+      within(confirm).getByRole('button', { name: 'Delete image' }),
+    );
+    expect(
+      await screen.findByText('No images are kept in this browser yet.'),
+    ).toBeInTheDocument();
   });
 });

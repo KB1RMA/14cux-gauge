@@ -1,23 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import {
+  readRom,
+  type NewRom,
+  type RomSummary,
+  type StoredRom,
+} from '../model/rom';
+import { sortRecords, type UnreadableRecord } from '../model/record';
+import {
   completed,
+  entries,
   openDatabase,
   request,
   ROMS,
   type DatabaseOptions,
 } from './database';
-import {
-  newestRomFirst,
-  summaryOf,
-  type NewRom,
-  type RomStore,
-  type RomSummary,
-} from './romStore';
-
-interface RomRecord extends RomSummary {
-  bytes: Uint8Array;
-}
+import { newestRomFirst, summaryOf, type RomStore } from './romStore';
 
 /** ROM images in IndexedDB, one record each, bytes included. */
 export class IndexedDbRomStore implements RomStore {
@@ -29,7 +27,7 @@ export class IndexedDbRomStore implements RomStore {
 
   async save(rom: NewRom): Promise<RomSummary> {
     const summary = summaryOf(rom, crypto.randomUUID());
-    const record: RomRecord = { ...summary, bytes: rom.bytes.slice() };
+    const record: StoredRom = { ...summary, bytes: rom.bytes.slice() };
     const tx = this.db.transaction(ROMS, 'readwrite');
 
     tx.objectStore(ROMS).add(record);
@@ -39,21 +37,20 @@ export class IndexedDbRomStore implements RomStore {
   }
 
   async list(): Promise<RomSummary[]> {
-    const tx = this.db.transaction(ROMS, 'readonly');
-    const all = await request<RomRecord[]>(tx.objectStore(ROMS).getAll());
-
-    return all
+    return (await this.readAll()).readable
       .map(({ bytes: _bytes, ...summary }) => summary)
       .sort(newestRomFirst);
   }
 
+  async listUnreadable(): Promise<UnreadableRecord[]> {
+    return (await this.readAll()).unreadable;
+  }
+
   async read(id: string): Promise<Uint8Array | undefined> {
     const tx = this.db.transaction(ROMS, 'readonly');
-    const record = await request<RomRecord | undefined>(
-      tx.objectStore(ROMS).get(id),
-    );
+    const raw = await request<unknown>(tx.objectStore(ROMS).get(id));
 
-    return record?.bytes;
+    return raw === undefined ? undefined : readRom(raw).bytes;
   }
 
   async remove(id: string): Promise<void> {
@@ -65,5 +62,11 @@ export class IndexedDbRomStore implements RomStore {
 
   close(): void {
     this.db.close();
+  }
+
+  private async readAll() {
+    const tx = this.db.transaction(ROMS, 'readonly');
+
+    return sortRecords(await entries(tx.objectStore(ROMS)), readRom);
   }
 }

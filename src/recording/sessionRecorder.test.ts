@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { WriteLogEntry } from '../ecuWrite/writes';
+import type { WriteLogEntry } from '../model/write';
 import { MemorySessionStore } from '../storage/sessionStore';
 import { snapshotAt } from '../test-support/snapshots';
 import { SessionRecorder } from './sessionRecorder';

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { VisuallyHidden } from 'radix-ui';
-import type { WriteLogEntry } from '../ecuWrite/writes';
+import type { WriteLogEntry } from '../model/write';
 import type { Replay } from '../replay/useReplay';
 import {
   writeDetail,

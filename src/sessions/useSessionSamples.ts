@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { useEffect, useState } from 'react';
-import type { LiveSnapshot } from '../ecu/poller';
-import type { WriteLogEntry } from '../ecuWrite/writes';
+import type { LiveSnapshot } from '../model/snapshot';
+import type { WriteLogEntry } from '../model/write';
 import { useSessions } from './useSessions';
 
 export type SessionSamples =

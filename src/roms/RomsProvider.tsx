@@ -9,11 +9,14 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { recordedSource } from '../ecu/connect';
 import { describeError } from '../ecu/errors';
 import { useEcu } from '../ecu/useEcu';
 import { useRecording } from '../recording/useRecording';
 import { openRomStore } from '../storage/openRomStore';
-import type { RomStore, RomSummary } from '../storage/romStore';
+import type { UnreadableRecord } from '../model/record';
+import type { RomSummary } from '../model/rom';
+import type { RomStore } from '../storage/romStore';
 import {
   RomsContext,
   type RomOutcome,
@@ -47,11 +50,13 @@ export function RomsProvider({
   const [store, setStore] = useState<RomStore | undefined>(undefined);
   const [persistent, setPersistent] = useState(false);
   const [images, setImages] = useState<RomSummary[] | undefined>(undefined);
+  const [unreadable, setUnreadable] = useState<UnreadableRecord[]>([]);
   const [progress, setProgress] = useState<RomProgress | undefined>(undefined);
   const [outcome, setOutcome] = useState<RomOutcome | undefined>(undefined);
   const readingRef = useRef(false);
   const cancelledRef = useRef(false);
-  const source = state.status === 'idle' ? undefined : state.source.kind;
+  const source =
+    state.status === 'idle' ? undefined : recordedSource(state.source);
 
   useEffect(() => {
     let opened: RomStore | undefined;
@@ -69,6 +74,7 @@ export function RomsProvider({
       setStore(result.store);
       setPersistent(result.persistent);
       setImages(await result.store.list().catch(() => []));
+      setUnreadable(await result.store.listUnreadable().catch(() => []));
     });
 
     return () => {
@@ -187,13 +193,14 @@ export function RomsProvider({
   );
 
   const remove = useCallback(
-    async (image: RomSummary) => {
+    async (id: string) => {
       if (!store) {
         return;
       }
 
-      await store.remove(image.id);
+      await store.remove(id);
       setImages(await store.list());
+      setUnreadable(await store.listUnreadable());
     },
     [store],
   );
@@ -201,6 +208,7 @@ export function RomsProvider({
   const value = useMemo<RomsValue>(
     () => ({
       images,
+      unreadable,
       persistent,
       progress,
       outcome,
@@ -212,6 +220,7 @@ export function RomsProvider({
     }),
     [
       images,
+      unreadable,
       persistent,
       progress,
       outcome,

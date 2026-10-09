@@ -9,13 +9,10 @@ import {
   useState,
 } from 'react';
 import { useEcu } from '../ecu/useEcu';
+import type { FinishedOutcome } from '../model/write';
 import type { WriteHandle } from './context';
 import { useEcuWrite } from './useEcuWrite';
-import {
-  failureOutcome,
-  notConnectedOutcome,
-  type FinishedOutcome,
-} from './writes';
+import { failureOutcome, notConnectedOutcome } from './writes';
 
 /** How long one `runFuelPump` keeps the relay closed: about two seconds. */
 export const PUMP_RUN_MS = 2000;

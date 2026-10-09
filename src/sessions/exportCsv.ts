@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { LiveSnapshot } from '../ecu/poller';
+import type { LiveSnapshot } from '../model/snapshot';
 import { METRICS, recordedKeys, sampleOf, type DisplayUnits } from '../metrics';
 
 /** A CSV field, quoted when it holds a comma, quote or line break. */

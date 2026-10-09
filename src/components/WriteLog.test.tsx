@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen } from '@testing-library/react';
-import type { WriteLogEntry } from '../ecuWrite/writes';
+import type { WriteLogEntry } from '../model/write';
 import { useReplay } from '../replay/useReplay';
 import { expectNoAxeViolations } from '../test-support/a11y';
 import { snapshotAt } from '../test-support/snapshots';

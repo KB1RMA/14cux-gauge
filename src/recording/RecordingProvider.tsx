@@ -8,11 +8,12 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { recordedSource } from '../ecu/connect';
 import { useEcu } from '../ecu/useEcu';
 import { useEcuWrite } from '../ecuWrite/useEcuWrite';
 import { defaultSessionName, describeStorageError } from '../sessions/format';
 import { useSessions } from '../sessions/useSessions';
-import type { SessionSummary } from '../storage/sessionStore';
+import type { SessionSummary } from '../model/session';
 import { RecordingContext } from './context';
 import { SessionRecorder } from './sessionRecorder';
 
@@ -38,7 +39,8 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
   const activeRef = useRef<Active | undefined>(undefined);
   const startingRef = useRef(false);
   const connected = state.status === 'connected';
-  const source = state.status === 'idle' ? undefined : state.source.kind;
+  const source =
+    state.status === 'idle' ? undefined : recordedSource(state.source);
   const canRecord = connected && store !== undefined;
 
   /** Stops recording; resolves with the finished session, if there was one. */

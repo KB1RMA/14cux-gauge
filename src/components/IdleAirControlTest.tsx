@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { RadioGroup } from 'radix-ui';
 import { useId, useState } from 'react';
-import type { LiveSnapshot } from '../ecu/poller';
+import type { LiveSnapshot } from '../model/snapshot';
 import { useEcuWrite } from '../ecuWrite/useEcuWrite';
 import { formatSample, METRICS, sampleOf } from '../metrics';
 import { usePreferences } from '../preferences/usePreferences';

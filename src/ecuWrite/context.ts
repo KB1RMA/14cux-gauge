@@ -7,7 +7,7 @@ import type {
   WriteId,
   WriteLogEntry,
   WriteOutcome,
-} from './writes';
+} from '../model/write';
 
 /** A write that has started; it holds the ECU until `finish` is called. */
 export interface WriteHandle {

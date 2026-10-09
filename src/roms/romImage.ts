@@ -6,7 +6,7 @@ import {
   ReadCancelledError,
   type Ecu,
 } from '@kb1rma/libcomm14cux-ts';
-import type { EcuSource } from '../ecu/connect';
+import type { RecordedSource } from '../model/source';
 import { hex } from '../hex';
 
 /** Length of the ROM image in bytes. */
@@ -57,7 +57,7 @@ export async function readRomImage(
  * A demo ECU's synthetic image is named as such.
  */
 export function romFileName(
-  source: EcuSource['kind'],
+  source: RecordedSource,
   tuneNumber: number,
   tuneIdent: number,
 ): string {

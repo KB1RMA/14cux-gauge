@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { LiveSnapshot } from '../ecu/poller';
-import type { WriteLogEntry } from '../ecuWrite/writes';
-import type {
-  NewSession,
-  SessionStore,
-  SessionSummary,
-} from '../storage/sessionStore';
+import type { LiveSnapshot } from '../model/snapshot';
+import type { WriteLogEntry } from '../model/write';
+import type { NewSession, SessionSummary } from '../model/session';
+import type { SessionStore } from '../storage/sessionStore';
 
 export interface RecorderOptions {
   /** Write buffered samples at least this often, in milliseconds. */

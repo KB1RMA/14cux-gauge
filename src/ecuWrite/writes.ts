@@ -2,35 +2,8 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { NotConnectedError } from '@kb1rma/libcomm14cux-ts';
 import { describeError } from '../ecu/errors';
+import type { FinishedOutcome, WriteId, WriteOutcome } from '../model/write';
 import type { NotificationInput } from '../notifications/context';
-
-/** Every feature that writes to the ECU. Only one may run at a time. */
-export type WriteId = 'clearFaultCodes' | 'idleAirControl' | 'fuelPump';
-
-/**
- * How a write went: `running` until it ends; `done`; `failed` when nothing
- * was written; `partial` when it failed after it may have written something.
- */
-export type WriteOutcome =
-  | { status: 'running' }
-  | { status: 'done' | 'failed' | 'partial'; message: string };
-
-export type FinishedOutcome = Exclude<WriteOutcome, { status: 'running' }>;
-
-/**
- * One write from start to end, as a recording keeps it. Times are
- * `Date.now()`, the clock sample timestamps use, so the write lines up with
- * the readings it changed.
- */
-export interface WriteLogEntry {
-  /** Unique to this write. */
-  id: string;
-  write: WriteId;
-  startedAt: number;
-  /** `null` while it runs, and in a recording that stopped first. */
-  endedAt: number | null;
-  outcome: WriteOutcome;
-}
 
 interface WriteText {
   /** Names the write where another control is waiting for it. */

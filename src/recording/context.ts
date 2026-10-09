@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { createContext } from 'react';
-import type { SessionSummary } from '../storage/sessionStore';
+import type { SessionSummary } from '../model/session';
 
 export interface RecordingValue {
   /** The session being recorded, or `undefined` when not recording. */

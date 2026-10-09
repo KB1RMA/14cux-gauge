@@ -1,61 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { EcuSource } from '../ecu/connect';
-import type { LiveSnapshot } from '../ecu/poller';
-import type { WriteLogEntry } from '../ecuWrite/writes';
+import {
+  SESSION_FORMAT_VERSION,
+  type NewSession,
+  type SessionChanges,
+  type SessionSummary,
+} from '../model/session';
+import type { UnreadableRecord } from '../model/record';
+import type { LiveSnapshot } from '../model/snapshot';
+import type { WriteLogEntry } from '../model/write';
 
 /**
- * Recorded debug sessions: the live snapshots from one connection, kept so
- * they can be reviewed or exported later.
+ * Recorded debug sessions (see `src/model/session.ts`) and where they are
+ * kept.
  *
  * `SessionStore` is the contract every backend meets: IndexedDB in the
  * browser, memory when storage is unavailable, and (later) files on disk in
  * the Electron app, reached over IPC. Everything is async and structured-
- * cloneable so a backend can live in another process.
- *
- * Snapshots are stored as the poller produced them, in the library's units,
- * so a recording does not depend on the display units chosen at the time.
- * Writes to the ECU made while recording are kept beside them.
+ * cloneable so a backend can live in another process. A backend that reads
+ * stored summaries back runs them through `readSession`, which migrates
+ * older formats and rejects records it cannot read.
  */
-
-/**
- * Bumped when the stored shape changes; readers must check it.
- *
- * 1: the first format. 2: adds `notes`. 3: keeps the writes to the ECU made
- * while recording. Sessions in format 2 stay in it: whether any writes were
- * made during them is not known.
- */
-export const SESSION_FORMAT_VERSION = 3;
-
-export type SessionFormatVersion = 2 | typeof SESSION_FORMAT_VERSION;
-
-export interface SessionSummary {
-  id: string;
-  name: string;
-  source: EcuSource['kind'];
-  /** `Date.now()` when recording started. */
-  startedAt: number;
-  /** `Date.now()` when recording stopped; `null` while recording, or if the app closed first. */
-  endedAt: number | null;
-  sampleCount: number;
-  /** Free text the user keeps with the session; empty if none. */
-  notes: string;
-  formatVersion: SessionFormatVersion;
-}
-
-/** Whether `session` kept its writes to the ECU (format 3 on). */
-export function keepsWrites(session: SessionSummary): boolean {
-  return session.formatVersion >= 3;
-}
-
-export interface NewSession {
-  name: string;
-  source: EcuSource['kind'];
-  startedAt: number;
-}
-
-/** The parts of a session the user can edit. */
-export type SessionChanges = Partial<Pick<SessionSummary, 'name' | 'notes'>>;
 
 export interface SessionStore {
   create(session: NewSession): Promise<SessionSummary>;
@@ -65,8 +30,13 @@ export interface SessionStore {
   finish(id: string, endedAt: number): Promise<SessionSummary>;
   /** Renames a session or changes its notes. */
   update(id: string, changes: SessionChanges): Promise<SessionSummary>;
-  /** Every session, newest first. */
+  /** Every session that can be read, newest first. */
   list(): Promise<SessionSummary[]>;
+  /**
+   * Stored sessions whose summary cannot be read (damaged, or from a newer
+   * version of the app), so the user can see and delete them.
+   */
+  listUnreadable(): Promise<UnreadableRecord[]>;
   get(id: string): Promise<SessionSummary | undefined>;
   /** Every sample in a session, in the order appended. */
   readSamples(id: string): Promise<LiveSnapshot[]>;
@@ -179,6 +149,11 @@ export class MemorySessionStore implements SessionStore {
     return [...this.sessions.values()]
       .map(({ summary }) => ({ ...summary }))
       .sort(newestFirst);
+  }
+
+  async listUnreadable(): Promise<UnreadableRecord[]> {
+    // Only this visit's sessions, which are always readable.
+    return [];
   }
 
   async get(id: string): Promise<SessionSummary | undefined> {

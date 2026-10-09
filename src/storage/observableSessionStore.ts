@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { LiveSnapshot } from '../ecu/poller';
-import type { WriteLogEntry } from '../ecuWrite/writes';
+import type { UnreadableRecord } from '../model/record';
+import type { LiveSnapshot } from '../model/snapshot';
+import type { WriteLogEntry } from '../model/write';
 import type {
   NewSession,
   SessionChanges,
-  SessionStore,
   SessionSummary,
-} from './sessionStore';
+} from '../model/session';
+import type { SessionStore } from './sessionStore';
 
 /**
  * A {@link SessionStore} that tells subscribers when the list of sessions
@@ -43,6 +44,10 @@ export class ObservableSessionStore implements SessionStore {
 
   list(): Promise<SessionSummary[]> {
     return this.inner.list();
+  }
+
+  listUnreadable(): Promise<UnreadableRecord[]> {
+    return this.inner.listUnreadable();
   }
 
   get(id: string): Promise<SessionSummary | undefined> {

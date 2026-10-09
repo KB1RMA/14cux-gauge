@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { useEcuWrite } from '../ecuWrite/useEcuWrite';
-import { WRITES, type WriteId } from '../ecuWrite/writes';
+import { WRITES } from '../ecuWrite/writes';
+import type { WriteId } from '../model/write';
 import styles from './Panel.module.css';
 
 /**

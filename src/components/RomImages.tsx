@@ -8,7 +8,8 @@ import { useRecording } from '../recording/useRecording';
 import type { RomOutcome } from '../roms/context';
 import { useRoms } from '../roms/useRoms';
 import { formatDateTime } from '../sessions/format';
-import type { RomSummary } from '../storage/romStore';
+import type { UnreadableRecord } from '../model/record';
+import type { RomSummary } from '../model/rom';
 import { ConfirmDialog } from './ConfirmDialog';
 import styles from './RomImages.module.css';
 import panel from './Panel.module.css';
@@ -76,7 +77,9 @@ export function RomImages() {
   const roms = useRoms();
   const { active: recording } = useRecording();
   const [confirming, setConfirming] = useState(false);
-  const [deleting, setDeleting] = useState<RomSummary | undefined>(undefined);
+  const [deleting, setDeleting] = useState<
+    RomSummary | UnreadableRecord | undefined
+  >(undefined);
   const saveRef = useRef<HTMLButtonElement>(null);
   const reading = roms.progress !== undefined;
 
@@ -107,7 +110,8 @@ export function RomImages() {
         </button>
       </div>
 
-      {roms.images === undefined ? null : roms.images.length === 0 ? (
+      {roms.images === undefined ? null : roms.images.length === 0 &&
+        roms.unreadable.length === 0 ? (
         <p className={styles['hint']}>
           No images are kept in this browser yet.
         </p>
@@ -142,6 +146,27 @@ export function RomImages() {
                   aria-label={`Delete ${tuneName(image)}, read ${formatDateTime(image.readAt)}`}
                   onClick={() => {
                     setDeleting(image);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </li>
+          ))}
+          {roms.unreadable.map((unreadable) => (
+            <li key={unreadable.id} className={styles['item']}>
+              <span className={styles['name']}>Image that can’t be read</span>
+              <p className={styles['details']}>
+                {unreadable.detail}. Its ID is{' '}
+                <span className={styles['hash']}>{unreadable.id}</span>.
+              </p>
+              <div className={panel['actions']}>
+                <button
+                  type="button"
+                  className="danger"
+                  aria-label={`Delete image that can’t be read, ${unreadable.id}`}
+                  onClick={() => {
+                    setDeleting(unreadable);
                   }}
                 >
                   Delete
@@ -200,7 +225,7 @@ export function RomImages() {
         confirmLabel="Delete image"
         onConfirm={() => {
           if (deleting) {
-            void roms.remove(deleting);
+            void roms.remove(deleting.id);
           }
 
           setDeleting(undefined);
@@ -210,9 +235,13 @@ export function RomImages() {
         }}
       >
         <p>
-          {deleting ? tuneName(deleting) : ''} will be deleted from this
-          browser. This cannot be undone, and the ECU is not changed. Any file
-          you downloaded is kept.
+          {deleting === undefined
+            ? ''
+            : 'detail' in deleting
+              ? 'This image, which cannot be read,'
+              : tuneName(deleting)}{' '}
+          will be deleted from this browser. This cannot be undone, and the ECU
+          is not changed. Any file you downloaded is kept.
         </p>
       </ConfirmDialog>
 

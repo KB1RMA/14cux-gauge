@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { SessionSummary } from './sessionStore';
-
 /**
  * The browser database that holds recorded sessions and saved ROM images,
  * and the small helpers the stores over it share.
@@ -35,6 +33,21 @@ export function request<T>(req: IDBRequest<T>): Promise<T> {
 }
 
 /**
+ * Every record in `store`, as `[key, record]` pairs. Both are read in the
+ * same transaction, so they line up.
+ */
+export async function entries(
+  store: IDBObjectStore,
+): Promise<[string, unknown][]> {
+  const [keys, records] = await Promise.all([
+    request(store.getAllKeys()),
+    request<unknown[]>(store.getAll()),
+  ]);
+
+  return keys.map((key, index) => [String(key), records[index]]);
+}
+
+/**
  * Settles when `tx` commits or fails. A caller that gives up early (such as
  * after aborting for an unknown session) need not await it.
  */
@@ -64,12 +77,12 @@ export function completed(tx: IDBTransaction): Promise<void> {
   return done;
 }
 
-/** Takes the schema from `oldVersion` to the current one. */
-function upgrade(
-  db: IDBDatabase,
-  tx: IDBTransaction,
-  oldVersion: number,
-): void {
+/**
+ * Takes the object stores from `oldVersion` to the current ones. Only the
+ * stores change here; records are migrated as they are read (see
+ * `src/model/`), so every backend shares those steps.
+ */
+function upgrade(db: IDBDatabase, oldVersion: number): void {
   // Each step takes the schema from one version to the next.
   if (oldVersion < 1) {
     db.createObjectStore(SESSIONS, { keyPath: 'id' });
@@ -79,23 +92,8 @@ function upgrade(
     );
   }
 
-  if (oldVersion < 2) {
-    // Session format 2 adds notes.
-    const cursor = tx.objectStore(SESSIONS).openCursor();
-
-    cursor.onsuccess = () => {
-      const current = cursor.result;
-
-      if (current) {
-        current.update({
-          ...(current.value as Omit<SessionSummary, 'notes' | 'formatVersion'>),
-          notes: '',
-          formatVersion: 2,
-        });
-        current.continue();
-      }
-    };
-  }
+  // Version 2 changed no stores: session format 2 added notes, and
+  // `readSession` adds them to format 1 sessions as they are read.
 
   if (oldVersion < 3) {
     // ROM images.
@@ -127,10 +125,7 @@ export async function openDatabase({
   const req = factory.open(name, DB_VERSION);
 
   req.onupgradeneeded = (event) => {
-    // Set while an upgrade is running; the steps share its transaction.
-    if (req.transaction) {
-      upgrade(req.result, req.transaction, event.oldVersion);
-    }
+    upgrade(req.result, event.oldVersion);
   };
 
   const db = await request(req);
