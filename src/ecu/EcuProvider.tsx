@@ -2,6 +2,8 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { useEffect, useState, type ReactNode } from 'react';
 import { DiagnosticsContext } from '../diagnostics/context';
+import { usePlatform } from '../platform/usePlatform';
+import { ecuConnections } from './connect';
 import { EcuSessionContext, HistoryContext } from './contexts';
 import { EcuSession, type EcuSessionOptions } from './session';
 
@@ -11,9 +13,10 @@ export interface EcuProviderProps extends Pick<
 > {
   children: ReactNode;
   /**
-   * The controller to provide, taken once on mount. Its owner ends it;
-   * without one the provider makes its own from the other props, and closes
-   * it on unmount.
+   * The controller to provide, taken once on mount, as `App` passes the one
+   * `createAppServices` built. Its owner ends it; without one the provider
+   * makes its own from the other props and the platform's serial ports, and
+   * closes it on unmount.
    */
   session?: EcuSession;
 }
@@ -25,8 +28,15 @@ export function EcuProvider({
   pollIntervalMs,
   diagnostics,
 }: EcuProviderProps) {
+  const { serial } = usePlatform();
   const [provided] = useState(
-    () => session ?? new EcuSession({ pollIntervalMs, diagnostics }),
+    () =>
+      session ??
+      new EcuSession({
+        pollIntervalMs,
+        diagnostics,
+        createConnection: ecuConnections(serial),
+      }),
   );
   const owned = provided !== session;
 

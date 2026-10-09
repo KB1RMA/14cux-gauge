@@ -3,8 +3,9 @@
 
 /**
  * Small, synchronous settings (preferences, view state), kept as JSON in
- * `localStorage` under a `cuxGauge.` prefix. `localStorage` also works in an
- * Electron renderer, so the desktop app can use this module unchanged.
+ * `localStorage` under a `cuxGauge.` prefix: the browser platform's
+ * settings backend (see `src/platform/browser.ts`). `localStorage` also works
+ * in an Electron renderer, so a desktop build can use it unchanged.
  *
  * Storage can be missing or throw (private windows, blocked site data, a full
  * quota), so every access is guarded: reads fall back to the caller's default

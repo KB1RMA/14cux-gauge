@@ -2,7 +2,8 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { ArrowLeftIcon, DownloadIcon } from '@radix-ui/react-icons';
 import { useEffect, useRef, useState } from 'react';
-import { downloadText } from '../diagnostics/report';
+import { saveFile } from '../platform/saveFile';
+import { usePlatform } from '../platform/usePlatform';
 import { usePreferences } from '../preferences/usePreferences';
 import { useRecording } from '../recording/useRecording';
 import { sessionCsv, sessionCsvFileName } from '../sessions/exportCsv';
@@ -80,8 +81,14 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
   const list = useSessionList();
   const samples = useSessionSamples(id);
   const { temperatureUnit, speedUnit } = usePreferences();
+  const { files } = usePlatform();
   const [deleting, setDeleting] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
+  // Why the last export of a session was not saved, kept with its id so it
+  // is not shown on another session.
+  const [exportFailed, setExportFailed] = useState<
+    { id: string; message: string } | undefined
+  >(undefined);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const session =
     list.status === 'loaded'
@@ -187,6 +194,11 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
               One row per sample, in your chosen units, with the unit in each
               column heading. Invalid readings are left empty.
             </p>
+            {exportFailed?.id === id ? (
+              <p role="alert" className={styles['error']}>
+                {exportFailed.message}
+              </p>
+            ) : null}
             <button
               type="button"
               disabled={
@@ -194,11 +206,17 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
               }
               onClick={() => {
                 if (samples.status === 'loaded') {
-                  downloadText(
+                  setExportFailed(undefined);
+                  void saveFile(
+                    files,
                     sessionCsvFileName(session.name, session.startedAt),
                     sessionCsv(samples.samples, { temperatureUnit, speedUnit }),
                     'text/csv',
-                  );
+                  ).then((feedback) => {
+                    if (feedback?.kind === 'failed') {
+                      setExportFailed({ id, message: feedback.message });
+                    }
+                  });
                 }
               }}
             >

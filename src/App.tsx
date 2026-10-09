@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
+import { useEffect, useState } from 'react';
 import { HashRouter, Navigate, NavLink, Route, Routes } from 'react-router';
+import {
+  createAppServices,
+  type AppServices,
+  type AppServicesOptions,
+} from './appServices';
 import { goatCounter, type UsageCounter } from './usage/goatCounter';
 import { useUsageCounts } from './usage/useUsageCounts';
 import { AppNotices } from './components/AppNotices';
@@ -11,13 +17,15 @@ import { PreferencesMenu } from './components/PreferencesMenu';
 import { SaveSessionDialog } from './components/SaveSessionDialog';
 import { SessionsView } from './components/SessionsView';
 import { StatusBar } from './components/StatusBar';
-import { EcuProvider, type EcuProviderProps } from './ecu/EcuProvider';
+import { EcuProvider } from './ecu/EcuProvider';
 import { useEcu } from './ecu/useEcu';
 import { EcuWriteProvider } from './ecuWrite/EcuWriteProvider';
 import { NotificationsProvider } from './notifications/NotificationsProvider';
+import { browserPlatform } from './platform/browser';
+import { PlatformContext } from './platform/context';
+import type { Platform } from './platform/platform';
 import { PreferencesProvider } from './preferences/PreferencesProvider';
 import { AppStatusProvider } from './pwa/AppStatusProvider';
-import type { AppStatusStoreOptions } from './pwa/appStatusStore';
 import { ReadingsProvider } from './readings/ReadingsProvider';
 import { RecordingProvider } from './recording/RecordingProvider';
 import {
@@ -28,10 +36,7 @@ import {
 } from './routing/paths';
 import { RomsProvider } from './roms/RomsProvider';
 import { SessionsProvider } from './sessions/SessionsProvider';
-import {
-  StorageProvider,
-  type StorageProviderProps,
-} from './storage/StorageProvider';
+import { StorageProvider } from './storage/StorageProvider';
 import styles from './App.module.css';
 
 const VIEWS: readonly { label: string; to: string }[] = [
@@ -74,65 +79,101 @@ function Main({ usageCounter }: { usageCounter: UsageCounter | undefined }) {
   );
 }
 
-export function App({
-  pollIntervalMs,
-  openStorage,
-  appStatus,
-  usageCounter = DEFAULT_USAGE_COUNTER,
-}: Pick<EcuProviderProps, 'pollIntervalMs'> & {
-  /** Opens where sessions and ROM images are kept; defaults to IndexedDB. */
-  openStorage?: StorageProviderProps['open'];
-  /** Overrides the offline and update checks; they are off outside a production build. */
-  appStatus?: AppStatusStoreOptions;
+export interface AppProps extends AppServicesOptions {
+  /**
+   * The services to run on, built by the caller with `createAppServices`,
+   * who also disposes them. The other building options are then ignored.
+   */
+  services?: AppServices;
+  /**
+   * Where the app runs, without `services`: the app builds its services on
+   * it, once, and disposes them on unmount. Defaults to the browser.
+   */
+  platform?: Platform;
   /** Counts usage anonymously; only set on the published site by default. */
   usageCounter?: UsageCounter | undefined;
-}) {
+}
+
+export function App({
+  services,
+  platform,
+  pollIntervalMs,
+  appStatus,
+  usageCounter = DEFAULT_USAGE_COUNTER,
+}: AppProps) {
+  const [provided] = useState(
+    () =>
+      services ??
+      createAppServices(platform ?? browserPlatform(), {
+        pollIntervalMs,
+        appStatus,
+      }),
+  );
+  const owned = provided !== services;
+
+  useEffect(
+    () => () => {
+      if (owned) {
+        provided.dispose();
+      }
+    },
+    [owned, provided],
+  );
+
   return (
-    <HashRouter>
-      <PreferencesProvider>
-        <AppStatusProvider {...(appStatus ? { options: appStatus } : {})}>
-          <NotificationsProvider>
-            <EcuProvider {...(pollIntervalMs ? { pollIntervalMs } : {})}>
-              <ReadingsProvider>
-                <EcuWriteProvider>
-                  <StorageProvider
-                    {...(openStorage ? { open: openStorage } : {})}
-                  >
-                    <SessionsProvider>
-                      <RecordingProvider>
-                        <RomsProvider>
-                          <div className={styles['app']}>
-                            <header className={styles['appBar']}>
-                              <h1 className={styles['brand']}>14CUX Gauge</h1>
-                              <nav aria-label="Views" className={styles['nav']}>
-                                {VIEWS.map(({ label, to }) => (
-                                  <NavLink
-                                    key={to}
-                                    to={to}
-                                    className={styles['navItem'] ?? ''}
-                                  >
-                                    {label}
-                                  </NavLink>
-                                ))}
-                              </nav>
-                              <PreferencesMenu
-                                offerUsageCounts={usageCounter !== undefined}
+    <PlatformContext value={provided.platform}>
+      <HashRouter>
+        <PreferencesProvider>
+          <AppStatusProvider
+            store={provided.appStatus}
+            checks={provided.checksAppStatus}
+          >
+            <NotificationsProvider>
+              <EcuProvider session={provided.session}>
+                <ReadingsProvider>
+                  <EcuWriteProvider>
+                    <StorageProvider open={provided.platform.storage.open}>
+                      <SessionsProvider>
+                        <RecordingProvider>
+                          <RomsProvider>
+                            <div className={styles['app']}>
+                              <header className={styles['appBar']}>
+                                <h1 className={styles['brand']}>14CUX Gauge</h1>
+                                <nav
+                                  aria-label="Views"
+                                  className={styles['nav']}
+                                >
+                                  {VIEWS.map(({ label, to }) => (
+                                    <NavLink
+                                      key={to}
+                                      to={to}
+                                      className={styles['navItem'] ?? ''}
+                                    >
+                                      {label}
+                                    </NavLink>
+                                  ))}
+                                </nav>
+                                <PreferencesMenu
+                                  offerUsageCounts={usageCounter !== undefined}
+                                />
+                              </header>
+                              <AppNotices />
+                              <Main usageCounter={usageCounter} />
+                              <Footer
+                                countsUsage={usageCounter !== undefined}
                               />
-                            </header>
-                            <AppNotices />
-                            <Main usageCounter={usageCounter} />
-                            <Footer countsUsage={usageCounter !== undefined} />
-                          </div>
-                        </RomsProvider>
-                      </RecordingProvider>
-                    </SessionsProvider>
-                  </StorageProvider>
-                </EcuWriteProvider>
-              </ReadingsProvider>
-            </EcuProvider>
-          </NotificationsProvider>
-        </AppStatusProvider>
-      </PreferencesProvider>
-    </HashRouter>
+                            </div>
+                          </RomsProvider>
+                        </RecordingProvider>
+                      </SessionsProvider>
+                    </StorageProvider>
+                  </EcuWriteProvider>
+                </ReadingsProvider>
+              </EcuProvider>
+            </NotificationsProvider>
+          </AppStatusProvider>
+        </PreferencesProvider>
+      </HashRouter>
+    </PlatformContext>
   );
 }

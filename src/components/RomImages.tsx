@@ -37,21 +37,53 @@ function Outcome({
   );
 
   switch (outcome.kind) {
-    case 'saved':
-      return (
+    case 'read': {
+      const label =
+        outcome.image.source === 'demo' ? (
+          <p className={styles['label']}>{SYNTHETIC}</p>
+        ) : null;
+
+      if (outcome.notSaved === undefined) {
+        return (
+          <div aria-live="polite">
+            <p>
+              Downloaded {outcome.fileName}.{' '}
+              {outcome.kept
+                ? 'A copy is kept in this browser.'
+                : 'A copy could not be kept in this browser.'}
+            </p>
+            {label}
+            {dismiss}
+          </div>
+        );
+      }
+
+      // The image was read, but the file was not saved: say so, and where
+      // the image can still be found, rather than look like a success.
+      const kept = outcome.kept
+        ? 'A copy is kept in this browser; download it from the list below.'
+        : 'A copy could not be kept in this browser either, so nothing was saved.';
+
+      return outcome.notSaved.kind === 'cancelled' ? (
         <div aria-live="polite">
           <p>
-            Downloaded {outcome.fileName}.{' '}
-            {outcome.kept
-              ? 'A copy is kept in this browser.'
-              : 'A copy could not be kept in this browser.'}
+            The ROM image was read, but {outcome.fileName} was not saved: the
+            save was cancelled. {kept}
           </p>
-          {outcome.image.source === 'demo' ? (
-            <p className={styles['label']}>{SYNTHETIC}</p>
-          ) : null}
+          {label}
+          {dismiss}
+        </div>
+      ) : (
+        <div role="alert" className={panel['error']}>
+          <p>
+            The ROM image was read, but {outcome.notSaved.message} {kept}
+          </p>
+          {label}
           {dismiss}
         </div>
       );
+    }
+
     case 'cancelled':
       return (
         <div aria-live="polite">

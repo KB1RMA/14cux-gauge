@@ -6,6 +6,8 @@ import { describeError } from '../ecu/errors';
 import type { Lease } from '../ecu/session';
 import { useEcu } from '../ecu/useEcu';
 import { useEcuSession } from '../ecu/useEcuSession';
+import { saveFile } from '../platform/saveFile';
+import { usePlatform } from '../platform/usePlatform';
 import type { UnreadableRecord } from '../model/record';
 import type { RomSummary } from '../model/rom';
 import type { RomStore } from '../storage/romStore';
@@ -19,7 +21,6 @@ import {
 } from './context';
 import {
   cancelRomRead,
-  downloadBytes,
   isRomReadCancelled,
   readRom,
   ROM_READ_HOLDER,
@@ -38,6 +39,9 @@ async function readList(store: RomStore) {
 
 const NONE: UnreadableRecord[] = [];
 
+/** A ROM image is saved as raw bytes. */
+const ROM_FILE_TYPE = 'application/octet-stream';
+
 /**
  * Reads the ECU's ROM image on request and keeps the saved images. It lives
  * above the dashboard's tabs, so a read carries on if the user changes view.
@@ -47,6 +51,7 @@ const NONE: UnreadableRecord[] = [];
 export function RomsProvider({ children }: { children: ReactNode }) {
   const session = useEcuSession();
   const { state } = useEcu();
+  const { files } = usePlatform();
   const storage = useStorage();
   const store = storage?.roms;
   const persistent = storage?.persistent ?? false;
@@ -127,12 +132,14 @@ export function RomsProvider({ children }: { children: ReactNode }) {
           kept = true;
           await settled();
         } catch {
-          // Still download it; the outcome says no copy was kept.
+          // Still save the file; the outcome says no copy was kept.
         }
       }
 
-      downloadBytes(fileName, bytes);
-      setOutcome({ kind: 'saved', fileName, image, kept });
+      // Never rejects: a file that was not saved is not a failed read.
+      const notSaved = await saveFile(files, fileName, bytes, ROM_FILE_TYPE);
+
+      setOutcome({ kind: 'read', fileName, image, kept, notSaved });
     } catch (error) {
       setOutcome(
         isRomReadCancelled(error)
@@ -144,7 +151,7 @@ export function RomsProvider({ children }: { children: ReactNode }) {
       setProgress(undefined);
       lease.release();
     }
-  }, [session, source, store, settled]);
+  }, [session, source, store, settled, files]);
 
   const cancel = useCallback(() => {
     const lease = leaseRef.current;
@@ -169,10 +176,17 @@ export function RomsProvider({ children }: { children: ReactNode }) {
       const bytes = await store?.read(image.id);
 
       if (bytes) {
-        downloadBytes(
+        const notSaved = await saveFile(
+          files,
           romFileName(image.source, image.tuneNumber, image.tuneIdent),
           bytes,
+          ROM_FILE_TYPE,
         );
+
+        // Dismissing a Save dialog needs no message: the user chose it.
+        if (notSaved?.kind === 'failed') {
+          setOutcome({ kind: 'failed', message: notSaved.message });
+        }
       } else {
         setOutcome({
           kind: 'failed',
@@ -180,7 +194,7 @@ export function RomsProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [store],
+    [store, files],
   );
 
   const remove = useCallback(

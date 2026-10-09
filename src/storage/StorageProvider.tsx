@@ -2,19 +2,16 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { useEffect, useState, type ReactNode } from 'react';
 import { StorageContext } from './context';
-import { openStorage, type AppStorage } from './openStorage';
+import type { AppStorage } from './openStorage';
 
 export interface StorageProviderProps {
   children: ReactNode;
-  /** Opens the storage; tests and the Electron app can supply their own. */
-  open?: () => Promise<AppStorage>;
+  /** Opens the storage; `App` passes the platform's. */
+  open: () => Promise<AppStorage>;
 }
 
 /** Opens the sessions and ROM image stores once, and closes them on unmount. */
-export function StorageProvider({
-  children,
-  open = openStorage,
-}: StorageProviderProps) {
+export function StorageProvider({ children, open }: StorageProviderProps) {
   const [storage, setStorage] = useState<AppStorage | undefined>(undefined);
 
   useEffect(() => {

@@ -6,7 +6,7 @@ import { connectionEvent, recordingEvents } from './events';
 const demo = { kind: 'demo' } as const;
 const serial = {
   kind: 'serial',
-  port: {} as SerialPort,
+  port: { description: 'USB vendor 0x0403, product 0x6001' },
   doubleSpeed: false,
 } as const;
 
