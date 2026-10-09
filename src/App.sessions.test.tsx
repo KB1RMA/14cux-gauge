@@ -4,6 +4,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { IDBFactory } from 'fake-indexeddb';
 import { App } from './App';
+import type { SessionSummary } from './model/session';
 import type { LiveSnapshot } from './model/snapshot';
 import { openStorage } from './storage/openStorage';
 import { MemorySessionStore } from './storage/sessionStore';
@@ -597,6 +598,56 @@ describe('Recording and browsing sessions', () => {
       await screen.findByText('The changes could not be saved.'),
     ).toBeInTheDocument();
     otherTab.close();
+  });
+
+  it('keeps a recording under its default name when the new one cannot be saved', async () => {
+    const user = userEvent.setup();
+
+    class NoRenames extends MemorySessionStore {
+      override update(): Promise<SessionSummary> {
+        return Promise.reject(new DOMException('Gone', 'UnknownError'));
+      }
+    }
+
+    render(
+      <App
+        pollIntervalMs={{ demo: 10 }}
+        openStorage={storageWith({ sessions: new NoRenames() })}
+      />,
+    );
+    await connectDemo(user);
+
+    const dialog = await recordAndStop(user);
+
+    await user.type(
+      within(dialog).getByRole('textbox', { name: 'Notes' }),
+      'Cold start',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'The changes could not be saved. The recording is kept under its original name.',
+    );
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled();
+    await user.click(within(dialog).getByRole('button', { name: 'Skip' }));
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  });
+
+  it('says when the recorded sessions cannot be listed', async () => {
+    const user = userEvent.setup();
+
+    class NoList extends MemorySessionStore {
+      override list(): Promise<SessionSummary[]> {
+        return Promise.reject(new DOMException('Gone', 'UnknownError'));
+      }
+    }
+
+    render(<App openStorage={storageWith({ sessions: new NoList() })} />);
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The recorded sessions could not be read.',
+    );
   });
 
   it('stays where the user went while a session is being deleted', async () => {

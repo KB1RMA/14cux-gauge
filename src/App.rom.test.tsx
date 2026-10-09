@@ -7,6 +7,8 @@ import { App } from './App';
 import type * as demoEngine from './demo/demoEngine';
 import { buildSyntheticRom } from './demo/syntheticRom';
 import { openStorage } from './storage/openStorage';
+import type { UnreadableRecord } from './model/record';
+import type { RomSummary } from './model/rom';
 import { MemoryRomStore } from './storage/romStore';
 import { expectNoAxeViolations } from './test-support/a11y';
 import { storageWith } from './test-support/storage';
@@ -266,6 +268,27 @@ describe('Saving the ROM image', () => {
       { timeout: 10_000 },
     );
     expect(screen.getByRole('button', { name: 'Record' })).toBeInTheDocument();
+  });
+
+  it('shows no images, rather than failing, when the saved ones cannot be listed', async () => {
+    const user = userEvent.setup();
+
+    class UnreadableRoms extends MemoryRomStore {
+      override list(): Promise<RomSummary[]> {
+        return Promise.reject(new DOMException('Gone', 'UnknownError'));
+      }
+
+      override listUnreadable(): Promise<UnreadableRecord[]> {
+        return Promise.reject(new DOMException('Gone', 'UnknownError'));
+      }
+    }
+
+    renderApp(new UnreadableRoms());
+    await connectDemo(user);
+
+    expect(
+      await screen.findByText('No images are kept in this browser yet.'),
+    ).toBeInTheDocument();
   });
 
   it('shows an image that cannot be read, and deletes it', async () => {
