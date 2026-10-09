@@ -41,20 +41,27 @@ test.describe('Preferences', () => {
     await expect(
       menu.getByRole('menuitemradio', { name: 'Dark' }),
     ).toBeChecked();
+
+    // The page goes dark, even though the system asks for light.
+    await expect.poll(() => pageBackground(page)).not.toBe(lightBackground);
+
+    const darkBackground = await pageBackground(page);
+
     await menu.getByRole('menuitemradio', { name: 'Arles Blue' }).click();
     await expect(
       menu.getByRole('menuitemradio', { name: 'Arles Blue' }),
     ).toBeChecked();
+
+    // Each paint has its own background, so the page is repainted again.
+    await expect.poll(() => pageBackground(page)).not.toBe(darkBackground);
+
+    const chosenBackground = await pageBackground(page);
+
     await page.keyboard.press('Escape');
     await expect(menu).toBeHidden();
 
     await expect(reading(page, 'Coolant')).toHaveText(/°C$/);
     await expect(reading(page, 'Road speed')).toHaveText(/km\/h$/);
-
-    // The page is repainted, even though the system asks for light.
-    await expect.poll(() => pageBackground(page)).not.toBe(lightBackground);
-
-    const chosenBackground = await pageBackground(page);
 
     await page.reload();
 
