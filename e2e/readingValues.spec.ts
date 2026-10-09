@@ -30,7 +30,7 @@ const ADC_105_F = [100];
 const ADC_32_F = [195];
 /** Thermistor count 255, the coldest, is -13 °F, -25 °C. */
 const ADC_MINUS_13_F = [255];
-/** 100 km/h as the ECU counts it is 62 mph (truncated), shown as 99.8 km/h. */
+/** 100 km/h as the ECU counts it is 62 mph (truncated): 99.78 km/h, shown as 100. */
 const ROAD_SPEED_100_KMH = [100];
 /** Target idle is held in rpm: 0x02EE is 750. */
 const TARGET_IDLE_750_RPM = [0x02, 0xee];
@@ -97,7 +97,9 @@ test.describe('Reading values', () => {
     await expect(reading(live, 'Idle bypass')).toHaveText('75 % open');
 
     // Converted from the ECU's units and rounded only for display: 40.6 °C
-    // rounds up, 0 °C is not "-0", and 62 mph is 99.8 km/h.
+    // rounds up, 32 °F is 0 °C, and 62 mph (99.78 km/h) rounds to 100 km/h.
+    // A value just below 0 °C showing as "0", not "-0", is a unit test in
+    // src/metrics.test.ts: whole-number °F readings cannot produce one.
     await chooseUnits(page, 'Celsius', 'Kilometres per hour');
     await expect(reading(live, 'Coolant')).toHaveText('41 °C');
     await expect(reading(live, 'Fuel temp')).toHaveText('0 °C');
@@ -161,8 +163,8 @@ test.describe('Reading values', () => {
 
     await expect(reading(throttle, 'Now')).toContainText('No valid reading');
     // An invalid sample is a gap, not a 0: there is no lowest or highest yet.
-    await expect(reading(throttle, 'Min')).not.toContainText(/\d/);
-    await expect(reading(throttle, 'Max')).not.toContainText(/\d/);
+    await expect(reading(throttle, 'Min')).toHaveText('—No data yet');
+    await expect(reading(throttle, 'Max')).toHaveText('—No data yet');
 
     // Once the sensor reads again, the invalid samples still do not count.
     await emulatedSerial.poke(THROTTLE_POSITION, THROTTLE_512);

@@ -108,7 +108,13 @@ test.describe('Recorded values', () => {
     };
 
     expect(rows.length).toBeGreaterThan(1);
-    expect(column('Time since start (s)')[0]).toBe('0');
+
+    // Samples in the order they were read, from the start of the recording.
+    const times = column('Time since start (s)').map(Number);
+
+    expect(times[0]).toBe(0);
+    expect(times).toEqual(times.toSorted((a, b) => a - b));
+    expect(times.at(-1)).toBeGreaterThan(1);
 
     // Every sample, unrounded.
     expect(new Set(column('Throttle (%)'))).toEqual(
