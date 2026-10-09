@@ -152,6 +152,10 @@ The app must be usable with a keyboard alone and with a screen reader, and meet 
 - Drive the ECU through a real `Ecu` over `SimulatedTransport` with bytes planted in `memory` (or its fault-injection flags), or over `WebSerialTransport` with a fake `SerialPort`. Do not mock `Ecu` methods.
 - Write expected values as literals; do not compute them by calling library decoders.
 - Name test files `*.test.ts(x)` next to the code they test. Do not lower the coverage thresholds in `vite.config.ts` to land a change.
+- A test is the specification: it states what the app does for the user, not how. Assert what a user sees or hears (text, roles, accessible names) and what reaches the ECU (its memory). Do not assert class names (least of all another library's, such as uPlot's), `data-*` attributes, `localStorage` keys or a library's internal identifiers, and set up state through the UI rather than by writing storage. A refactor that changes nothing for users must not break a test.
+- Make sure a new test can fail: run it once with a wrong expected value and see it fail.
+- `fake-indexeddb`, `SimulatedTransport.silent`, `failWrites` and the like are only as good as what they simulate. `failWrites` rejects every write, polling included, so it simulates a lost link, not a single failed ECU write ([libcomm14cux-ts#16](https://github.com/KB1RMA/libcomm14cux-ts/issues/16)). Say in the test or the pull request when a behaviour cannot be reached this way, rather than faking it some other way.
+- When reviewing tests, check them against the design goals, not just the code: exact values in every unit, invalid readings as gaps rather than 0, no old readings left looking live, full precision in recordings and exports, and the same reading reading the same in every view.
 
 ### Acceptance suite (`e2e/`)
 
@@ -159,6 +163,13 @@ The app must be usable with a keyboard alone and with a screen reader, and meet 
 - Drive a serial ECU only through the `emulatedSerial` fixture: comm14cux-ts's `SimulatedTransport` behind a fake `navigator.serial`, with bytes planted in its memory. Do not stub app modules or intercept `Ecu` calls.
 - `eslint-plugin-playwright`'s recommended rules run as errors, with `no-raw-locators` on. Find elements by role and accessible name, as in the unit tests; a CSS or XPath locator needs a one-line disable saying why no role fits. Run `expectNoAxeViolations` for every new view or state; pass `within` while a Radix menu or dialog is open.
 - Do not raise `retries` (CI retries once only to capture a trace), skip a browser or loosen `failOnFlakyTests` to land a change. A release deploys only when the suite passes in Chromium, Firefox and WebKit.
+- Assert readings exactly. Plant raw bytes through `emulatedSerial`, work the expected string out by hand from the encoding (note it beside the bytes), and assert it literally, in both unit systems where the reading converts. A pattern such as `/^\d+ rpm$/` checks only the shape; keep patterns for demo-mode values, which move. After any write to the ECU, `peek` its memory, after cancelling as well as after confirming.
+- Scope every locator to the region, figure or dialog it belongs to. Roles such as `status`, `table`, `listitem` and `term` appear in more than one place, so a page-wide lookup breaks, or finds the wrong element, when another view adds one. Do not reach for `.first()` or `.nth()` to settle the ambiguity.
+- Prefer role options and web-first matchers to attribute checks: `getByRole('tab', { selected: true })`, `toBeChecked()`, `toBeDisabled()` (which honours `aria-disabled`), not `toHaveAttribute('aria-…')`.
+- Do not hard-code what follows from the app's data or layout, such as how many readings or graphs there are or how many tab stops lie between two controls. Take the number from the page, or name the items.
+- `count()`, `boundingBox()`, `textContent()` and `evaluate()` do not wait. Wait for the view with a web-first assertion first. Do not assert timings or relative speeds unless they are the behaviour being specified.
+- The emulated ECU answers instantly, so it polls many times faster than a real one and exposes races a car seldom does. Treat a flaky test as a possible app bug, as with view switches held back by polling (#62). Read the failed attempt's `error-context.md` and screenshot in the `e2e-report-<browser>` artifact (only the retry has a trace) before changing anything, and never hide a flake with `toPass`, longer timeouts or a fixed wait.
+- If a browser will not run locally, say so in the pull request, so reviewers know CI is its first run.
 
 ## Pull requests and the changelog
 
