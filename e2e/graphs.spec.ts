@@ -8,6 +8,17 @@ test.describe('Live graphs', () => {
   }) => {
     await page.goto('./');
     await page.getByRole('button', { name: 'Demo mode' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Live data' }),
+    ).toBeVisible();
+
+    // One graph for each reading the overview shows.
+    const readings = await page
+      .getByRole('region', { name: 'Live data' })
+      .getByRole('term')
+      .count();
+
+    expect(readings).toBeGreaterThan(1);
 
     const tabs = page.getByRole('tablist', { name: 'Dashboard views' });
 
@@ -15,7 +26,7 @@ test.describe('Live graphs', () => {
     await expect(
       page.getByRole('heading', { name: 'Live graphs' }),
     ).toBeVisible();
-    await expect(page.getByRole('figure')).toHaveCount(25);
+    await expect(page.getByRole('figure')).toHaveCount(readings);
 
     const rpm = page.getByRole('figure', { name: 'Engine speed (rpm)' });
 
@@ -39,7 +50,7 @@ test.describe('Live graphs', () => {
     ).not.toBeChecked();
     await page.keyboard.press('Escape');
     await expect(picker).toBeHidden();
-    await expect(page.getByRole('figure')).toHaveCount(24);
+    await expect(page.getByRole('figure')).toHaveCount(readings - 1);
 
     await page.reload();
     await page.getByRole('button', { name: 'Demo mode' }).click();
@@ -48,7 +59,7 @@ test.describe('Live graphs', () => {
       page.getByRole('heading', { name: 'Live graphs' }),
     ).toBeFocused();
     await expect(page.getByRole('radio', { name: '5 minutes' })).toBeChecked();
-    await expect(page.getByRole('figure')).toHaveCount(24);
+    await expect(page.getByRole('figure')).toHaveCount(readings - 1);
     await expect(
       page.getByRole('figure', { name: 'Fuel temp (°F)' }),
     ).toHaveCount(0);
@@ -148,7 +159,9 @@ test.describe('Live graphs', () => {
     ).toBeVisible();
 
     await page.keyboard.press('ArrowLeft');
-    await expect(overview).toHaveAttribute('aria-selected', 'true');
+    await expect(
+      page.getByRole('tab', { name: 'Overview', selected: true }),
+    ).toBeFocused();
     await expect(
       page.getByRole('heading', { name: 'Live data' }),
     ).toBeVisible();

@@ -43,6 +43,11 @@ test.describe('Choosing readings', () => {
   }) => {
     await page.goto('./');
     await page.getByRole('button', { name: 'Demo mode' }).click();
+    await expect(reading(page, 'Engine speed')).toHaveText(/^\d+ rpm$/);
+
+    const all = await liveTerms(page).count();
+
+    expect(all).toBeGreaterThan(2);
 
     const connection = page.getByRole('region', { name: 'Connection' });
     const allRate = await settledRate(connection);
@@ -57,7 +62,7 @@ test.describe('Choosing readings', () => {
     await expect(picker).toBeHidden();
 
     await expect(liveTerms(page)).toHaveText(['Engine speed', 'MIL']);
-    await expect(connection).toContainText('2 of 25 readings');
+    await expect(connection).toContainText(`2 of ${String(all)} readings`);
 
     const oneRate = await settledRate(connection);
 
@@ -76,7 +81,7 @@ test.describe('Choosing readings', () => {
       .getByRole('radio', { name: 'All' })
       .click();
     await page.keyboard.press('Escape');
-    await expect(liveTerms(page)).toHaveCount(25);
+    await expect(liveTerms(page)).toHaveCount(all);
     await expect(connection).not.toContainText('readings');
   });
 

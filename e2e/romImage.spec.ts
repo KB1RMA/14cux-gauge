@@ -2,7 +2,12 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { readFile } from 'node:fs/promises';
 import { buildSyntheticRom } from '../src/demo/syntheticRom';
-import { expect, expectNoAxeViolations, test } from './support/fixtures';
+import {
+  connectionStatus,
+  expect,
+  expectNoAxeViolations,
+  test,
+} from './support/fixtures';
 
 /** ROM address 0xC100, in the middle of the image. */
 const PLANTED_ADDRESS = 0xc100;
@@ -16,7 +21,7 @@ test.describe('Saving the ROM image', () => {
     await page.goto('./');
     await emulatedSerial.poke(PLANTED_ADDRESS, PLANTED_BYTES);
     await page.getByRole('button', { name: 'Connect to ECU' }).click();
-    await expect(page.getByRole('status')).toHaveText(
+    await expect(connectionStatus(page)).toHaveText(
       'Serial ECU (7812 baud) · Polling',
     );
 
@@ -46,7 +51,7 @@ test.describe('Saving the ROM image', () => {
     await expect(
       page.getByText('A copy is kept in this browser.'),
     ).toBeVisible();
-    await expect(page.getByRole('status')).toHaveText(
+    await expect(connectionStatus(page)).toHaveText(
       'Serial ECU (7812 baud) · Polling',
     );
     await expectNoAxeViolations(page);
@@ -93,9 +98,7 @@ test.describe('Saving the ROM image', () => {
     await expect(
       page.getByText('The read was cancelled. Nothing was saved.'),
     ).toBeVisible();
-    await expect(page.getByRole('status').first()).toHaveText(
-      'Demo ECU · Polling',
-    );
+    await expect(connectionStatus(page)).toHaveText('Demo ECU · Polling');
     await expect(
       page.getByText('No images are kept in this browser yet.'),
     ).toBeVisible();

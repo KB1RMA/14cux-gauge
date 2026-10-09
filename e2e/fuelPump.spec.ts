@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import {
+  connectionStatus,
   expect,
   expectNoAxeViolations,
   notification,
@@ -23,9 +24,7 @@ test.describe('Fuel pump test', () => {
     await emulatedSerial.poke(PORT1, [PUMP_OFF]);
     await page.getByRole('button', { name: 'Connect to ECU' }).click();
 
-    const status = page
-      .getByRole('region', { name: 'Connection' })
-      .getByRole('status');
+    const status = connectionStatus(page);
     const notice = notification(page, 'Fuel pump test');
 
     await expect(status).toHaveText('Serial ECU (7812 baud) · Polling');

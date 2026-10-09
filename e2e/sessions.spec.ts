@@ -2,6 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import type { Locator, Page } from '@playwright/test';
 import {
+  connectionStatus,
   expect,
   expectNoAxeViolations,
   reading,
@@ -13,7 +14,7 @@ async function recordDemo(page: Page) {
   await page.goto('./');
   await page.getByRole('button', { name: 'Demo mode' }).click();
   await page.getByRole('button', { name: 'Record', exact: true }).click();
-  await expect(page.getByRole('status')).toHaveText(
+  await expect(connectionStatus(page)).toHaveText(
     'Demo ECU · Polling · Recording',
   );
   await expect(page.getByText('0:02 recorded')).toBeVisible();
@@ -78,13 +79,14 @@ test.describe('Recorded sessions', () => {
       log.getByRole('rowheader', { name: 'Fuel pump test At the playhead' }),
     ).toBeVisible();
 
-    // The write's name shows once more on the graphs: on the overview
-    // strip's mark, which is hidden from assistive tech.
-    const named = page.getByText('Fuel pump test', { exact: true });
-    const before = await named.count();
-
+    // The graphs mark the write by name too, on the timeline overview. The
+    // mark is a picture of the log above, so it is hidden from assistive tech.
     await page.getByRole('tab', { name: 'Graphs' }).click();
-    await expect(named).toHaveCount(before + 1);
+    await expect(
+      page
+        .getByRole('tabpanel', { name: 'Graphs' })
+        .getByText('Fuel pump test', { exact: true }),
+    ).toBeVisible();
     await expectNoAxeViolations(page);
   });
 
@@ -198,14 +200,14 @@ test.describe('Recorded sessions', () => {
     const showAll = page.getByRole('button', { name: 'Show all' });
     const position = page.getByRole('slider', { name: 'Playback position' });
     const rpm = page.getByRole('figure', { name: 'Engine speed (rpm)' });
-    // eslint-disable-next-line playwright/no-raw-locators -- the plot area is a canvas overlay with no role; it is hidden from assistive tech
-    const plot = rpm.locator('.u-over');
+    // eslint-disable-next-line playwright/no-raw-locators -- a canvas has no role; it is hidden from assistive tech
+    const plot = rpm.locator('canvas');
 
     // The whole recording, to start with.
     await expect(
       page.getByText(/^Graphs show 0:00 to (0:0\d) of \1\.$/),
     ).toBeVisible();
-    await expect(showAll).toHaveAttribute('aria-disabled', 'true');
+    await expect(showAll).toBeDisabled();
     await plot.scrollIntoViewIfNeeded();
 
     const box = await boxOf(plot);
@@ -217,13 +219,13 @@ test.describe('Recorded sessions', () => {
     await page.mouse.down();
     await page.mouse.move(at(0.6), y, { steps: 5 });
     await page.mouse.up();
-    await expect(showAll).toHaveAttribute('aria-disabled', 'false');
+    await expect(showAll).toBeEnabled();
     await expectNoAxeViolations(page);
 
     // From the keyboard, the button keeps focus once it has nothing to do.
     await showAll.focus();
     await page.keyboard.press('Enter');
-    await expect(showAll).toHaveAttribute('aria-disabled', 'true');
+    await expect(showAll).toBeDisabled();
     await expect(showAll).toBeFocused();
 
     // Ctrl and the wheel zoom around the pointer.
@@ -231,7 +233,7 @@ test.describe('Recorded sessions', () => {
     await page.keyboard.down('Control');
     await page.mouse.wheel(0, -400);
     await page.keyboard.up('Control');
-    await expect(showAll).toHaveAttribute('aria-disabled', 'false');
+    await expect(showAll).toBeEnabled();
 
     // A click moves the playhead.
     await expect(position).toHaveAttribute('aria-valuenow', '0');
@@ -242,7 +244,7 @@ test.describe('Recorded sessions', () => {
     await showAll.click();
     await page.getByRole('slider', { name: 'Graphs to' }).focus();
     await page.keyboard.press('ArrowLeft');
-    await expect(showAll).toHaveAttribute('aria-disabled', 'false');
+    await expect(showAll).toBeEnabled();
   });
 
   for (const colorScheme of ['light', 'dark'] as const) {
@@ -260,7 +262,11 @@ test.describe('Recorded sessions', () => {
       await page.getByRole('button', { name: 'Record', exact: true }).click();
       await nav(page).getByRole('link', { name: 'Sessions' }).click();
       // The recording in progress, and the finished one.
-      await expect(page.getByRole('listitem')).toHaveCount(2);
+      await expect(
+        page
+          .getByRole('region', { name: 'Recorded sessions' })
+          .getByRole('listitem'),
+      ).toHaveCount(2);
       await expect(
         page.getByRole('button', { name: /^Delete Demo ECU, / }).first(),
       ).toBeDisabled();
