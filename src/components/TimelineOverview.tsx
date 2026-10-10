@@ -89,33 +89,46 @@ function Handle({
   step: number;
 }) {
   const [held, setHeld] = useState(false);
+  const [keyed, setKeyed] = useState(false);
+  // Pressing a handle focuses it; only focus from the keyboard shows the
+  // time once the pointer lets go.
+  const pressedRef = useRef(false);
 
   const release = () => {
+    pressedRef.current = false;
     setHeld(false);
   };
 
   return (
     <Slider.Thumb
-      className={
-        held
-          ? `${styles['handle'] ?? ''} ${styles['held'] ?? ''}`
-          : styles['handle']
-      }
+      className={styles['handle']}
       aria-label={label}
       aria-valuetext={describeTime(ms, step)}
       onPointerDown={() => {
+        pressedRef.current = true;
         setHeld(true);
       }}
       onPointerUp={release}
       onLostPointerCapture={release}
+      onFocus={() => {
+        setKeyed(!pressedRef.current);
+      }}
+      onKeyDown={() => {
+        setKeyed(true);
+      }}
+      onBlur={() => {
+        setKeyed(false);
+      }}
     >
-      {/* The value is in aria-valuetext; this is its look. */}
-      <span
-        className={`${styles['time'] ?? ''} ${styles[side] ?? ''}`}
-        aria-hidden="true"
-      >
-        {formatPreciseDuration(ms)}
-      </span>
+      {(held || keyed) && (
+        // The value is in aria-valuetext; this is its look.
+        <span
+          className={`${styles['time'] ?? ''} ${styles[side] ?? ''}`}
+          aria-hidden="true"
+        >
+          {formatPreciseDuration(ms)}
+        </span>
+      )}
     </Slider.Thumb>
   );
 }

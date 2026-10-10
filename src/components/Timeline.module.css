@@ -91,13 +91,12 @@
   outline-offset: 2px;
 }
 
-/* The time a handle is at, shown below it over the time axis while it is
+/* The time a handle is at, below it over the time axis, while it is
    dragged or has the keyboard's focus. */
 .time {
   position: absolute;
   top: calc(100% + 0.2rem);
   z-index: 1;
-  display: none;
   padding: 0.1rem 0.4rem;
   font-family: var(--font-mono);
   font-size: 0.75rem;
@@ -115,11 +114,6 @@
 
 .end {
   right: -0.35rem;
-}
-
-.held .time,
-.handle:focus-visible .time {
-  display: block;
 }
 
 .range {
