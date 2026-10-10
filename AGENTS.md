@@ -158,6 +158,14 @@ Types and options that are stored (such as graph settings) live in `model/` or `
 - Store contracts are async and structured-cloneable: plain objects, arrays and typed arrays, no class instances, functions or DOM objects. A store must work unchanged behind IPC in a desktop build. Return large data, such as a recording's samples, in pages or as typed-array columns, not one array of objects.
 - Every persistent store tells other windows when what it holds changes, as settings do.
 
+### Boundaries enforced by lint
+
+`eslint.config.js` restricts imports, as errors, so these cannot be crossed unnoticed. Fix the code, not the config.
+
+- Views (`src/components/`) never import the ECU library, storage, `settingStore`, `SampleHistory` or `EcuSession` as values; they use hooks (`useSessions`, `useRoms`, `useSetting`, `useHistory`, `useEcu`, `useEcuRead`).
+- `src/model/` imports nothing from the app above it.
+- Hooks (`use*.ts`) and providers (`*Provider.tsx`) never import the ECU library or hold a `Lease`; only the controllers (`EcuSession`, `EcuWrites`, `RomReader`) do.
+
 ### Series
 
 - Live graphs and replay share one time-series model. Build series from samples in one module outside `components/`, so a gap, an extreme and a time read the same in both.

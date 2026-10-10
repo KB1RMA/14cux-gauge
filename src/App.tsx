@@ -12,24 +12,24 @@ import { PreferencesMenu } from './components/PreferencesMenu';
 import { SaveSessionDialog } from './components/SaveSessionDialog';
 import { SessionsView } from './components/SessionsView';
 import { StatusBar } from './components/StatusBar';
-import { EcuProvider } from './ecu/EcuProvider';
 import { useEcu } from './ecu/useEcu';
+import { EcuProvider } from './ecu/EcuProvider';
 import { EcuWriteProvider } from './ecuWrite/EcuWriteProvider';
 import { NotificationsProvider } from './notifications/NotificationsProvider';
 import { PlatformContext } from './platform/context';
 import { PreferencesProvider } from './preferences/PreferencesProvider';
 import { AppStatusProvider } from './pwa/AppStatusProvider';
-import { ReadingsProvider } from './readings/ReadingsProvider';
-import { RecordingProvider } from './recording/RecordingProvider';
 import {
   LIVE_PATH,
   LIVE_TAB_PATHS,
   SESSIONS_PATH,
   type LiveTab,
 } from './routing/paths';
+import { ServicesContext } from './services/context';
+import { ReadingsProvider } from './readings/ReadingsProvider';
+import { RecordingProvider } from './recording/RecordingProvider';
 import { RomsProvider } from './roms/RomsProvider';
 import { SessionsProvider } from './sessions/SessionsProvider';
-import { StorageProvider } from './storage/StorageProvider';
 import styles from './App.module.css';
 
 const VIEWS: readonly { label: string; to: string }[] = [
@@ -95,10 +95,10 @@ export function App({
             checks={provided.checksAppStatus}
           >
             <NotificationsProvider>
-              <EcuProvider session={provided.session}>
-                <ReadingsProvider>
-                  <EcuWriteProvider>
-                    <StorageProvider open={provided.platform.storage.open}>
+              <ServicesContext value={provided}>
+                <EcuProvider session={provided.session}>
+                  <ReadingsProvider>
+                    <EcuWriteProvider>
                       <SessionsProvider>
                         <RecordingProvider>
                           <RomsProvider>
@@ -132,10 +132,10 @@ export function App({
                           </RomsProvider>
                         </RecordingProvider>
                       </SessionsProvider>
-                    </StorageProvider>
-                  </EcuWriteProvider>
-                </ReadingsProvider>
-              </EcuProvider>
+                    </EcuWriteProvider>
+                  </ReadingsProvider>
+                </EcuProvider>
+              </ServicesContext>
             </NotificationsProvider>
           </AppStatusProvider>
         </PreferencesProvider>

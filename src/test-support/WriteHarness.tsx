@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { useState, type ReactNode } from 'react';
-import { EcuProvider } from '../ecu/EcuProvider';
 import type { EcuSession } from '../ecu/session';
 import { EcuWriteProvider } from '../ecuWrite/EcuWriteProvider';
 import { useEcuWrite } from '../ecuWrite/useEcuWrite';
 import { describeOutcome } from '../ecuWrite/writes';
-import { NotificationsProvider } from '../notifications/NotificationsProvider';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { ReadingsProvider } from '../readings/ReadingsProvider';
-import { TestPlatform } from './TestApp';
+import { TestSessionServices } from './TestApp';
 
-/** The latest write's state, as the provider holds it. */
+/** The latest write's state, as the controller holds it. */
 function WriteAnnouncement() {
   const { latest, outcomes, running } = useEcuWrite();
   const outcome = latest && outcomes[latest];
@@ -35,13 +33,11 @@ export function SessionHarness({
   children: ReactNode;
 }) {
   return (
-    <TestPlatform>
+    <TestSessionServices session={session}>
       <PreferencesProvider>
-        <EcuProvider session={session}>
-          <ReadingsProvider>{children}</ReadingsProvider>
-        </EcuProvider>
+        <ReadingsProvider>{children}</ReadingsProvider>
       </PreferencesProvider>
-    </TestPlatform>
+    </TestSessionServices>
   );
 }
 
@@ -60,23 +56,21 @@ export function WriteHarness({
 
   return (
     <SessionHarness session={session}>
-      <NotificationsProvider>
-        <EcuWriteProvider>
-          <WriteAnnouncement />
-          <button type="button" onClick={() => void session.disconnect()}>
-            Drop link
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setShown((previous) => !previous);
-            }}
-          >
-            {shown ? 'Leave view' : 'Return to view'}
-          </button>
-          {shown ? children : null}
-        </EcuWriteProvider>
-      </NotificationsProvider>
+      <EcuWriteProvider>
+        <WriteAnnouncement />
+        <button type="button" onClick={() => void session.disconnect()}>
+          Drop link
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setShown((previous) => !previous);
+          }}
+        >
+          {shown ? 'Leave view' : 'Return to view'}
+        </button>
+        {shown ? children : null}
+      </EcuWriteProvider>
     </SessionHarness>
   );
 }
