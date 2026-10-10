@@ -18,7 +18,7 @@ flowchart TB
     Connect[ConnectScreen]
     Dash["Dashboard<br/>LiveTiles · GraphsView · FuelMapView<br/>FaultCodes · EcuInfo · tests"]
     Sessions["SessionsView<br/>SessionList · SessionDetail · SessionReplay"]
-    Chrome["StatusBar · PreferencesMenu<br/>SaveSessionDialog · AppNotices"]
+    Chrome["StatusBar · PreferencesMenu · Footer<br/>SaveSessionDialog · AppNotices"]
   end
 
   subgraph react["Hooks and providers — React"]
@@ -31,6 +31,8 @@ flowchart TB
     HSet["useSetting · usePreferences<br/>ReadingsProvider"]
     HReplay["useReplay<br/>useRecordedSeries"]
     HRoute["routing/<br/>React Router"]
+    HAppStatus[useAppStatus]
+    HPlat[usePlatform]
   end
 
   subgraph services["AppServices — plain TS, subscribe / getSnapshot"]
@@ -80,6 +82,9 @@ flowchart TB
   Sessions --> HReplay
   views --> HSet
   views --> HRoute
+  Chrome --> HAppStatus
+  Connect & Sessions & Chrome --> HPlat
+  Dash & Sessions --> ChartSeries
 
   HEcu --> Session
   HWrite --> Writes
@@ -88,8 +93,12 @@ flowchart TB
   HSess --> StorageSvc
   HSet --> SettingStore
   HSet -. chosen readings .-> Session
-  HReplay --> ChartSeries
+  HReplay --> SampleHistory
   HEcu --> SampleHistory
+  HAppStatus --> AppStatus
+  HPlat --> Serial
+  HPlat --> Files
+  HPlat --> AppPlat
 
   Writes --> Session
   Recorder --> Session
@@ -103,6 +112,8 @@ flowchart TB
   Session --> SampleHistory
   SampleHistory --> ChartSeries
   Session -- "Lease · Ecu calls" --> Lib
+  Writes -- "Lease · Ecu calls" --> Lib
+  Roms -- "Lease · Ecu calls" --> Lib
   Session --> Serial
   Session --> Demo
   Session --> Diag
@@ -121,18 +132,22 @@ flowchart TB
 ### Layers
 
 A module never imports from a layer above its own; `eslint.config.js` enforces
-the boundaries.
+the boundaries. As above, arrows point from a layer to the layers it may use.
+`history/` and `replay/` (outside their hooks) use only `model/`, `metrics` and
+`units`, so the series model sits below the services and views that read it.
 
 ```mermaid
-flowchart BT
+flowchart TB
   model["model/<br/>stored shapes, zod schemas"]
   storage["storage/ · settings/<br/>IndexedDB stores, settingStore"]
   platform["platform/<br/>serial, files, storage, settings, app"]
   svc["services<br/>ecu/ · ecuWrite/ · roms/ · recording/ · readings/"]
+  series["history/ · replay/<br/>series model"]
   hooks["hooks and providers<br/>use*.ts · *Provider.tsx"]
   components["components/<br/>views"]
 
-  model --> storage --> platform --> svc --> hooks --> components
+  components --> hooks --> svc --> platform --> storage --> model
+  svc --> series --> model
 ```
 
 ## Live data flow
@@ -157,17 +172,20 @@ sequenceDiagram
   Session->>History: pushSnapshot (full precision, time read)
   Session-->>View: notify subscribers
   View->>Session: getSnapshot (useSyncExternalStore)
-  View->>History: series for graphs (useHistory → chartSeries)
+  View->>History: series for graphs (useHistory, then chartSeries in the chart)
   Note over View: metric.format converts units<br/>and rounds for display only
   Session-->>Recorder: snapshot event, while recording
-  Recorder->>Store: append full-precision samples
+  Recorder->>Store: append full-precision samples<br/>(buffered, saved about once a second)
 ```
 
 ECU writes (clearing faults, actuator tests) go the other way: a view behind
 `ConfirmDialog` calls `useEcuWrite`, which asks `EcuWrites`; `EcuWrites` takes
-the `Lease` from `EcuSession`, keys the outcome by `EcuLink`, and the
-`Recorder` logs it into the current session.
+the `Lease` from `EcuSession`, calls the `Ecu` through it, keys the outcome by
+`EcuLink`, and the `Recorder` logs it into the current session. `RomReader`
+reads the ROM image the same way, through a `Lease` of its own.
 
-Replay reads a stored session through `useSessionSamples`, turns it into the
-same series with `useRecordedSeries`, and `useReplay` drives the shared
-timeline, so a gap or an extreme reads the same live and in replay.
+Replay reads a stored session through `useSessionSamples`, and
+`useRecordedSeries` builds a `SampleHistory` from it with `pushSnapshot`, as
+`EcuSession` does live. The charts draw both with `chartSeries`, and `useReplay`
+drives the shared timeline, so a gap or an extreme reads the same live and in
+replay.
