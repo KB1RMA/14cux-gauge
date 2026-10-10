@@ -28,8 +28,8 @@ but never the ones above it. From top to bottom:
    data, but they never fetch it themselves. The dashboard and the sessions
    views are downloaded just after the app starts, so the first screen shows
    sooner. If one of them breaks, only that view shows an error and a Reload
-   button. The app bar and status bar keep working, so you can still
-   disconnect.
+   button. Going to another page tries the view again. The app bar and
+   status bar keep working, so you can still disconnect.
 2. **Hooks and providers** are the go-betweens. A view asks a hook for what it
    needs, and the hook gets it from a service.
 3. **Services** do the real work. There are six:

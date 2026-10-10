@@ -3,6 +3,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { lazy, type ReactNode } from 'react';
+import { Link, MemoryRouter, Route, Routes, useParams } from 'react-router';
 import { expectNoAxeViolations } from '../test-support/a11y';
 import { testPlatform } from '../test-support/platform';
 import { TestServices } from '../test-support/TestApp';
@@ -19,14 +20,18 @@ function Broken(): never {
  */
 function renderView(view: ReactNode, reload: () => void = () => {}) {
   return render(
-    <TestServices
-      platform={testPlatform({ app: { userAgent: 'TestBrowser/1.0', reload } })}
-      pollIntervalMs={{ demo: 10 }}
-    >
-      <p>The app bar</p>
-      <ConnectScreen />
-      <ViewBoundary>{view}</ViewBoundary>
-    </TestServices>,
+    <MemoryRouter>
+      <TestServices
+        platform={testPlatform({
+          app: { userAgent: 'TestBrowser/1.0', reload },
+        })}
+        pollIntervalMs={{ demo: 10 }}
+      >
+        <p>The app bar</p>
+        <ConnectScreen />
+        <ViewBoundary>{view}</ViewBoundary>
+      </TestServices>
+    </MemoryRouter>,
   );
 }
 
@@ -72,7 +77,7 @@ describe('ViewBoundary', () => {
     expect(
       screen.getByRole('region', { name: 'This view could not be shown' }),
     ).toHaveTextContent(
-      'If you are offline or a newer version of the app has been published, part of it may not have downloaded. Reload the page to try again.Error: Cannot read properties of undefined',
+      'If you are offline or a newer version of the app has been published, part of it may not have downloaded. Open another view, or reload the page to try again.Error: Cannot read properties of undefined',
     );
     expect(screen.getByText('The app bar')).toBeInTheDocument();
     await expectNoAxeViolations(container);
@@ -105,6 +110,52 @@ describe('ViewBoundary', () => {
     expect(
       screen.getByRole('region', { name: 'This view could not be shown' }),
     ).toHaveTextContent('Error: Lost the ECU link');
+  });
+
+  it('tries again when the user opens another page of the same view', async () => {
+    const user = userEvent.setup();
+
+    /** A tabbed view whose fuel map page fails. */
+    function Tab() {
+      const { tab } = useParams();
+
+      if (tab === 'fuel-map') {
+        throw new Error('Cannot read properties of undefined');
+      }
+
+      return <h2>Overview</h2>;
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/fuel-map']}>
+        <TestServices>
+          <Link to="/overview">Live</Link>
+          <Routes>
+            <Route
+              path="/:tab"
+              element={
+                <ViewBoundary>
+                  <Tab />
+                </ViewBoundary>
+              }
+            />
+          </Routes>
+        </TestServices>
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'This view could not be shown' }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Live' }));
+
+    expect(
+      screen.getByRole('heading', { name: 'Overview' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'This view could not be shown' }),
+    ).not.toBeInTheDocument();
   });
 
   it('reloads at once when nothing is connected', async () => {
