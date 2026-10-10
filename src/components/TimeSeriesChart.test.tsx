@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { Gear } from '@kb1rma/libcomm14cux-ts';
 import { HistoryContext } from '../ecu/contexts';
 import { SampleHistory } from '../history/sampleHistory';
@@ -294,6 +301,157 @@ describe('TimeSeriesChart drawing', () => {
     await waitFor(() => {
       expect(container.querySelector('canvas')).not.toBeNull();
     });
+  });
+
+  /** The plot area of the `index`th chart, once it is drawn. */
+  async function plotArea(container: HTMLElement, index = 0) {
+    // uPlot's plot area has no role; it is hidden from assistive tech.
+    await vi.waitFor(() => {
+      expect(container.querySelectorAll('.u-over').length).toBeGreaterThan(
+        index,
+      );
+    });
+
+    const over = container.querySelectorAll<HTMLElement>('.u-over')[index];
+
+    if (!over) {
+      throw new Error(`No plot ${String(index)}`);
+    }
+
+    return over;
+  }
+
+  /** Moves the pointer over the plot, `x` pixels from its left edge. */
+  function hover(over: HTMLElement, x: number) {
+    fireEvent.mouseMove(over, { clientX: x, clientY: 50 });
+  }
+
+  it('shows the time and value of the sample nearest the pointer', async () => {
+    const history = new SampleHistory(METRIC_KEYS, 100);
+
+    // 60 s across the plot: these are 30 s before the newest, and the newest.
+    history.push(0, { engineRpm: 750 });
+    history.push(30_000, { engineRpm: 1500 });
+
+    const { container } = renderChart('engineRpm', history);
+    const figure = screen.getByRole('figure', { name: 'Engine speed (rpm)' });
+    const over = await plotArea(container);
+
+    // Near the left edge, 50 s back: the nearest sample is the one 30 s back.
+    hover(over, 10);
+
+    const readout = await within(figure).findByText('−0:30.0 · 750 rpm');
+
+    expect(readout).toBeVisible();
+
+    // At the right edge: the newest sample.
+    hover(over, over.clientWidth - 1);
+
+    expect(readout).toHaveTextContent(/^now · 1500 rpm$/);
+
+    fireEvent.mouseLeave(over);
+
+    await vi.waitFor(() => {
+      expect(readout).not.toBeVisible();
+    });
+  });
+
+  it('follows new samples under a still pointer', async () => {
+    const history = new SampleHistory(METRIC_KEYS, 100);
+
+    history.push(0, { engineRpm: 750 });
+
+    const { container } = renderChart('engineRpm', history);
+    const figure = screen.getByRole('figure', { name: 'Engine speed (rpm)' });
+    const over = await plotArea(container);
+
+    hover(over, over.clientWidth - 1);
+
+    const readout = await within(figure).findByText('now · 750 rpm');
+
+    act(() => {
+      history.push(400, { engineRpm: 812 });
+    });
+
+    await vi.waitFor(() => {
+      expect(readout).toHaveTextContent(/^now · 812 rpm$/);
+    });
+  });
+
+  it('reads "No reading" over a gap, never 0', async () => {
+    const history = new SampleHistory(METRIC_KEYS, 100);
+
+    // 60 s, 31 s and 0 s before the newest; the middle one is invalid.
+    history.push(0, { mainVoltage: 14.2 });
+    history.push(29_000, { mainVoltage: null });
+    history.push(60_000, { mainVoltage: 14.04 });
+
+    const { container } = renderChart('mainVoltage', history);
+    const figure = screen.getByRole('figure', { name: 'Main voltage (V)' });
+    const over = await plotArea(container);
+
+    // Halfway across: 30 s back, nearest the invalid sample.
+    hover(over, over.clientWidth / 2);
+
+    expect(
+      await within(figure).findByText('−0:31.0 · No reading'),
+    ).toBeVisible();
+
+    hover(over, over.clientWidth - 1);
+
+    expect(await within(figure).findByText('now · 14.0 V')).toBeVisible();
+  });
+
+  it('reads in the chosen units', async () => {
+    localStorage.setItem(
+      'cuxGauge.preferences',
+      JSON.stringify({ temperatureUnit: 'C' }),
+    );
+
+    const history = new SampleHistory(METRIC_KEYS, 100);
+
+    // 212 °F is 100 °C.
+    history.push(0, { coolantTempF: 212 });
+
+    const { container } = renderChart('coolantTempF', history);
+    const figure = screen.getByRole('figure', { name: 'Coolant (°C)' });
+    const over = await plotArea(container);
+
+    hover(over, over.clientWidth - 1);
+
+    expect(await within(figure).findByText('now · 100 °C')).toBeVisible();
+  });
+
+  it('shares the crosshair with the other graphs', async () => {
+    const history = new SampleHistory(METRIC_KEYS, 100);
+
+    history.push(0, { engineRpm: 750, throttle: 0.5 });
+
+    const { container } = render(
+      <TestPlatform platform={browserPlatform()}>
+        <PreferencesProvider>
+          <HistoryContext value={history}>
+            <TimeSeriesChart
+              metric={metric('engineRpm')}
+              timeWindow={60}
+              syncKey="live"
+            />
+            <TimeSeriesChart
+              metric={metric('throttle')}
+              timeWindow={60}
+              syncKey="live"
+            />
+          </HistoryContext>
+        </PreferencesProvider>
+      </TestPlatform>,
+    );
+
+    await plotArea(container, 1);
+    hover(await plotArea(container, 0), 300);
+
+    const throttle = screen.getByRole('figure', { name: /^Throttle/ });
+
+    expect(await within(throttle).findByText(/^now · \S+ %$/)).toBeVisible();
   });
 
   it('does not build a chart if unmounted before the library loads', async () => {

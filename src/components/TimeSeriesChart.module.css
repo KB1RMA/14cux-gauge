@@ -58,6 +58,22 @@
   min-height: 140px;
 }
 
+/* The value under the pointer, beside the crosshair. */
+.readout {
+  position: absolute;
+  top: 0.25rem;
+  left: 0;
+  padding: 0.1rem 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
 @media print {
   /* Keep each graph whole on one sheet. */
   .chart {

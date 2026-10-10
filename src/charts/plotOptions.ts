@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import type uPlot from 'uplot';
 import type { Metric } from '../metrics';
-import { formatDuration } from '../sessions/format';
+import { formatDuration, formatPreciseDuration } from '../sessions/format';
 
 /**
  * uPlot options for one metric's live graph. The x axis is seconds relative
@@ -46,6 +46,16 @@ export function formatAgo(seconds: number): string {
 }
 
 /**
+ * A sample's time on a live graph, to the tenth of a second, for the
+ * pointer's readout: "now" for the newest sample, then "−0:12.3", "−2:05.0".
+ */
+export function formatAgoPrecise(seconds: number): string {
+  const ago = Math.round(-seconds * 1000);
+
+  return ago <= 0 ? 'now' : `−${formatPreciseDuration(ago)}`;
+}
+
+/**
  * Whether this browser can draw a chart. jsdom (the unit tests) has neither
  * `matchMedia` nor a 2D canvas, so charts there show their text summary only.
  */
@@ -75,7 +85,8 @@ function padded([min, max]: readonly [number, number]): [number, number] {
 /**
  * `windowSeconds` is the span of the x axis; pass a function for a span
  * that changes (the session window), and it is read each time the data is
- * set.
+ * set. The pointer shows a crosshair that every chart with the same
+ * `syncKey` follows.
  */
 export function plotOptions(
   plot: UPlot,
@@ -83,7 +94,12 @@ export function plotOptions(
   {
     width,
     windowSeconds,
-  }: { width: number; windowSeconds: number | (() => number) },
+    syncKey = '',
+  }: {
+    width: number;
+    windowSeconds: number | (() => number);
+    syncKey?: string;
+  },
 ): uPlot.Options {
   const { step = false, range, atLeast } = metric.chart;
   // Optional in uPlot's types, but part of every build we ship.
@@ -102,7 +118,16 @@ export function plotOptions(
     width,
     height: PLOT_HEIGHT,
     legend: { show: false },
-    cursor: { show: false, drag: { x: false, y: false } },
+    cursor: {
+      show: true,
+      x: true,
+      y: false,
+      // A point would mark the nearest valid sample, which is not always
+      // the one the readout names.
+      points: { show: false },
+      drag: { x: false, y: false },
+      ...(syncKey ? { sync: { key: syncKey, setSeries: false } } : {}),
+    },
     scales: {
       x: {
         time: false,
@@ -205,20 +230,17 @@ export function timelinePlotOptions(
     xRange,
   }: { width: number; syncKey: string; xRange(): [number, number] },
 ): uPlot.Options {
-  const options = plotOptions(plot, metric, { width, windowSeconds: 0 });
+  // Dragging is the timeline's own gesture (see timelineGestures), not
+  // uPlot's, which the live graph's cursor leaves off.
+  const options = plotOptions(plot, metric, {
+    width,
+    windowSeconds: 0,
+    syncKey,
+  });
   const [xAxis, yAxis] = options.axes ?? [];
 
   return {
     ...options,
-    cursor: {
-      show: true,
-      x: true,
-      y: false,
-      points: { show: false },
-      // Dragging is the timeline's own gesture (see timelineGestures).
-      drag: { x: false, y: false },
-      sync: { key: syncKey, setSeries: false },
-    },
     scales: {
       ...options.scales,
       x: { time: false, auto: false, range: () => xRange() },

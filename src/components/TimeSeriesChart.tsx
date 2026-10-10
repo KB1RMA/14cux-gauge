@@ -2,8 +2,9 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { useEffect, useId, useRef } from 'react';
 import type uPlot from 'uplot';
+import { cursorReadout } from '../charts/cursorReadout';
 import { mountPlot } from '../charts/mountPlot';
-import { plotOptions } from '../charts/plotOptions';
+import { formatAgoPrecise, plotOptions } from '../charts/plotOptions';
 import { chartData, extremes } from '../history/chartSeries';
 import { useHistory } from '../history/useHistory';
 import type { Metric } from '../metrics';
@@ -24,7 +25,9 @@ const MIN_SESSION_SECONDS = 30;
 /**
  * One metric's recent history as a scrolling line graph, with its latest,
  * lowest and highest values as text. The canvas is hidden from assistive
- * tech; the text carries the same information.
+ * tech; the text carries the same information. Over the graph, the pointer
+ * shows the time and value of the nearest sample, with a crosshair that
+ * every graph with the same `syncKey` follows.
  *
  * `timeWindow` is the seconds shown, or `'session'` for every sample held. The
  * samples are thinned to a few per pixel, keeping each one's extremes
@@ -33,9 +36,11 @@ const MIN_SESSION_SECONDS = 30;
 export function TimeSeriesChart({
   metric,
   timeWindow,
+  syncKey = '',
 }: {
   metric: Metric;
   timeWindow: GraphWindow;
+  syncKey?: string;
 }) {
   const units = usePreferences();
   const { history } = useHistory();
@@ -63,6 +68,8 @@ export function TimeSeriesChart({
   const summary = { now: shown.at(-1), ...extremes(shown) };
   const format = (value: number) =>
     unit ? `${metric.format(value)} ${unit}` : metric.format(value);
+  // The readout's formatter, which outlives any one render.
+  const formatRef = useRef(format);
 
   // The chart is built once per metric and window, then fed new data.
   useEffect(() => {
@@ -76,11 +83,20 @@ export function TimeSeriesChart({
       container,
       (plot, width) =>
         new plot(
-          plotOptions(plot, metric, {
-            width,
-            windowSeconds:
-              timeWindow === 'session' ? () => spanRef.current : timeWindow,
-          }),
+          {
+            ...plotOptions(plot, metric, {
+              width,
+              windowSeconds:
+                timeWindow === 'session' ? () => spanRef.current : timeWindow,
+              syncKey,
+            }),
+            plugins: [
+              cursorReadout(styles['readout'] ?? '', {
+                time: formatAgoPrecise,
+                value: (value) => formatRef.current(value),
+              }).plugin,
+            ],
+          },
           dataRef.current,
           container,
         ),
@@ -88,12 +104,13 @@ export function TimeSeriesChart({
         chartRef.current = chart;
       },
     );
-  }, [metric, timeWindow]);
+  }, [metric, timeWindow, syncKey]);
 
   // After every render: keep the latest data for a chart still loading, and
   // hand it to a chart already drawn.
   useEffect(() => {
     spanRef.current = span;
+    formatRef.current = format;
     dataRef.current = [times, shown];
     // Rescales y to fit the data, and x to the window.
     chartRef.current?.setData(dataRef.current, true);

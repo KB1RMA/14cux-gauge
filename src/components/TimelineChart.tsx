@@ -2,6 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import type uPlot from 'uplot';
+import { cursorReadout } from '../charts/cursorReadout';
 import { mountPlot } from '../charts/mountPlot';
 import { formatTimelineTick, timelinePlotOptions } from '../charts/plotOptions';
 import {
@@ -137,36 +138,10 @@ export function TimelineChart({
         const playhead = overlay(timeline['playhead'] ?? '', (chart, line) => {
           placeLine(chart, line, latestRef.current.replay.position / 1000);
         });
-        const readout = overlay(
-          timeline['readout'] ?? '',
-          (chart, label) => {
-            const { idx, left = -1 } = chart.cursor;
-            const time =
-              idx === null || idx === undefined
-                ? undefined
-                : chart.data[0][idx];
-
-            label.hidden = time === undefined || left < 0;
-
-            if (label.hidden || idx === null || idx === undefined) {
-              return;
-            }
-
-            const value = chart.data[1]?.[idx];
-
-            label.textContent = `${formatTimelineTick(time ?? 0, 0.1)} · ${
-              value === null || value === undefined
-                ? 'No reading'
-                : latestRef.current.format(value)
-            }`;
-            // Beside the crosshair, on whichever side has room.
-            label.style.transform =
-              left > chart.over.clientWidth / 2
-                ? `translateX(calc(${String(left)}px - 100% - 6px))`
-                : `translateX(${String(left + 6)}px)`;
-          },
-          ['setCursor'],
-        );
+        const readout = cursorReadout(styles['readout'] ?? '', {
+          time: (seconds) => formatTimelineTick(seconds, 0.1),
+          value: (value) => latestRef.current.format(value),
+        });
 
         playheadRef.current = playhead;
 
