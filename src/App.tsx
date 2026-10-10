@@ -69,8 +69,7 @@ function Main({ usageCounter }: { usageCounter: UsageCounter | undefined }) {
   // when opened, and while the build on the server still matches this page.
   // A failure shows in the view that needs the code, if it is opened.
   useEffect(() => {
-    loadDashboard().catch(() => undefined);
-    loadSessionsView().catch(() => undefined);
+    void Promise.allSettled([loadDashboard(), loadSessionsView()]);
   }, []);
 
   return (

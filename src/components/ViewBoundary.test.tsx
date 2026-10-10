@@ -95,6 +95,18 @@ describe('ViewBoundary', () => {
     expect(screen.getByText('The app bar')).toBeInTheDocument();
   });
 
+  it('says what was thrown when it is not an Error', () => {
+    function ThrowsText(): never {
+      throw 'Lost the ECU link';
+    }
+
+    renderView(<ThrowsText />);
+
+    expect(
+      screen.getByRole('region', { name: 'This view could not be shown' }),
+    ).toHaveTextContent('Error: Lost the ECU link');
+  });
+
   it('reloads at once when nothing is connected', async () => {
     const user = userEvent.setup();
     const reload = vi.fn();
