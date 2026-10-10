@@ -239,6 +239,24 @@ describe('browser settings', () => {
       usageCounts: 'on',
     });
   });
+
+  it('does not count usage by default when the browser asks not to be tracked', () => {
+    Object.defineProperty(navigator, 'globalPrivacyControl', {
+      value: true,
+      configurable: true,
+    });
+
+    try {
+      expect(browserPlatform().settings.defaults()).toEqual({
+        usageCounts: 'off',
+      });
+    } finally {
+      Object.defineProperty(navigator, 'globalPrivacyControl', {
+        value: undefined,
+        configurable: true,
+      });
+    }
+  });
 });
 
 describe('browserAsksNotToTrack', () => {
