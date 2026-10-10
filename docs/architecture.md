@@ -3,6 +3,10 @@
 How 14CUX Gauge is put together after the #76–#81 refactors. The rules behind
 it are in [AGENTS.md](../AGENTS.md#state-and-data).
 
+Keep this document up to date: a pull request that changes a service, hook,
+provider, store, platform part, layer, stored shape or the flow of readings
+updates these diagrams too.
+
 ## Structure
 
 `main.tsx` builds the `Platform` and the `AppServices` once and hands them to

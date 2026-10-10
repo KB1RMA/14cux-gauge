@@ -126,6 +126,8 @@ Serving the JS bundle to a browser is distribution under the GPL.
 
 React renders the app and holds view state. Work that coordinates the ECU link or storage across views lives in plain TypeScript services underneath it, which React reads. Some older code does not follow these rules yet and is being moved under #76–#81. Follow the rules in new code; do not copy the older pattern.
 
+[`docs/architecture.md`](docs/architecture.md) diagrams this structure. Update it in the same pull request whenever a change adds, removes, renames or rewires a service, hook, provider, store, platform part, layer or stored shape, or changes how readings flow from the ECU to views, history and recordings. A reviewer checks the diagrams against the change.
+
 ### What lives where
 
 - **Services** coordinate: work that holds or shares the ECU link (polling, writes, ROM reads), runs across views (recording), or must not race with other work. A service is a plain TypeScript controller in `AppServices` (`src/appServices.ts`) that exposes `subscribe` / `getSnapshot` as `EcuSession` does; React reads it with `useSyncExternalStore`.
