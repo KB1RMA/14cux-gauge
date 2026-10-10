@@ -218,8 +218,8 @@ export default [
     // `storage/` sits just above `model/`: it imports nothing from the
     // services, hooks, components or platform above it. `settings/` joins
     // this rule when #79 removes the imports in `settings/registry.ts`.
-    files: ['src/storage/**/*.ts'],
-    ignores: ['src/storage/**/*.test.ts', 'src/storage/**/*.test.tsx'],
+    files: ['src/storage/**/*.{ts,tsx}'],
+    ignores: ['src/storage/**/*.test.{ts,tsx}'],
     plugins: { '@typescript-eslint': tseslint.plugin },
     rules: {
       'no-restricted-imports': 'off',
@@ -237,6 +237,11 @@ export default [
               ],
               message:
                 'storage/ imports only model/ and itself; services, hooks, components and the platform sit above it. See AGENTS.md > State and data.',
+            },
+            {
+              group: ['@kb1rma/libcomm14cux-ts'],
+              message:
+                'storage/ never touches the ECU library; only the controllers do. See AGENTS.md > State and data.',
             },
           ],
         },

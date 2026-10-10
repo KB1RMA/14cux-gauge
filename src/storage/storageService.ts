@@ -26,6 +26,8 @@ export class StorageService {
   private current: StorageStatus = OPENING;
   private disposed = false;
   private stopWatching: (() => void) | undefined;
+  /** Kept after it closes by itself, so `dispose` can release its channels. */
+  private opened: AppStorage | undefined;
   private readonly listeners = new Set<() => void>();
 
   /** @param open - Opens the storage; the platform's `storage.open`. */
@@ -41,6 +43,7 @@ export class StorageService {
           return;
         }
 
+        this.opened = opened;
         this.stopWatching = opened.onClosed(() => {
           this.stopWatching = undefined;
           this.set({ status: 'closed' });
@@ -76,10 +79,8 @@ export class StorageService {
     this.listeners.clear();
     this.stopWatching?.();
 
-    if (this.current.status === 'open') {
-      this.current.storage.close();
-    }
-
+    this.opened?.close();
+    this.opened = undefined;
     this.current = OPENING;
   }
 

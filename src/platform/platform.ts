@@ -5,10 +5,10 @@ import type { AppStorage } from '../storage/openStorage';
 
 /**
  * Everything the app needs from where it runs: serial ports, saving files,
- * storage for sessions and ROM images, small settings, and restarting. The browser build
- * uses `browserPlatform()`; a desktop build can supply its own (a serial port
- * in the main process over IPC, a native Save dialog, files on disk) without
- * changing the views.
+ * storage for sessions and ROM images, small settings, and restarting. The
+ * browser build uses `browserPlatform()`; a desktop build can supply its own
+ * (a serial port in the main process over IPC, a native Save dialog, files on
+ * disk) without changing the views.
  *
  * Every part must be plain web code: no Node APIs in `src/`.
  */

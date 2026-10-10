@@ -21,14 +21,17 @@ export function AppNotices() {
   const { state } = useEcu();
   const { unavailable: storage } = useSessions();
   const { app } = usePlatform();
-  // What the open confirmation will reload for, if one is open.
-  const [confirming, setConfirming] = useState<'update' | 'storage'>();
+  // What the confirmation reloads for. Kept after it closes, so its text does
+  // not change while it fades out.
+  const [reason, setReason] = useState<'update' | 'storage'>('update');
+  const [confirming, setConfirming] = useState(false);
   const inUse = state.status !== 'idle';
 
   /** Runs `reload` now, or once the user has confirmed if work would be lost. */
-  const reloadFor = (reason: 'update' | 'storage', reload: () => void) => {
+  const reloadFor = (why: 'update' | 'storage', reload: () => void) => {
     if (inUse) {
-      setConfirming(reason);
+      setReason(why);
+      setConfirming(true);
     } else {
       reload();
     }
@@ -111,20 +114,18 @@ export function AppNotices() {
         </div>
       )}
       <ConfirmDialog
-        open={confirming !== undefined}
-        title={
-          confirming === 'storage' ? 'Reload the page?' : 'Reload to update?'
-        }
+        open={confirming}
+        title={reason === 'storage' ? 'Reload the page?' : 'Reload to update?'}
         confirmLabel="Reload and disconnect"
-        onConfirm={confirming === 'storage' ? app.reload : applyUpdate}
+        onConfirm={reason === 'storage' ? app.reload : applyUpdate}
         onCancel={() => {
-          setConfirming(undefined);
+          setConfirming(false);
         }}
       >
         <p>
           Reloading closes the connection to the ECU and ends any recording in
           progress.{' '}
-          {confirming === 'storage'
+          {reason === 'storage'
             ? 'Recordings made until then cannot be saved.'
             : 'Update when you are not in the middle of a diagnosis.'}
         </p>

@@ -120,6 +120,32 @@ describe('StorageService status', () => {
   });
 });
 
+describe('StorageService after the storage closes by itself', () => {
+  it('still releases the storage when the service is disposed', async () => {
+    const storage = memoryStorage();
+    let closedByItself = () => undefined as void;
+
+    storage.onClosed = (listener) => {
+      closedByItself = listener;
+
+      return () => undefined;
+    };
+
+    const close = vi.spyOn(storage, 'close');
+    const service = new StorageService(() => Promise.resolve(storage));
+
+    await vi.waitFor(() => {
+      expect(service.getStatus().status).toBe('open');
+    });
+    closedByItself();
+    expect(service.getStatus()).toEqual({ status: 'closed' });
+    expect(close).not.toHaveBeenCalled();
+
+    service.dispose();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('sessions before storage is open', () => {
   it('refuses session changes until storage is open', async () => {
     const { open } = slowStorage();
