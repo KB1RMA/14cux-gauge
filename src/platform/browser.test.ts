@@ -206,6 +206,8 @@ describe('browserPlatform', () => {
 });
 
 describe('browser settings', () => {
+  // The `cuxGauge.` key prefix is what this backend specifies, so it is
+  // asserted here and nowhere in the views' tests.
   it('stores JSON under the cuxGauge prefix and reads it back', () => {
     expect(writeSetting('graphs', { window: 300 })).toBe('{"window":300}');
     expect(localStorage.getItem('cuxGauge.graphs')).toBe('{"window":300}');

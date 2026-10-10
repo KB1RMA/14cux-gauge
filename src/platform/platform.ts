@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import type { Transport } from '@kb1rma/libcomm14cux-ts';
+import type { SettingDefaults } from '../settings/settingDefaults';
 import type { AppStorage } from '../storage/openStorage';
 
 /**
@@ -86,11 +87,6 @@ export interface StoragePlatform {
    * a method: it is passed on and called on its own.
    */
   open: () => Promise<AppStorage>;
-}
-
-/** Settings whose default depends on where the app runs. */
-export interface SettingDefaults {
-  usageCounts: 'on' | 'off';
 }
 
 /**

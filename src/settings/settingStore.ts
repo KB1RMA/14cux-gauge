@@ -134,7 +134,9 @@ export function settingStore<K extends SettingKey>(
     store = new SettingStore<unknown>(
       backend,
       key,
-      // Defaults are asked for at each parse, as the platform's may change.
+      // Asked for at each parse, not once, so a value read after the
+      // platform's defaults change (a new privacy signal) uses the new ones.
+      // A value already in use is not re-parsed until storage changes.
       (stored) => settingParser(key, backend.defaults())(stored),
     );
     stores.set(key, store);

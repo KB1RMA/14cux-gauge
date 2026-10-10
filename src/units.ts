@@ -2,8 +2,11 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { Gear } from '@kb1rma/libcomm14cux-ts';
 
-export type TemperatureUnit = 'F' | 'C';
-export type SpeedUnit = 'mph' | 'kmh';
+export const TEMPERATURE_UNITS = ['F', 'C'] as const;
+export type TemperatureUnit = (typeof TEMPERATURE_UNITS)[number];
+
+export const SPEED_UNITS = ['mph', 'kmh'] as const;
+export type SpeedUnit = (typeof SPEED_UNITS)[number];
 
 export function fahrenheitToCelsius(fahrenheit: number): number {
   return ((fahrenheit - 32) * 5) / 9;

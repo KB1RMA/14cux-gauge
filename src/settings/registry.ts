@@ -2,10 +2,15 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import * as z from 'zod/mini';
 import { METRIC_KEYS } from '../metrics';
-import type { SettingDefaults } from '../platform/platform';
-import type { PalettePreference } from './preferences';
+import {
+  PALETTE_PREFERENCES,
+  THEME_PREFERENCES,
+  USAGE_COUNTS_PREFERENCES,
+} from './preferences';
 import { ALWAYS_READ } from './readingSettings';
 import { LAYOUT_OPTIONS, WINDOW_OPTIONS } from './graphSettings';
+import type { SettingDefaults } from './settingDefaults';
+import { SPEED_UNITS, TEMPERATURE_UNITS } from '../units';
 import {
   choice,
   pickedFrom,
@@ -26,23 +31,16 @@ import {
  * Read and change settings with `useSetting`.
  */
 
-const PALETTES = [
-  'coniston',
-  'arles',
-  'alpine-beluga',
-  'racing-green',
-] as const satisfies readonly PalettePreference[];
-
 export const SETTINGS = {
   /** Units, theme, palette and usage counts, chosen in Preferences. */
   preferences: (defaults: SettingDefaults) =>
     settingObject({
-      temperatureUnit: choice(['F', 'C'], 'F'),
-      speedUnit: choice(['mph', 'kmh'], 'mph'),
-      theme: choice(['system', 'light', 'dark'], 'system'),
-      palette: choice(PALETTES, 'coniston'),
+      temperatureUnit: choice(TEMPERATURE_UNITS, 'F'),
+      speedUnit: choice(SPEED_UNITS, 'mph'),
+      theme: choice(THEME_PREFERENCES, 'system'),
+      palette: choice(PALETTE_PREFERENCES, 'coniston'),
       // The platform's default applies until a choice is made in Preferences.
-      usageCounts: choice(['on', 'off'], defaults.usageCounts),
+      usageCounts: choice(USAGE_COUNTS_PREFERENCES, defaults.usageCounts),
     }),
   /** Which readings are polled and recorded; every reading by default. */
   readings: () =>
