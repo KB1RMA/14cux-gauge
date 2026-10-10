@@ -166,6 +166,7 @@ Types and options that are stored (such as graph settings) live in `model/` or `
 
 - Views (`src/components/`) never import the ECU library, storage, `settingStore`, `SampleHistory` or `EcuSession` as values; they use hooks (`useSessions`, `useRoms`, `useSetting`, `useHistory`, `useEcu`, `useEcuRead`).
 - `src/model/` imports nothing from the app above it.
+- `src/storage/` imports only `model/` and itself, not the platform, services, hooks or components (its hooks live in `src/services/`). `src/settings/` joins this once #79 lands.
 - Hooks (`use*.ts`) and providers (`*Provider.tsx`) never import the ECU library or hold a `Lease`; only the controllers (`EcuSession`, `EcuWrites`, `RomReader`) do.
 
 ### Series

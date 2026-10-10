@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { useMemo, type ReactNode } from 'react';
 import type { SessionStore } from '../storage/sessionStore';
-import { useStorage } from '../storage/useStorage';
+import { useStorage, useStorageStatus } from '../services/useStorage';
 import { useStoreQuery } from '../storage/useStoreQuery';
 import { SessionsContext, type SessionsValue } from './context';
 
@@ -22,6 +22,7 @@ function notOpen(): Promise<never> {
 /** The recorded sessions, for views to list, read, rename and delete. */
 export function SessionsProvider({ children }: { children: ReactNode }) {
   const storage = useStorage();
+  const { status } = useStorageStatus();
   const store = storage?.sessions;
   const [query, settled] = useStoreQuery(store, readList);
 
@@ -56,6 +57,8 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
   );
   const persistent = storage?.persistent;
   const opened = storage !== undefined;
+  const unavailable =
+    status === 'closed' || status === 'failed' ? status : undefined;
   const value = useMemo<SessionsValue>(
     () => ({
       list:
@@ -64,9 +67,10 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
           : query,
       persistent,
       opened,
+      unavailable,
       ...actions,
     }),
-    [query, persistent, opened, actions],
+    [query, persistent, opened, unavailable, actions],
   );
 
   return <SessionsContext value={value}>{children}</SessionsContext>;

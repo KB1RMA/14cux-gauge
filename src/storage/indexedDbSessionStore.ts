@@ -28,7 +28,7 @@ import {
   SESSIONS,
   WRITES,
 } from './database';
-import { Listeners } from './listeners';
+import { Listeners, type OpenChangeChannel } from './listeners';
 import {
   applyChanges,
   byStart,
@@ -71,10 +71,25 @@ function samplesOf(raw: unknown): LiveSnapshot[] {
  * `openStorage`, which closes it.
  */
 export class IndexedDbSessionStore implements SessionStore {
-  private readonly listeners = new Listeners();
-  readonly subscribe = this.listeners.subscribe;
+  private readonly listeners: Listeners;
+  readonly subscribe: SessionStore['subscribe'];
 
-  constructor(private readonly db: IDBDatabase) {}
+  /**
+   * `openChannel` lets stores over the same database, in other windows,
+   * hear of each other's creates, finishes, updates and removes.
+   */
+  constructor(
+    private readonly db: IDBDatabase,
+    openChannel?: OpenChangeChannel,
+  ) {
+    this.listeners = new Listeners(openChannel?.(`${db.name}:sessions`));
+    this.subscribe = this.listeners.subscribe;
+  }
+
+  /** Stops listening to other windows. The connection is closed by its owner. */
+  close(): void {
+    this.listeners.close();
+  }
 
   async create(session: NewSession): Promise<SessionSummary> {
     const summary = emptySummary(session);

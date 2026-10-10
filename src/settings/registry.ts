@@ -85,7 +85,9 @@ export function settingParser<K extends SettingKey>(
   key: K,
   defaults: SettingDefaults,
 ): SettingParser<SettingValue<K>> {
-  const schema = SETTINGS[key](defaults) as z.ZodMiniType<SettingValue<K>>;
+  const schema = SETTINGS[key](defaults) as unknown as z.ZodMiniType<
+    SettingValue<K>
+  >;
 
   return (stored) => schema.parse(stored);
 }

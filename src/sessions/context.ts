@@ -36,6 +36,12 @@ export interface SessionsValue {
   persistent: boolean | undefined;
   /** Whether storage has finished opening; `read` fails until it has. */
   opened: boolean;
+  /**
+   * Why storage cannot be used, once it has stopped working: `closed` when
+   * another window upgraded the database (reload to use it again), `failed`
+   * when it could not be opened at all. `undefined` otherwise.
+   */
+  unavailable: 'closed' | 'failed' | undefined;
   /** Renames a session or changes its notes. */
   edit(id: string, changes: SessionChanges): Promise<void>;
   /** Deletes a session, readable or not, by its `id`. */

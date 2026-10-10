@@ -134,7 +134,8 @@ export function settingStore<K extends SettingKey>(
     store = new SettingStore<unknown>(
       backend,
       key,
-      settingParser(key, backend.defaults()),
+      // Defaults are asked for at each parse, as the platform's may change.
+      (stored) => settingParser(key, backend.defaults())(stored),
     );
     stores.set(key, store);
   }

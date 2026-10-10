@@ -3,6 +3,7 @@
 import { blockStorage } from '../test-support/storage';
 import {
   affectsSetting,
+  broadcastChannels,
   browserAsksNotToTrack,
   browserPlatform,
   readRawSetting,
@@ -257,5 +258,75 @@ describe('browserAsksNotToTrack', () => {
         nav({ globalPrivacyControl: false, doNotTrack: '0' }),
       ),
     ).toBe(false);
+  });
+});
+
+describe('broadcastChannels', () => {
+  it('tells other channels of the same name, but not the one that posted', async () => {
+    const first = broadcastChannels('cuxGauge:test');
+    const second = broadcastChannels('cuxGauge:test');
+    const other = broadcastChannels('cuxGauge:other');
+    const heardFirst = vi.fn();
+    const heardSecond = vi.fn();
+    const heardOther = vi.fn();
+
+    first.listen(heardFirst);
+    second.listen(heardSecond);
+    other.listen(heardOther);
+    onTestFinished(() => {
+      first.close();
+      second.close();
+      other.close();
+    });
+
+    first.post();
+    await vi.waitFor(() => {
+      expect(heardSecond).toHaveBeenCalledTimes(1);
+    });
+    expect(heardFirst).not.toHaveBeenCalled();
+    expect(heardOther).not.toHaveBeenCalled();
+  });
+
+  it('does nothing, and does not throw, without BroadcastChannel', () => {
+    vi.stubGlobal('BroadcastChannel', undefined);
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const channel = broadcastChannels('cuxGauge:test');
+
+    expect(() => {
+      channel.listen(() => undefined);
+      channel.post();
+      channel.close();
+    }).not.toThrow();
+  });
+});
+
+describe('browserPlatform app', () => {
+  it('restarts by reloading the page', () => {
+    const reload = vi.fn();
+
+    vi.stubGlobal('location', { reload });
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+    browserPlatform().app.reload();
+
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('browserPlatform storage', () => {
+  it('uses memory when the browser has no IndexedDB', async () => {
+    vi.stubGlobal('indexedDB', undefined);
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const storage = await browserPlatform().storage.open();
+
+    expect(storage.persistent).toBe(false);
+    storage.close();
   });
 });
