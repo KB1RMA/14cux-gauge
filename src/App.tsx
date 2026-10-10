@@ -1,12 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { useEffect, useState } from 'react';
 import { HashRouter, Navigate, NavLink, Route, Routes } from 'react-router';
-import {
-  createAppServices,
-  type AppServices,
-  type AppServicesOptions,
-} from './appServices';
+import type { AppServices } from './appServices';
 import { goatCounter, type UsageCounter } from './usage/goatCounter';
 import { useUsageCounts } from './usage/useUsageCounts';
 import { AppNotices } from './components/AppNotices';
@@ -21,9 +16,7 @@ import { EcuProvider } from './ecu/EcuProvider';
 import { useEcu } from './ecu/useEcu';
 import { EcuWriteProvider } from './ecuWrite/EcuWriteProvider';
 import { NotificationsProvider } from './notifications/NotificationsProvider';
-import { browserPlatform } from './platform/browser';
 import { PlatformContext } from './platform/context';
-import type { Platform } from './platform/platform';
 import { PreferencesProvider } from './preferences/PreferencesProvider';
 import { AppStatusProvider } from './pwa/AppStatusProvider';
 import { ReadingsProvider } from './readings/ReadingsProvider';
@@ -79,47 +72,20 @@ function Main({ usageCounter }: { usageCounter: UsageCounter | undefined }) {
   );
 }
 
-export interface AppProps extends AppServicesOptions {
+export interface AppProps {
   /**
-   * The services to run on, built by the caller with `createAppServices`,
-   * who also disposes them. The other building options are then ignored.
+   * The services to run on, built once by the entry point with
+   * `createAppServices`, which also disposes them.
    */
-  services?: AppServices;
-  /**
-   * Where the app runs, without `services`: the app builds its services on
-   * it, once, and disposes them on unmount. Defaults to the browser.
-   */
-  platform?: Platform;
+  services: AppServices;
   /** Counts usage anonymously; only set on the published site by default. */
   usageCounter?: UsageCounter | undefined;
 }
 
 export function App({
-  services,
-  platform,
-  pollIntervalMs,
-  appStatus,
+  services: provided,
   usageCounter = DEFAULT_USAGE_COUNTER,
 }: AppProps) {
-  const [provided] = useState(
-    () =>
-      services ??
-      createAppServices(platform ?? browserPlatform(), {
-        pollIntervalMs,
-        appStatus,
-      }),
-  );
-  const owned = provided !== services;
-
-  useEffect(
-    () => () => {
-      if (owned) {
-        provided.dispose();
-      }
-    },
-    [owned, provided],
-  );
-
   return (
     <PlatformContext value={provided.platform}>
       <HashRouter>

@@ -4,32 +4,13 @@ import { SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
+import { TestApp } from './test-support/TestApp';
 import { createAppServices } from './appServices';
 import { buildSyntheticRom } from './demo/syntheticRom';
-import type {
-  FilePlatform,
-  Platform,
-  SettingsBackend,
-} from './platform/platform';
+import type { FilePlatform, Platform } from './platform/platform';
+import { memorySettings } from './test-support/platform';
 import { storageWith } from './test-support/storage';
 import { fakeUsageCounter } from './test-support/usageCounter';
-
-/** Settings kept in memory, as a desktop build might keep them in a file. */
-function memorySettings(): SettingsBackend {
-  const stored = new Map<string, string>();
-
-  return {
-    read: (key) => stored.get(key) ?? null,
-    write: (key, value) => {
-      const raw = JSON.stringify(value);
-
-      stored.set(key, raw);
-
-      return raw;
-    },
-    watch: () => () => undefined,
-  };
-}
 
 /**
  * A platform that is not the browser: its one serial port leads to
@@ -93,7 +74,7 @@ describe('App on another platform', () => {
     expect('serial' in navigator).toBe(false);
 
     const first = render(
-      <App
+      <TestApp
         platform={platform}
         pollIntervalMs={{ serial: 20 }}
         usageCounter={undefined}
@@ -127,7 +108,7 @@ describe('App on another platform', () => {
 
     // The double-speed choice was kept by the platform, not the browser.
     const second = render(
-      <App platform={platform} usageCounter={fakeUsageCounter()} />,
+      <TestApp platform={platform} usageCounter={fakeUsageCounter()} />,
     );
 
     expect(
@@ -136,7 +117,7 @@ describe('App on another platform', () => {
     second.unmount();
 
     // The browser's own platform has neither the port nor the choice.
-    render(<App usageCounter={undefined} />);
+    render(<TestApp usageCounter={undefined} />);
     expect(await screen.findByRole('note')).toHaveTextContent(
       /^This browser can't talk to serial ports\./,
     );
@@ -182,7 +163,7 @@ describe('App on another platform', () => {
     const save = vi.fn<FilePlatform['save']>();
 
     render(
-      <App
+      <TestApp
         platform={{ ...platform, files: { save } }}
         usageCounter={undefined}
       />,

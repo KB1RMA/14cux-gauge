@@ -6,11 +6,13 @@ import type { LiveSnapshot } from '../model/snapshot';
 import type { TimelineMark } from '../charts/timelinePlugins';
 import type { MetricKey } from '../metrics';
 import { loadPlot } from '../charts/plotOptions';
+import { browserPlatform } from '../platform/browser';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { useReplay } from '../replay/useReplay';
 import { expectNoAxeViolations } from '../test-support/a11y';
 import { installCanvasStandIns } from '../test-support/canvas';
 import { snapshotAt } from '../test-support/snapshots';
+import { TestPlatform } from '../test-support/TestApp';
 import { ReplayControls } from './ReplayControls';
 import { ReplayGraphs } from './ReplayGraphs';
 
@@ -36,15 +38,17 @@ function Replay({
   const replay = useReplay(recording);
 
   return (
-    <PreferencesProvider>
-      <ReplayControls replay={replay} />
-      <ReplayGraphs
-        samples={recording}
-        replay={replay}
-        {...(recorded ? { recorded } : {})}
-        {...(writes ? { writes } : {})}
-      />
-    </PreferencesProvider>
+    <TestPlatform platform={browserPlatform()}>
+      <PreferencesProvider>
+        <ReplayControls replay={replay} />
+        <ReplayGraphs
+          samples={recording}
+          replay={replay}
+          {...(recorded ? { recorded } : {})}
+          {...(writes ? { writes } : {})}
+        />
+      </PreferencesProvider>
+    </TestPlatform>
   );
 }
 

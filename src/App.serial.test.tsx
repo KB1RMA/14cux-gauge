@@ -3,7 +3,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
-import { App } from './App';
+import { TestApp } from './test-support/TestApp';
 import { buildSyntheticRom } from './demo/syntheticRom';
 import { expectNoAxeViolations } from './test-support/a11y';
 import { fakeUsageCounter } from './test-support/usageCounter';
@@ -144,7 +144,7 @@ describe('App with a serial ECU', () => {
 
     port.failOpen = true;
     installSerial(port);
-    render(<App usageCounter={counter} />);
+    render(<TestApp usageCounter={counter} />);
 
     await user.click(screen.getByRole('checkbox', { name: /Double-speed/ }));
     await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
@@ -186,7 +186,7 @@ describe('App with a serial ECU', () => {
 
     installSerial(port);
     // The emulation answers at once; pace polling as a real link would.
-    render(<App pollIntervalMs={{ serial: 20 }} usageCounter={counter} />);
+    render(<TestApp pollIntervalMs={{ serial: 20 }} usageCounter={counter} />);
     await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent(
@@ -248,7 +248,7 @@ describe('App with a serial ECU', () => {
 
     port.failOpen = true;
     installSerial(port);
-    render(<App usageCounter={counter} />);
+    render(<TestApp usageCounter={counter} />);
     await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
 
     const dialog = await screen.findByRole('dialog', {
@@ -312,7 +312,7 @@ describe('App with a serial ECU', () => {
 
     // The port opens but the ECU never answers, so every read times out.
     installSerial(port);
-    render(<App />);
+    render(<TestApp />);
     await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
 
     const dialog = await screen.findByRole('dialog', {
@@ -336,7 +336,7 @@ describe('App with a serial ECU', () => {
       },
       configurable: true,
     });
-    render(<App />);
+    render(<TestApp />);
     await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();

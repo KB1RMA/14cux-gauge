@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { App } from './App';
+import { TestApp } from './test-support/TestApp';
 
 /** Back and Forward are asynchronous in jsdom; wait for the address to settle. */
 async function goBack() {
@@ -14,7 +14,7 @@ async function goBack() {
 describe('Addresses', () => {
   it('starts on the live view and redirects an unknown address there', () => {
     window.location.hash = '#/nowhere/at/all';
-    render(<App />);
+    render(<TestApp />);
 
     expect(window.location.hash).toBe('#/live');
     expect(screen.getByRole('link', { name: 'Live' })).toHaveAttribute(
@@ -25,7 +25,7 @@ describe('Addresses', () => {
 
   it('opens a session address directly', async () => {
     window.location.hash = '#/sessions/missing-id';
-    render(<App />);
+    render(<TestApp />);
 
     expect(
       await screen.findByText('This session has been deleted.'),
@@ -39,7 +39,7 @@ describe('Addresses', () => {
   it('gives each view its own address, and Back and Forward move between them', async () => {
     const user = userEvent.setup();
 
-    render(<App pollIntervalMs={{ demo: 10 }} />);
+    render(<TestApp pollIntervalMs={{ demo: 10 }} />);
     await user.click(screen.getByRole('button', { name: 'Demo mode' }));
     await screen.findByRole('heading', { name: 'Live data' });
 
@@ -77,7 +77,7 @@ describe('Addresses', () => {
     const user = userEvent.setup();
 
     window.location.hash = '#/sessions';
-    render(<App />);
+    render(<TestApp />);
 
     expect(
       await screen.findByRole('heading', { name: 'Recorded sessions' }),

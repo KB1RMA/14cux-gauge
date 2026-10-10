@@ -9,6 +9,7 @@ import { describeOutcome } from '../ecuWrite/writes';
 import { NotificationsProvider } from '../notifications/NotificationsProvider';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { ReadingsProvider } from '../readings/ReadingsProvider';
+import { TestPlatform } from './TestApp';
 
 /** The latest write's state, as the provider holds it. */
 function WriteAnnouncement() {
@@ -34,11 +35,13 @@ export function SessionHarness({
   children: ReactNode;
 }) {
   return (
-    <PreferencesProvider>
-      <EcuProvider session={session}>
-        <ReadingsProvider>{children}</ReadingsProvider>
-      </EcuProvider>
-    </PreferencesProvider>
+    <TestPlatform>
+      <PreferencesProvider>
+        <EcuProvider session={session}>
+          <ReadingsProvider>{children}</ReadingsProvider>
+        </EcuProvider>
+      </PreferencesProvider>
+    </TestPlatform>
   );
 }
 

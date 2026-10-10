@@ -3,7 +3,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { IDBFactory } from 'fake-indexeddb';
-import { App } from './App';
+import { TestApp } from './test-support/TestApp';
 import { browserPlatform } from './platform/browser';
 import type * as demoEngine from './demo/demoEngine';
 import { buildSyntheticRom } from './demo/syntheticRom';
@@ -76,7 +76,7 @@ function renderApp(
   files?: FilePlatform,
 ) {
   return render(
-    <App
+    <TestApp
       pollIntervalMs={{ demo: 10 }}
       usageCounter={fakeUsageCounter()}
       platform={browserPlatform({
@@ -443,7 +443,7 @@ describe('Saving the ROM image', () => {
     });
 
     const { container } = render(
-      <App
+      <TestApp
         pollIntervalMs={{ demo: 10 }}
         usageCounter={fakeUsageCounter()}
         platform={browserPlatform({

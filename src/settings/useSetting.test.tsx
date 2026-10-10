@@ -1,10 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { act, render, renderHook, screen } from '@testing-library/react';
+import {
+  act,
+  render as rtlRender,
+  renderHook as rtlRenderHook,
+  screen,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { StrictMode } from 'react';
+import { StrictMode, type ReactElement, type ReactNode } from 'react';
+import { browserPlatform } from '../platform/browser';
 import { blockStorage } from '../test-support/storage';
+import { TestPlatform } from '../test-support/TestApp';
 import { useSetting } from './useSetting';
+
+// These settings live in the browser's `localStorage`, so that is the platform.
+function InBrowser({ children }: { children: ReactNode }) {
+  return <TestPlatform platform={browserPlatform()}>{children}</TestPlatform>;
+}
+
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: InBrowser });
+const renderHook = <T,>(hook: () => T) =>
+  rtlRenderHook(hook, { wrapper: InBrowser });
 
 /** Shows the graph window, and switches it between 1 and 5 minutes. */
 function WindowButton({ view }: { view: string }) {

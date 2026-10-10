@@ -4,6 +4,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Gear } from '@kb1rma/libcomm14cux-ts';
 import type { LiveSnapshot } from '../model/snapshot';
+import { browserPlatform } from '../platform/browser';
+import { TestPlatform } from '../test-support/TestApp';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { expectNoAxeViolations, readingFor } from '../test-support/a11y';
 import { SnapshotTiles } from './LiveTiles';
@@ -35,10 +37,12 @@ const SNAPSHOT: LiveSnapshot = {
 
 function renderWithTiles() {
   return render(
-    <PreferencesProvider>
-      <PreferencesMenu />
-      <SnapshotTiles snapshot={SNAPSHOT} />
-    </PreferencesProvider>,
+    <TestPlatform platform={browserPlatform()}>
+      <PreferencesProvider>
+        <PreferencesMenu />
+        <SnapshotTiles snapshot={SNAPSHOT} />
+      </PreferencesProvider>
+    </TestPlatform>,
   );
 }
 
@@ -289,9 +293,11 @@ describe('PreferencesMenu', () => {
     const user = userEvent.setup();
 
     render(
-      <PreferencesProvider>
-        <PreferencesMenu offerUsageCounts />
-      </PreferencesProvider>,
+      <TestPlatform platform={browserPlatform()}>
+        <PreferencesProvider>
+          <PreferencesMenu offerUsageCounts />
+        </PreferencesProvider>
+      </TestPlatform>,
     );
     await user.click(trigger());
 
