@@ -51,7 +51,7 @@ function desktopPlatform() {
     },
     storage: { open: storageWith() },
     settings: memorySettings(),
-    app: { reload: () => undefined },
+    app: { userAgent: 'TestBrowser/1.0', reload: () => undefined },
   };
 
   return {

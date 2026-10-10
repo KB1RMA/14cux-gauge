@@ -31,7 +31,7 @@ function describeConnection(state: ConnectionState): string {
 export function DownloadLogButton({ primary = false }: { primary?: boolean }) {
   const log = useDiagnostics();
   const { state } = useEcu();
-  const { files, serial } = usePlatform();
+  const { app, files, serial } = usePlatform();
   const [error, setError] = useState<string | undefined>(undefined);
 
   return (
@@ -49,7 +49,7 @@ export function DownloadLogButton({ primary = false }: { primary?: boolean }) {
             formatReport(log.snapshot(), {
               generatedAt,
               build: BUILD_INFO,
-              userAgent: navigator.userAgent,
+              userAgent: app.userAgent,
               webSerial: serial.available(),
               connection: describeConnection(state),
             }),

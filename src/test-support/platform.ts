@@ -41,7 +41,7 @@ export function testPlatform(overrides: Partial<Platform> = {}): Platform {
     files: { save: () => Promise.resolve('saved') },
     storage: { open: storageWith() },
     settings: memorySettings(),
-    app: { reload: () => undefined },
+    app: { userAgent: 'TestBrowser/1.0', reload: () => undefined },
     ...overrides,
   };
 }

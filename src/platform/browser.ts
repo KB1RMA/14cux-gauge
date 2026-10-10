@@ -167,6 +167,7 @@ export const localStorageSettings: SettingsBackend = {
 
 /** Restarts by reloading the page. */
 export const browserApp: AppPlatform = {
+  userAgent: navigator.userAgent,
   reload: () => {
     location.reload();
   },

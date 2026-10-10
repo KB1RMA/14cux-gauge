@@ -4,7 +4,11 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { IDBFactory } from 'fake-indexeddb';
 import { TestApp } from './test-support/TestApp';
-import { broadcastChannels, browserPlatform } from './platform/browser';
+import {
+  broadcastChannels,
+  browserApp,
+  browserPlatform,
+} from './platform/browser';
 import type { SessionSummary } from './model/session';
 import type { LiveSnapshot } from './model/snapshot';
 import { openStorage } from './storage/openStorage';
@@ -918,7 +922,7 @@ describe('Recording and browsing sessions', () => {
       <TestApp
         platform={browserPlatform({
           storage: { open: () => openStorage(factory, broadcastChannels) },
-          app: { reload },
+          app: { ...browserApp, reload },
         })}
       />,
     );
@@ -967,7 +971,7 @@ describe('Recording and browsing sessions', () => {
         pollIntervalMs={{ demo: 10 }}
         platform={browserPlatform({
           storage: { open: () => openStorage(factory) },
-          app: { reload },
+          app: { ...browserApp, reload },
         })}
       />,
     );
