@@ -9,6 +9,7 @@ import { useRecording } from '../recording/useRecording';
 import { sessionCsv, sessionCsvFileName } from '../sessions/exportCsv';
 import { Link, useNavigate } from 'react-router';
 import { SESSIONS_PATH, sessionPath, type ReplayTab } from '../routing/paths';
+import { useCurrentPath } from '../routing/useCurrentPath';
 import { useSessionList } from '../sessions/useSessionList';
 import { useSessionSamples } from '../sessions/useSessionSamples';
 import { useSessions } from '../sessions/useSessions';
@@ -76,6 +77,7 @@ function DetailsForm({ session }: { session: SessionSummary }) {
 /** One recorded session: replay it, rename it, keep notes, or delete it. */
 export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
   const navigate = useNavigate();
+  const currentPathRef = useCurrentPath();
   const { remove } = useSessions();
   const { active } = useRecording();
   const list = useSessionList();
@@ -268,7 +270,7 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
               const showing = [
                 sessionPath(target.id),
                 sessionPath(target.id, 'graphs'),
-              ].some((path) => window.location.hash === `#${path}`);
+              ].includes(currentPathRef.current);
 
               if (showing) {
                 // Back would only lead to the session that is now gone.

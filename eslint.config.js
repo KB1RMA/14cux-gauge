@@ -348,9 +348,6 @@ export default [
       // until a desktop build starts (#81).
       'src/pwa/**',
       'src/usage/**',
-      // The router part of #81.
-      'src/routing/useNavigateOnce.ts',
-      'src/components/SessionDetail.tsx',
       // The diagnostic report's wording (#75).
       'src/components/DownloadLogButton.tsx',
     ],
