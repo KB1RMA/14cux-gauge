@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { useSyncExternalStore } from 'react';
-import { useServices } from '../services/useServices';
+import { useServices } from './useServices';
 
 /**
  * The open storage, or `undefined` while it is being opened, or once it has

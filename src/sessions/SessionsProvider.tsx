@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { useMemo, type ReactNode } from 'react';
 import type { SessionStore } from '../storage/sessionStore';
-import { useStorage, useStorageStatus } from '../storage/useStorage';
+import { useStorage, useStorageStatus } from '../services/useStorage';
 import { useStoreQuery } from '../storage/useStoreQuery';
 import { SessionsContext, type SessionsValue } from './context';
 

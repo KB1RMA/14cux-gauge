@@ -111,8 +111,8 @@ function upgrade(db: IDBDatabase, oldVersion: number): void {
 }
 
 export interface DatabaseOptions {
-  /** The IndexedDB factory; defaults to the browser's `indexedDB`. */
-  factory?: IDBFactory;
+  /** The IndexedDB factory; the platform supplies the browser's. */
+  factory: IDBFactory;
   /** Database name; tests use their own. */
   name?: string;
   /**
@@ -125,10 +125,10 @@ export interface DatabaseOptions {
 
 /** Opens the database, creating or upgrading it if needed. */
 export async function openDatabase({
-  factory = indexedDB,
+  factory,
   name = DB_NAME,
   onClosed,
-}: DatabaseOptions = {}): Promise<IDBDatabase> {
+}: DatabaseOptions): Promise<IDBDatabase> {
   const req = factory.open(name, DB_VERSION);
 
   req.onupgradeneeded = (event) => {

@@ -156,7 +156,14 @@ export function browserPlatform(overrides: Partial<Platform> = {}): Platform {
   return {
     serial: webSerial,
     files: browserDownloads,
-    storage: { open: () => openStorage(undefined, broadcastChannels) },
+    storage: {
+      // Missing in some private windows and embedded browsers.
+      open: () =>
+        openStorage(
+          globalThis.indexedDB as IDBFactory | undefined,
+          broadcastChannels,
+        ),
+    },
     settings: localStorageSettings,
     app: browserApp,
     ...overrides,

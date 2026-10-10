@@ -50,8 +50,7 @@ export function memoryStorage(): AppStorage {
  * `AppStorage` (files on disk, over IPC) instead of calling this.
  */
 export async function openStorage(
-  factory: IDBFactory | undefined = globalThis.indexedDB as
-    IDBFactory | undefined,
+  factory: IDBFactory | undefined,
   openChannel?: OpenChangeChannel,
 ): Promise<AppStorage> {
   if (factory) {
