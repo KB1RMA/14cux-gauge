@@ -775,3 +775,17 @@ describe('IndexedDbSessionStore in two windows', () => {
     expect(heard).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('openDatabase', () => {
+  it('reports when the browser closes the connection by itself', async () => {
+    const onClosed = vi.fn();
+    const db = await openDatabase({ factory: new IDBFactory(), onClosed });
+
+    // `fake-indexeddb` never drops a connection, so the browser's `close`
+    // event is fired by hand.
+    db.onclose?.call(db, new Event('close'));
+
+    expect(onClosed).toHaveBeenCalledTimes(1);
+    db.close();
+  });
+});

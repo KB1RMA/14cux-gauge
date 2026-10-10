@@ -6,6 +6,7 @@ import { TestApp } from '../test-support/TestApp';
 import type { BuildInfo } from '../buildInfo';
 import type { AppStatusStoreOptions } from '../pwa/appStatusStore';
 import { expectNoAxeViolations } from '../test-support/a11y';
+import { testPlatform } from '../test-support/platform';
 
 const RUNNING: BuildInfo = {
   version: '1.0.0',
@@ -131,6 +132,28 @@ describe('AppNotices', () => {
     await user.click(
       screen.getByRole('button', { name: 'Reload and disconnect' }),
     );
+
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('says when saved sessions could not be opened, and reloads on request', async () => {
+    const user = userEvent.setup();
+    const reload = vi.fn();
+    const { container } = render(
+      <TestApp
+        appStatus={options(RUNNING)}
+        platform={testPlatform({
+          storage: { open: () => Promise.reject(new Error('no disk')) },
+          app: { reload },
+        })}
+      />,
+    );
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Saved sessions and ROM images could not be opened. Reload this page to try again.',
+    );
+    await expectNoAxeViolations(container);
+    await user.click(screen.getByRole('button', { name: 'Reload' }));
 
     expect(reload).toHaveBeenCalledTimes(1);
   });
