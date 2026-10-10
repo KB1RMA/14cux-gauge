@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.9.1...v0.10.0) (2026-10-10)
+
+
+### Features
+
+* show the time and value under the pointer on live graphs ([#99](https://github.com/KB1RMA/14cux-gauge/issues/99)) ([1446f8c](https://github.com/KB1RMA/14cux-gauge/commit/1446f8c3f98613b1cfc2a8b4be60922515eef1cf))
+
 ## [0.9.1](https://github.com/KB1RMA/14cux-gauge/compare/v0.9.0...v0.9.1) (2026-10-10)
 
 
