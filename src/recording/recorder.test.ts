@@ -151,6 +151,7 @@ describe('Recorder', () => {
               sessions,
               roms: new MemoryRomStore(),
               persistent: true,
+              onClosed: () => () => undefined,
               close: () => {
                 order.push('closed');
               },

@@ -4,7 +4,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { IDBFactory } from 'fake-indexeddb';
 import { TestApp } from './test-support/TestApp';
-import { browserPlatform } from './platform/browser';
+import { broadcastChannels, browserPlatform } from './platform/browser';
 import type { SessionSummary } from './model/session';
 import type { LiveSnapshot } from './model/snapshot';
 import { openStorage } from './storage/openStorage';
@@ -904,5 +904,101 @@ describe('Recording and browsing sessions', () => {
       ).not.toBeInTheDocument();
     });
     expect(screen.getByRole('link', { name: 'Cold start' })).toBeVisible();
+  });
+  it('shows a session saved in another window, and says when another window took the storage', async () => {
+    const user = userEvent.setup();
+    const factory = new IDBFactory();
+    const otherWindow = await openStorage(factory, broadcastChannels);
+    const reload = vi.fn();
+
+    onTestFinished(() => {
+      otherWindow.close();
+    });
+    const { container } = render(
+      <TestApp
+        platform={browserPlatform({
+          storage: { open: () => openStorage(factory, broadcastChannels) },
+          app: { reload },
+        })}
+      />,
+    );
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    expect(await screen.findByText(/^No sessions yet\./)).toBeInTheDocument();
+
+    await otherWindow.sessions.create({
+      name: 'From elsewhere',
+      source: 'serial',
+      startedAt: Date.UTC(2026, 9, 5),
+    });
+
+    expect(
+      await screen.findByRole('link', { name: 'From elsewhere' }),
+    ).toBeVisible();
+
+    // Another window upgrades the database: this one must say so.
+    await new Promise<void>((resolve, reject) => {
+      const req = factory.open('cuxGauge', 99);
+
+      req.onsuccess = () => {
+        req.result.close();
+        resolve();
+      };
+
+      req.onerror = () => {
+        reject(req.error ?? new Error('upgrade failed'));
+      };
+    });
+
+    expect(
+      await screen.findByText(/Saved sessions and ROM images are unavailable/),
+    ).toBeVisible();
+    await expectNoAxeViolations(container);
+
+    await user.click(screen.getByRole('button', { name: 'Reload' }));
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+  it('asks before reloading for storage while connected, as that ends the connection', async () => {
+    const user = userEvent.setup();
+    const factory = new IDBFactory();
+    const reload = vi.fn();
+
+    render(
+      <TestApp
+        pollIntervalMs={{ demo: 10 }}
+        platform={browserPlatform({
+          storage: { open: () => openStorage(factory) },
+          app: { reload },
+        })}
+      />,
+    );
+    await connectDemo(user);
+    await new Promise<void>((resolve, reject) => {
+      const req = factory.open('cuxGauge', 99);
+
+      req.onsuccess = () => {
+        req.result.close();
+        resolve();
+      };
+
+      req.onerror = () => {
+        reject(req.error ?? new Error('upgrade failed'));
+      };
+    });
+    await user.click(await screen.findByRole('button', { name: 'Reload' }));
+
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Reload the page?',
+    });
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(reload).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Reload' }));
+    await user.click(
+      within(
+        screen.getByRole('alertdialog', { name: 'Reload the page?' }),
+      ).getByRole('button', { name: 'Reload and disconnect' }),
+    );
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });

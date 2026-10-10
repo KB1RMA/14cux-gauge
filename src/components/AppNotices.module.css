@@ -29,3 +29,7 @@
 .notice output {
   flex: 1 1 16rem;
 }
+
+.notice[data-kind='storage'] {
+  border-left-color: var(--warn);
+}

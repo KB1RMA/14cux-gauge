@@ -215,12 +215,48 @@ export default [
     },
   },
   {
+    // `storage/` sits just above `model/`: it imports nothing from the
+    // services, hooks, components or platform above it. `settings/` joins
+    // this rule when #79 removes the imports in `settings/registry.ts`.
+    files: ['src/storage/**/*.{ts,tsx}'],
+    ignores: ['src/storage/**/*.test.{ts,tsx}'],
+    plugins: { '@typescript-eslint': tseslint.plugin },
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '../*',
+                '!../model',
+                '!../model/**',
+                '!../storage',
+                '!../storage/**',
+              ],
+              message:
+                'storage/ imports only model/ and itself; services, hooks, components and the platform sit above it. See AGENTS.md > State and data.',
+            },
+            {
+              group: ['@kb1rma/libcomm14cux-ts'],
+              message:
+                'storage/ never touches the ECU library; only the controllers do. See AGENTS.md > State and data.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Hooks and providers adapt the controllers for React. Only the
     // controllers (src/ecu, src/ecuWrite/ecuWrites.ts, src/roms/romReader.ts)
     // call `Ecu` methods or hold a `Lease`.
     files: ['src/**/use*.{ts,tsx}', 'src/**/*Provider.tsx'],
     ignores: [
       'src/components/**',
+      // Has its own object above, which a later one would replace.
+      'src/storage/**',
       'src/**/*.test.{ts,tsx}',
       'src/test-support/**',
     ],
