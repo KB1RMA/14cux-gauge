@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { LiveSnapshot } from '../model/snapshot';
 import {
   clampWindow,
@@ -45,15 +45,30 @@ interface Timeline {
   view: TimeWindow;
 }
 
-/** How many of `samples` (oldest first) were taken at or before `time`. */
-function countUpTo(samples: readonly LiveSnapshot[], time: number): number {
+/**
+ * When each of `samples` is placed on the timeline: its timestamp, or the
+ * newest earlier timestamp if the clock was set back, as the graphs' series
+ * model places it, so the playhead and the graphs agree.
+ */
+function timesOf(samples: readonly LiveSnapshot[]): number[] {
+  let latest = -Infinity;
+
+  return samples.map((sample) => {
+    latest = Math.max(latest, sample.timestamp);
+
+    return latest;
+  });
+}
+
+/** How many of `times` (oldest first) are at or before `time`. */
+function countUpTo(times: readonly number[], time: number): number {
   let low = 0;
-  let high = samples.length;
+  let high = times.length;
 
   while (low < high) {
     const mid = (low + high) >>> 1;
 
-    if ((samples[mid]?.timestamp ?? 0) <= time) {
+    if ((times[mid] ?? 0) <= time) {
       low = mid + 1;
     } else {
       high = mid;
@@ -70,8 +85,9 @@ function countUpTo(samples: readonly LiveSnapshot[], time: number): number {
  * end. `samples` must not change; key the caller by session instead.
  */
 export function useReplay(samples: readonly LiveSnapshot[]): Replay {
-  const start = samples[0]?.timestamp ?? 0;
-  const duration = (samples.at(-1)?.timestamp ?? start) - start;
+  const times = useMemo(() => timesOf(samples), [samples]);
+  const start = times[0] ?? 0;
+  const duration = (times.at(-1) ?? start) - start;
   const [timeline, setTimeline] = useState<Timeline>(() => ({
     position: 0,
     view: wholeWindow(duration),
@@ -81,7 +97,7 @@ export function useReplay(samples: readonly LiveSnapshot[]): Replay {
   const [speed, setSpeed] = useState<ReplaySpeed>(1);
   const atEnd = position >= duration;
   const playing = wantsToPlay && !atEnd;
-  const count = countUpTo(samples, start + position);
+  const count = countUpTo(times, start + position);
 
   useEffect(() => {
     if (!playing) {

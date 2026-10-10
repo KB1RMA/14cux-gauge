@@ -41,6 +41,29 @@ describe('useReplay', () => {
     expect(result.current.view).toEqual({ start: 0, end: 10_000 });
   });
 
+  it('places a sample taken after the clock was set back at the newest time before it', () => {
+    // Timestamps 0 s, 5 s, then 2 s (clock set back), then 8 s.
+    const set = [0, 5000, 2000, 8000].map((offset, i) =>
+      snapshotAt(START + offset, { engineRpm: 1000 + i }),
+    );
+    const { result } = renderHook(() => useReplay(set));
+
+    expect(result.current.duration).toBe(8000);
+
+    act(() => {
+      result.current.seek(3000);
+    });
+
+    // The third sample is placed at 5 s, so at 3 s the first is still shown.
+    expect(result.current.snapshot?.engineRpm).toBe(1000);
+
+    act(() => {
+      result.current.seek(5000);
+    });
+
+    expect(result.current.snapshot?.engineRpm).toBe(1002);
+  });
+
   it('plays in real time, and pauses', () => {
     const { result } = renderHook(() => useReplay(samples));
 

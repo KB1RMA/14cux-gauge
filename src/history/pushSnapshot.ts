@@ -24,10 +24,8 @@ export function pushSnapshot(
 export function historyOf(
   snapshots: readonly LiveSnapshot[],
 ): SampleHistory<MetricKey> {
-  const history = new SampleHistory<MetricKey>(
-    METRIC_KEYS,
-    Math.max(snapshots.length, 1),
-  );
+  const size = Math.max(snapshots.length, 1);
+  const history = new SampleHistory<MetricKey>(METRIC_KEYS, size, size);
 
   for (const snapshot of snapshots) {
     pushSnapshot(history, snapshot);

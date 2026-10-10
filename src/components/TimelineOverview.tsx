@@ -17,6 +17,7 @@ import {
 import { chartData } from '../history/chartSeries';
 import type { ReadonlySeries } from '../history/sampleHistory';
 import type { Metric, MetricKey } from '../metrics';
+import { usePreferences } from '../preferences/usePreferences';
 import {
   MIN_WINDOW_MS,
   sliderStep,
@@ -87,6 +88,7 @@ export function TimelineOverview({
   replay: Replay;
   writes?: readonly TimelineMark[];
 }) {
+  const units = usePreferences();
   const { position, duration, view } = replay;
   const plotRef = useRef<HTMLDivElement>(null);
   const windowRef = useRef<Overlay | null>(null);
@@ -162,12 +164,12 @@ export function TimelineOverview({
             buckets: width,
             edges: true,
           },
-          (value) => value,
+          (value) => metric.toDisplay(value, units),
         ),
         container,
       );
     });
-  }, [metric, series, writes]);
+  }, [metric, series, units, writes]);
 
   useEffect(() => {
     windowRef.current?.update();

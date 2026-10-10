@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { useEffect, useId, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import type uPlot from 'uplot';
 import { mountPlot } from '../charts/mountPlot';
 import { formatTimelineTick, timelinePlotOptions } from '../charts/plotOptions';
@@ -23,7 +23,10 @@ import timeline from './Timeline.module.css';
 
 const NO_MARKS: readonly TimelineMark[] = [];
 
-/** Buckets the window's lowest and highest are worked out over. */
+/**
+ * Buckets the window's lowest and highest are worked out over. Thinning
+ * keeps every extreme, so they are exact whatever this is.
+ */
 const BUCKET_COUNT = 1000;
 
 /** Buckets per pixel of width the samples are thinned to. */
@@ -60,7 +63,10 @@ export function TimelineChart({
   const playheadRef = useRef<Overlay | null>(null);
   const { position, view } = replay;
   const origin = series.earliestTime ?? 0;
-  const convert = (value: number) => metric.toDisplay(value, units);
+  const convert = useCallback(
+    (value: number) => metric.toDisplay(value, units),
+    [metric, units],
+  );
   const from = view.start / 1000;
   const to = view.end / 1000;
   const { min, max } = useMemo(
@@ -73,9 +79,9 @@ export function TimelineChart({
           until: origin + view.end,
           buckets: BUCKET_COUNT,
         },
-        (value) => metric.toDisplay(value, units),
+        convert,
       ),
-    [series, metric, units, origin, view.start, view.end],
+    [series, metric, convert, origin, view.start, view.end],
   );
   const now = series.valueAt(metric.key, origin + position);
   const unit = metric.unit(units);
@@ -213,12 +219,12 @@ export function TimelineChart({
             buckets: chart.width * BUCKETS_PER_PIXEL,
             edges: true,
           },
-          (value) => metric.toDisplay(value, units),
+          convert,
         ),
         true,
       );
     }
-  }, [series, metric, units, origin, from, to]);
+  }, [series, metric, convert, origin, from, to]);
 
   useEffect(() => {
     playheadRef.current?.update();

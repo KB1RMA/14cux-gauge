@@ -44,6 +44,9 @@ export interface ReadonlySeries<K extends string> {
   valueAt(key: K, time: number): number | null | undefined;
 }
 
+/** Samples held before the buffers first grow. */
+const INITIAL_LENGTH = 1024;
+
 /**
  * An in-memory ring buffer of recent samples, one column per series, so the
  * graphs can show the session without the memory use growing without limit.
@@ -53,9 +56,6 @@ export interface ReadonlySeries<K extends string> {
  * It is an external store for `useSyncExternalStore`: `subscribe` and
  * `getVersion` are bound, and the version changes on every push or clear.
  */
-/** Samples held before the buffers first grow. */
-const INITIAL_LENGTH = 1024;
-
 export class SampleHistory<K extends string> implements ReadonlySeries<K> {
   readonly capacity: number;
   private times: Float64Array;
@@ -67,14 +67,23 @@ export class SampleHistory<K extends string> implements ReadonlySeries<K> {
   private dropped = false;
   private version = 0;
 
-  constructor(keys: readonly K[], capacity: number) {
+  /**
+   * `initialLength` is how many samples to allocate for at first (at most
+   * `capacity`); pass the count when it is known, so the buffers need not
+   * grow.
+   */
+  constructor(
+    keys: readonly K[],
+    capacity: number,
+    initialLength = INITIAL_LENGTH,
+  ) {
     if (!Number.isInteger(capacity) || capacity < 1) {
       throw new RangeError('capacity must be a positive integer');
     }
 
     this.capacity = capacity;
 
-    const length = Math.min(capacity, INITIAL_LENGTH);
+    const length = Math.max(1, Math.min(capacity, initialLength));
 
     this.times = new Float64Array(length);
     this.columns = new Map(

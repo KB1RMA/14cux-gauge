@@ -520,7 +520,7 @@ describe('ReplayGraphs drawing', () => {
     );
 
     await vi.waitFor(() => {
-      expect(live.container.querySelectorAll('.u-over')).toHaveLength(1);
+      expect(stat('Engine speed (rpm)', 'Max')).toBe('4322 rpm');
     });
 
     const liveStats = ['Min', 'Max'].map((term) =>
