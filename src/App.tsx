@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
+import { lazy, useEffect } from 'react';
 import { HashRouter, Navigate, NavLink, Route, Routes } from 'react-router';
 import type { AppServices } from './appServices';
 import { goatCounter, type UsageCounter } from './usage/goatCounter';
 import { useUsageCounts } from './usage/useUsageCounts';
 import { AppNotices } from './components/AppNotices';
 import { ConnectScreen } from './components/ConnectScreen';
-import { Dashboard } from './components/Dashboard';
 import { Footer } from './components/Footer';
 import { PreferencesMenu } from './components/PreferencesMenu';
 import { SaveSessionDialog } from './components/SaveSessionDialog';
-import { SessionsView } from './components/SessionsView';
 import { StatusBar } from './components/StatusBar';
+import { ViewBoundary } from './components/ViewBoundary';
 import { useEcu } from './ecu/useEcu';
 import { EcuProvider } from './ecu/EcuProvider';
 import { EcuWriteProvider } from './ecuWrite/EcuWriteProvider';
@@ -39,12 +39,24 @@ const VIEWS: readonly { label: string; to: string }[] = [
 
 const DEFAULT_USAGE_COUNTER = goatCounter();
 
+// The views behind the connect screen are split out of the startup bundle.
+const loadDashboard = () => import('./components/Dashboard');
+const loadSessionsView = () => import('./components/SessionsView');
+const Dashboard = lazy(() =>
+  loadDashboard().then((module) => ({ default: module.Dashboard })),
+);
+const SessionsView = lazy(() =>
+  loadSessionsView().then((module) => ({ default: module.SessionsView })),
+);
+
 /** The live views, or the connect screen until there is an ECU to show. */
 function Live({ tab }: { tab: LiveTab }) {
   const { state, link } = useEcu();
 
   return state.status === 'connected' && link ? (
-    <Dashboard tab={tab} />
+    <ViewBoundary>
+      <Dashboard tab={tab} />
+    </ViewBoundary>
   ) : (
     <ConnectScreen />
   );
@@ -52,6 +64,14 @@ function Live({ tab }: { tab: LiveTab }) {
 
 function Main({ usageCounter }: { usageCounter: UsageCounter | undefined }) {
   useUsageCounts(usageCounter);
+
+  // Fetch the other views once the first has rendered, so they show at once
+  // when opened, and while the build on the server still matches this page.
+  // A failure shows in the view that needs the code, if it is opened.
+  useEffect(() => {
+    loadDashboard().catch(() => undefined);
+    loadSessionsView().catch(() => undefined);
+  }, []);
 
   return (
     <main className={styles['main']}>
@@ -64,7 +84,14 @@ function Main({ usageCounter }: { usageCounter: UsageCounter | undefined }) {
         />
         <Route path={LIVE_TAB_PATHS.graphs} element={<Live tab="graphs" />} />
         <Route path={LIVE_TAB_PATHS.fuelMap} element={<Live tab="fuelMap" />} />
-        <Route path={`${SESSIONS_PATH}/*`} element={<SessionsView />} />
+        <Route
+          path={`${SESSIONS_PATH}/*`}
+          element={
+            <ViewBoundary>
+              <SessionsView />
+            </ViewBoundary>
+          }
+        />
         <Route path="*" element={<Navigate to={LIVE_PATH} replace />} />
       </Routes>
       <SaveSessionDialog />

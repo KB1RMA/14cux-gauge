@@ -25,7 +25,11 @@ Think of the app as a stack of layers. Each layer may use the layers below it,
 but never the ones above it. From top to bottom:
 
 1. **Views** are the screens, tiles, graphs and buttons you see. They show
-   data, but they never fetch it themselves.
+   data, but they never fetch it themselves. The dashboard and the sessions
+   views are downloaded just after the app starts, so the first screen shows
+   sooner. If one of them breaks, only that view shows an error and a Reload
+   button. The app bar and status bar keep working, so you can still
+   disconnect.
 2. **Hooks and providers** are the go-betweens. A view asks a hook for what it
    needs, and the hook gets it from a service.
 3. **Services** do the real work. There are six:
@@ -117,7 +121,9 @@ so a gap or a high point reads the same live and in replay.
 
 `main.tsx` builds the `Platform` and the `AppServices` once and hands them to
 `<App>`. React providers only expose the services; views reach them through
-hooks. Arrows point from the user of a module to the module it uses.
+hooks. `App.tsx` loads `Dashboard` and `SessionsView` with React's `lazy`,
+each inside its own `ViewBoundary` (an error boundary and a `Suspense`
+boundary). Arrows point from the user of a module to the module it uses.
 
 ```mermaid
 flowchart TB
@@ -126,8 +132,8 @@ flowchart TB
   subgraph views["components/ — views"]
     direction LR
     Connect[ConnectScreen]
-    Dash["Dashboard<br/>LiveTiles · GraphsView · FuelMapView<br/>FaultCodes · EcuInfo · tests"]
-    Sessions["SessionsView<br/>SessionList · SessionDetail · SessionReplay"]
+    Dash["Dashboard (lazy)<br/>LiveTiles · GraphsView · FuelMapView<br/>FaultCodes · EcuInfo · tests"]
+    Sessions["SessionsView (lazy)<br/>SessionList · SessionDetail · SessionReplay"]
     Chrome["StatusBar · PreferencesMenu · Footer<br/>SaveSessionDialog · AppNotices"]
   end
 
