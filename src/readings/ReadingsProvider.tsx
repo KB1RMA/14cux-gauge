@@ -11,7 +11,7 @@ import { useEcuSession } from '../ecu/useEcuSession';
 import { readingsFor, type MetricKey } from '../metrics';
 import { useSetting } from '../settings/useSetting';
 import { ReadingsContext } from './context';
-import { ALWAYS_READ, chosenReadings } from './readingSettings';
+import { ALWAYS_READ, chosenReadings } from '../settings/readingSettings';
 
 /**
  * Owns which readings the user has chosen (a stored setting) and which a

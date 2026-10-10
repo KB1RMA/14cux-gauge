@@ -3,8 +3,8 @@
 import * as z from 'zod/mini';
 import { METRIC_KEYS } from '../metrics';
 import type { SettingDefaults } from '../platform/platform';
-import type { PalettePreference } from '../preferences/context';
-import { ALWAYS_READ } from '../readings/readingSettings';
+import type { PalettePreference } from './preferences';
+import { ALWAYS_READ } from './readingSettings';
 import { LAYOUT_OPTIONS, WINDOW_OPTIONS } from './graphSettings';
 import {
   choice,
