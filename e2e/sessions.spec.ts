@@ -387,6 +387,28 @@ test.describe('Recorded sessions', () => {
     await page.getByRole('slider', { name: 'Graphs to' }).focus();
     await page.keyboard.press('ArrowLeft');
     await expect(showAll).toBeEnabled();
+
+    // Dragging the handle on the window's end moves that end.
+    await showAll.click();
+    await expect(showAll).toBeDisabled();
+
+    const end = await boxOf(page.getByRole('slider', { name: 'Graphs to' }));
+    const handleY = end.y + end.height / 2;
+
+    await page.mouse.move(end.x, handleY);
+    await page.mouse.down();
+    await page.mouse.move(end.x - 100, handleY, { steps: 5 });
+    // While it is held, it shows the time it is at, to the tenth of a second.
+    const shownTime = page.getByText(/^0:0\d\.\d$/).filter({ visible: true });
+
+    await expect(shownTime).toHaveCount(1);
+    await page.mouse.up();
+    await expect(shownTime).toHaveCount(0);
+    await expect(showAll).toBeEnabled();
+    // The other end stays where it was.
+    await expect(
+      page.getByRole('slider', { name: 'Graphs from' }),
+    ).toHaveAttribute('aria-valuenow', '0');
   });
 
   for (const colorScheme of ['light', 'dark'] as const) {

@@ -164,6 +164,37 @@ describe('ReplayGraphs', () => {
     expect(stat('Engine speed (rpm)', 'Max')).toBe('1070 rpm');
   });
 
+  it('shows the time at a handle while it is held or used from the keyboard', async () => {
+    const user = userEvent.setup();
+
+    renderReplay();
+
+    const from = screen.getByRole('slider', { name: 'Graphs from' });
+    const to = screen.getByRole('slider', { name: 'Graphs to' });
+
+    expect(screen.queryByText('0:00.0')).not.toBeInTheDocument();
+    expect(screen.queryByText('0:10.0')).not.toBeInTheDocument();
+
+    // Held with the pointer, then let go.
+    fireEvent.pointerDown(from, { pointerId: 1, button: 0 });
+    expect(screen.getByText('0:00.0')).toBeInTheDocument();
+    fireEvent.pointerUp(from, { pointerId: 1, button: 0 });
+    expect(screen.queryByText('0:00.0')).not.toBeInTheDocument();
+
+    // Focused from the keyboard, to the tenth of a second as it moves.
+    act(() => {
+      to.focus();
+    });
+    expect(screen.getByText('0:10.0')).toBeInTheDocument();
+    await user.keyboard('{ArrowLeft}');
+    expect(screen.getByText('0:09.9')).toBeInTheDocument();
+
+    act(() => {
+      to.blur();
+    });
+    expect(screen.queryByText('0:09.9')).not.toBeInTheDocument();
+  });
+
   it('pages to the playhead when it moves outside the stretch', async () => {
     const user = userEvent.setup();
 

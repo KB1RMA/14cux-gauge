@@ -19,6 +19,13 @@ export function formatDuration(ms: number): string {
     : `${String(minutes)}:${seconds}`;
 }
 
+/** A length of time as a clock to the tenth of a second: "0:05.3". */
+export function formatPreciseDuration(ms: number): string {
+  const tenths = Math.floor((Math.max(0, ms) % 1000) / 100);
+
+  return `${formatDuration(ms)}.${String(tenths)}`;
+}
+
 /** A length of time in words, for screen readers: "1 minute 5 seconds". */
 export function describeDuration(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));

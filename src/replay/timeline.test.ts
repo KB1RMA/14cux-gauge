@@ -4,6 +4,7 @@ import {
   clampWindow,
   followPlayback,
   panWindow,
+  sliderEnd,
   sliderStep,
   revealPosition,
   wholeWindow,
@@ -200,5 +201,14 @@ describe('sliderStep', () => {
     expect(sliderStep(275_000)).toBe(2000);
     expect(sliderStep(3_600_000)).toBe(30_000);
     expect(sliderStep(36_000_000)).toBe(60_000);
+  });
+});
+
+describe('sliderEnd', () => {
+  it('ends on a whole step at or past the end of the recording', () => {
+    expect(sliderEnd(0)).toBe(100);
+    expect(sliderEnd(5000)).toBe(5000);
+    expect(sliderEnd(5830)).toBe(5900);
+    expect(sliderEnd(275_100)).toBe(276_000);
   });
 });
