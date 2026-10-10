@@ -76,9 +76,9 @@ flowchart TB
 
   Connect & Dash & Chrome --> HEcu
   Dash --> HWrite
-  Chrome --> HRec
-  Dash & Sessions --> HRoms
-  Sessions --> HSess
+  Dash & Sessions & Chrome --> HRec
+  Dash --> HRoms
+  Sessions & Chrome --> HSess
   Sessions --> HReplay
   views --> HSet
   views --> HRoute
