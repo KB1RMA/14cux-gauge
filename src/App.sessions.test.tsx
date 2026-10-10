@@ -3,7 +3,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { IDBFactory } from 'fake-indexeddb';
-import { App } from './App';
+import { TestApp } from './test-support/TestApp';
 import { browserPlatform } from './platform/browser';
 import type { SessionSummary } from './model/session';
 import type { LiveSnapshot } from './model/snapshot';
@@ -58,7 +58,7 @@ function sessionsNav() {
 describe('Recording and browsing sessions', () => {
   it('records a session, names it, and finds it in Sessions', async () => {
     const user = userEvent.setup();
-    const { container } = render(<App pollIntervalMs={{ demo: 10 }} />);
+    const { container } = render(<TestApp pollIntervalMs={{ demo: 10 }} />);
 
     await connectDemo(user);
     await user.click(screen.getByRole('button', { name: 'Record' }));
@@ -165,7 +165,7 @@ describe('Recording and browsing sessions', () => {
     await store.update(id, { notes: 'Hunts between 600 and 900 rpm.' });
 
     const { container } = render(
-      <App
+      <TestApp
         platform={browserPlatform({
           storage: { open: storageWith({ sessions: store }) },
         })}
@@ -283,7 +283,7 @@ describe('Recording and browsing sessions', () => {
     await store.finish(id, START + 3000);
 
     const { container } = render(
-      <App
+      <TestApp
         platform={browserPlatform({
           storage: { open: storageWith({ sessions: store }) },
         })}
@@ -323,7 +323,7 @@ describe('Recording and browsing sessions', () => {
   it('records writes to the ECU made while recording', async () => {
     const user = userEvent.setup();
 
-    render(<App pollIntervalMs={{ demo: 10 }} />);
+    render(<TestApp pollIntervalMs={{ demo: 10 }} />);
     await connectDemo(user);
     await user.click(screen.getByRole('button', { name: 'Record' }));
     await collectSamples();
@@ -365,7 +365,7 @@ describe('Recording and browsing sessions', () => {
   it('replays a recording with the keyboard', async () => {
     const user = userEvent.setup();
 
-    render(<App pollIntervalMs={{ demo: 10 }} />);
+    render(<TestApp pollIntervalMs={{ demo: 10 }} />);
     await connectDemo(user);
     await recordAndStop(user);
     await user.click(screen.getByRole('button', { name: 'Skip' }));
@@ -400,7 +400,7 @@ describe('Recording and browsing sessions', () => {
   it('stops recording on disconnect, and keeps the default name if skipped', async () => {
     const user = userEvent.setup();
 
-    render(<App pollIntervalMs={{ demo: 10 }} />);
+    render(<TestApp pollIntervalMs={{ demo: 10 }} />);
     await connectDemo(user);
     await user.click(screen.getByRole('button', { name: 'Record' }));
     await collectSamples();
@@ -448,7 +448,7 @@ describe('Recording and browsing sessions', () => {
     ) {
       names.push(this.download);
     });
-    render(<App pollIntervalMs={{ demo: 10 }} />);
+    render(<TestApp pollIntervalMs={{ demo: 10 }} />);
     await connectDemo(user);
     await recordAndStop(user);
     await user.click(
@@ -483,7 +483,7 @@ describe('Recording and browsing sessions', () => {
     const user = userEvent.setup();
 
     render(
-      <App
+      <TestApp
         pollIntervalMs={{ demo: 10 }}
         platform={browserPlatform({
           files: { save: () => Promise.reject(new Error('Disk full')) },
@@ -520,7 +520,7 @@ describe('Recording and browsing sessions', () => {
 
   it('shows a recording in progress, which cannot be deleted', async () => {
     const user = userEvent.setup();
-    const { container } = render(<App pollIntervalMs={{ demo: 10 }} />);
+    const { container } = render(<TestApp pollIntervalMs={{ demo: 10 }} />);
 
     await connectDemo(user);
     await user.click(screen.getByRole('button', { name: 'Record' }));
@@ -578,7 +578,7 @@ describe('Recording and browsing sessions', () => {
     const factory = new IDBFactory();
     const open = () => openStorage(factory);
     const { unmount } = render(
-      <App
+      <TestApp
         pollIntervalMs={{ demo: 10 }}
         platform={browserPlatform({ storage: { open: open } })}
       />,
@@ -598,7 +598,7 @@ describe('Recording and browsing sessions', () => {
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
     unmount();
 
-    render(<App platform={browserPlatform({ storage: { open: open } })} />);
+    render(<TestApp platform={browserPlatform({ storage: { open: open } })} />);
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
 
     expect(
@@ -627,7 +627,7 @@ describe('Recording and browsing sessions', () => {
     });
 
     render(
-      <App
+      <TestApp
         platform={browserPlatform({
           storage: { open: () => openStorage(factory) },
         })}
@@ -667,7 +667,7 @@ describe('Recording and browsing sessions', () => {
     }
 
     render(
-      <App
+      <TestApp
         pollIntervalMs={{ demo: 10 }}
         platform={browserPlatform({
           storage: { open: storageWith({ sessions: new NoRenames() }) },
@@ -702,7 +702,7 @@ describe('Recording and browsing sessions', () => {
     }
 
     render(
-      <App
+      <TestApp
         platform={browserPlatform({
           storage: { open: storageWith({ sessions: new NoList() }) },
         })}
@@ -738,7 +738,7 @@ describe('Recording and browsing sessions', () => {
       startedAt: START,
     });
     render(
-      <App
+      <TestApp
         platform={browserPlatform({
           storage: { open: storageWith({ sessions: store }) },
         })}
@@ -784,7 +784,7 @@ describe('Recording and browsing sessions', () => {
     const counter = fakeUsageCounter();
 
     render(
-      <App
+      <TestApp
         pollIntervalMs={{ demo: 10 }}
         platform={browserPlatform({
           storage: { open: storageWith({ sessions: new FullStore() }) },
@@ -818,7 +818,7 @@ describe('Recording and browsing sessions', () => {
   it('records only the chosen readings, and replays only those', async () => {
     const user = userEvent.setup();
 
-    render(<App pollIntervalMs={{ demo: 10 }} />);
+    render(<TestApp pollIntervalMs={{ demo: 10 }} />);
     await connectDemo(user);
     await user.click(screen.getByRole('button', { name: /Choose readings/ }));
     await user.click(screen.getByRole('button', { name: 'Only Coolant' }));
@@ -862,7 +862,7 @@ describe('Recording and browsing sessions', () => {
     });
 
     const { container } = render(
-      <App
+      <TestApp
         platform={browserPlatform({
           storage: { open: () => openStorage(factory) },
         })}

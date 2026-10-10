@@ -2,10 +2,9 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { EcuProvider } from '../ecu/EcuProvider';
 import { browserPlatform } from '../platform/browser';
-import { PlatformContext } from '../platform/context';
 import { expectNoAxeViolations } from '../test-support/a11y';
+import { TestServices } from '../test-support/TestApp';
 import { ConnectScreen } from './ConnectScreen';
 
 /** Where serial ports can be used, or not; never asked for one here. */
@@ -23,11 +22,9 @@ function platform(serial: boolean) {
 
 function renderScreen({ serial = true } = {}) {
   return render(
-    <PlatformContext value={platform(serial)}>
-      <EcuProvider>
-        <ConnectScreen />
-      </EcuProvider>
-    </PlatformContext>,
+    <TestServices platform={platform(serial)}>
+      <ConnectScreen />
+    </TestServices>,
   );
 }
 

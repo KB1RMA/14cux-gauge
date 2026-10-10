@@ -6,5 +6,11 @@ import type { Platform } from './platform';
 
 /** Serial ports, file saves, storage and settings where the app is running. */
 export function usePlatform(): Platform {
-  return use(PlatformContext);
+  const platform = use(PlatformContext);
+
+  if (!platform) {
+    throw new Error('usePlatform must be used inside <PlatformContext>');
+  }
+
+  return platform;
 }

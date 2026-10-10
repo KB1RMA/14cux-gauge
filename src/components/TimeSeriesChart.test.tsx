@@ -5,6 +5,8 @@ import { Gear } from '@kb1rma/libcomm14cux-ts';
 import { HistoryContext } from '../ecu/contexts';
 import { SampleHistory } from '../history/sampleHistory';
 import { METRIC_KEYS, METRICS, type MetricKey } from '../metrics';
+import { browserPlatform } from '../platform/browser';
+import { TestPlatform } from '../test-support/TestApp';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { expectNoAxeViolations } from '../test-support/a11y';
 import { loadPlot } from '../charts/plotOptions';
@@ -28,11 +30,13 @@ function renderChart(
   timeWindow: GraphWindow = 60,
 ) {
   const result = render(
-    <PreferencesProvider>
-      <HistoryContext value={history}>
-        <TimeSeriesChart metric={metric(key)} timeWindow={timeWindow} />
-      </HistoryContext>
-    </PreferencesProvider>,
+    <TestPlatform platform={browserPlatform()}>
+      <PreferencesProvider>
+        <HistoryContext value={history}>
+          <TimeSeriesChart metric={metric(key)} timeWindow={timeWindow} />
+        </HistoryContext>
+      </PreferencesProvider>
+    </TestPlatform>,
   );
 
   return { ...result, history };

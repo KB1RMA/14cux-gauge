@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { App } from './App';
+import { TestApp } from './test-support/TestApp';
 import { expectNoAxeViolations, readingFor } from './test-support/a11y';
 import {
   notification,
@@ -12,7 +12,7 @@ import {
 describe('App in demo mode', () => {
   it('connects to the demo ECU, polls live data, and disconnects', async () => {
     const user = userEvent.setup();
-    const { container } = render(<App pollIntervalMs={{ demo: 10 }} />);
+    const { container } = render(<TestApp pollIntervalMs={{ demo: 10 }} />);
 
     await expectNoAxeViolations(container);
     await user.click(screen.getByRole('button', { name: 'Demo mode' }));
@@ -64,7 +64,7 @@ describe('App in demo mode', () => {
   it('keeps the sample rate out of the live region', async () => {
     const user = userEvent.setup();
 
-    render(<App pollIntervalMs={{ demo: 10 }} />);
+    render(<TestApp pollIntervalMs={{ demo: 10 }} />);
     await user.click(screen.getByRole('button', { name: 'Demo mode' }));
 
     const region = await screen.findByRole('region', { name: 'Connection' });
@@ -79,7 +79,7 @@ describe('App in demo mode', () => {
   it('switches between the overview and live graphs, and remembers the view', async () => {
     const user = userEvent.setup();
     const { container, unmount } = render(
-      <App pollIntervalMs={{ demo: 10 }} />,
+      <TestApp pollIntervalMs={{ demo: 10 }} />,
     );
 
     await user.click(screen.getByRole('button', { name: 'Demo mode' }));
@@ -126,7 +126,7 @@ describe('App in demo mode', () => {
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
     unmount();
 
-    render(<App pollIntervalMs={{ demo: 10 }} />);
+    render(<TestApp pollIntervalMs={{ demo: 10 }} />);
     await user.click(screen.getByRole('button', { name: 'Demo mode' }));
 
     expect(
@@ -138,7 +138,7 @@ describe('App in demo mode', () => {
   it('reads only the chosen readings, but the fuel map still follows the engine', async () => {
     const user = userEvent.setup();
 
-    render(<App pollIntervalMs={{ demo: 10 }} />);
+    render(<TestApp pollIntervalMs={{ demo: 10 }} />);
     await user.click(screen.getByRole('button', { name: 'Demo mode' }));
     await screen.findByRole('heading', { name: 'Live data' });
     await user.click(screen.getByRole('button', { name: /Choose readings/ }));
@@ -166,7 +166,7 @@ describe('App in demo mode', () => {
   it('notifies ECU writes over every view, apart from the status bar', async () => {
     const user = userEvent.setup();
 
-    render(<App pollIntervalMs={{ demo: 10 }} />);
+    render(<TestApp pollIntervalMs={{ demo: 10 }} />);
     await user.click(screen.getByRole('button', { name: 'Demo mode' }));
     await screen.findByRole('heading', { name: 'Live data' });
 
@@ -225,7 +225,7 @@ describe('App in demo mode', () => {
   it('stays connected when reconnected while the last connection is closing', async () => {
     const user = userEvent.setup();
 
-    render(<App pollIntervalMs={{ demo: 10 }} />);
+    render(<TestApp pollIntervalMs={{ demo: 10 }} />);
     await user.click(screen.getByRole('button', { name: 'Demo mode' }));
     await screen.findByRole('heading', { name: 'Live data' });
 

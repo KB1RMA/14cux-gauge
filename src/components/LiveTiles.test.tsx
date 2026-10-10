@@ -4,6 +4,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Gear } from '@kb1rma/libcomm14cux-ts';
 import type { LiveSnapshot } from '../model/snapshot';
+import { browserPlatform } from '../platform/browser';
+import { TestPlatform } from '../test-support/TestApp';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { expectNoAxeViolations, readingFor } from '../test-support/a11y';
 import { SnapshotTiles } from './LiveTiles';
@@ -44,9 +46,11 @@ function meterFill(reading: HTMLElement): Element | null {
 
 function renderTiles(snapshot: LiveSnapshot | undefined) {
   return render(
-    <PreferencesProvider>
-      <SnapshotTiles snapshot={snapshot} />
-    </PreferencesProvider>,
+    <TestPlatform platform={browserPlatform()}>
+      <PreferencesProvider>
+        <SnapshotTiles snapshot={snapshot} />
+      </PreferencesProvider>
+    </TestPlatform>,
   );
 }
 
@@ -82,11 +86,13 @@ describe('LiveTiles', () => {
     );
 
     rerender(
-      <PreferencesProvider>
-        <SnapshotTiles
-          snapshot={{ ...SNAPSHOT, engineRpm: 6000, injectorPulseUs: 10500 }}
-        />
-      </PreferencesProvider>,
+      <TestPlatform platform={browserPlatform()}>
+        <PreferencesProvider>
+          <SnapshotTiles
+            snapshot={{ ...SNAPSHOT, engineRpm: 6000, injectorPulseUs: 10500 }}
+          />
+        </PreferencesProvider>
+      </TestPlatform>,
     );
 
     expect(readingFor('Injector duty')).toHaveTextContent(
@@ -111,9 +117,11 @@ describe('LiveTiles', () => {
 
   it('shows only the readings asked for, without empty groups', () => {
     render(
-      <PreferencesProvider>
-        <SnapshotTiles snapshot={SNAPSHOT} keys={['coolantTempF', 'milOn']} />
-      </PreferencesProvider>,
+      <TestPlatform platform={browserPlatform()}>
+        <PreferencesProvider>
+          <SnapshotTiles snapshot={SNAPSHOT} keys={['coolantTempF', 'milOn']} />
+        </PreferencesProvider>
+      </TestPlatform>,
     );
 
     expect(screen.getAllByRole('term').map((dt) => dt.textContent)).toEqual([

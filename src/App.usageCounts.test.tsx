@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { App } from './App';
+import { TestApp } from './test-support/TestApp';
 import { expectNoAxeViolations } from './test-support/a11y';
 import { fakeUsageCounter as fakeCounter } from './test-support/usageCounter';
 
@@ -22,7 +22,7 @@ describe('App usage counts', () => {
     const user = userEvent.setup();
     const counter = fakeCounter();
 
-    render(<App pollIntervalMs={{ demo: 10 }} usageCounter={counter} />);
+    render(<TestApp pollIntervalMs={{ demo: 10 }} usageCounter={counter} />);
 
     expect(counter.start).toHaveBeenCalled();
 
@@ -46,7 +46,7 @@ describe('App usage counts', () => {
     const user = userEvent.setup();
     const counter = fakeCounter();
 
-    render(<App pollIntervalMs={{ demo: 10 }} usageCounter={counter} />);
+    render(<TestApp pollIntervalMs={{ demo: 10 }} usageCounter={counter} />);
     await user.click(screen.getByRole('button', { name: 'Demo mode' }));
     await screen.findByRole('heading', { name: 'Live data' });
     await user.click(screen.getByRole('button', { name: 'Record' }));
@@ -79,7 +79,7 @@ describe('App usage counts', () => {
   it('says so in the footer, and lets the user turn counting off', async () => {
     const user = userEvent.setup();
     const counter = fakeCounter();
-    const { container, unmount } = render(<App usageCounter={counter} />);
+    const { container, unmount } = render(<TestApp usageCounter={counter} />);
 
     expect(screen.getByRole('contentinfo')).toHaveTextContent(
       'Visits and basic usage are counted anonymously with GoatCounter (opens in a new tab), without cookies.',
@@ -94,7 +94,7 @@ describe('App usage counts', () => {
     unmount();
     counter.start.mockClear();
 
-    render(<App pollIntervalMs={{ demo: 10 }} usageCounter={counter} />);
+    render(<TestApp pollIntervalMs={{ demo: 10 }} usageCounter={counter} />);
     await user.click(screen.getByRole('button', { name: 'Demo mode' }));
     await screen.findByRole('heading', { name: 'Live data' });
 
@@ -108,7 +108,7 @@ describe('App usage counts', () => {
     const counter = fakeCounter();
 
     setGlobalPrivacyControl(true);
-    render(<App usageCounter={counter} />);
+    render(<TestApp usageCounter={counter} />);
 
     expect(counter.start).not.toHaveBeenCalled();
 
@@ -130,7 +130,7 @@ describe('App usage counts', () => {
   it('neither offers nor mentions counting where it does not count', async () => {
     const user = userEvent.setup();
 
-    render(<App usageCounter={undefined} />);
+    render(<TestApp usageCounter={undefined} />);
 
     expect(screen.getByRole('contentinfo')).not.toHaveTextContent(
       'GoatCounter',

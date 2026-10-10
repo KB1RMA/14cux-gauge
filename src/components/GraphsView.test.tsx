@@ -3,23 +3,24 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HistoryContext } from '../ecu/contexts';
-import { EcuProvider } from '../ecu/EcuProvider';
 import { SampleHistory } from '../history/sampleHistory';
 import { METRIC_KEYS } from '../metrics';
+import { browserPlatform } from '../platform/browser';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { ReadingsProvider } from '../readings/ReadingsProvider';
 import { expectNoAxeViolations } from '../test-support/a11y';
+import { TestServices } from '../test-support/TestApp';
 import { GraphsView } from './GraphsView';
 
 function renderGraphs() {
   return render(
-    <PreferencesProvider>
-      <EcuProvider>
+    <TestServices platform={browserPlatform()}>
+      <PreferencesProvider>
         <ReadingsProvider>
           <GraphsView />
         </ReadingsProvider>
-      </EcuProvider>
-    </PreferencesProvider>,
+      </PreferencesProvider>
+    </TestServices>,
   );
 }
 
@@ -136,15 +137,15 @@ describe('GraphsView', () => {
     }
 
     render(
-      <PreferencesProvider>
-        <EcuProvider>
+      <TestServices platform={browserPlatform()}>
+        <PreferencesProvider>
           <ReadingsProvider>
             <HistoryContext value={history}>
               <GraphsView />
             </HistoryContext>
           </ReadingsProvider>
-        </EcuProvider>
-      </PreferencesProvider>,
+        </PreferencesProvider>
+      </TestServices>,
     );
 
     expect(screen.getByText(/older ones have been dropped/)).toHaveTextContent(

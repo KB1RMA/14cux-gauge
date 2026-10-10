@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { App } from '../App';
+import { TestApp } from '../test-support/TestApp';
 import type { BuildInfo } from '../buildInfo';
 import type { AppStatusStoreOptions } from '../pwa/appStatusStore';
 import { expectNoAxeViolations } from '../test-support/a11y';
@@ -37,7 +37,7 @@ describe('AppNotices', () => {
 
   it('says nothing when online and up to date', async () => {
     const { container } = render(
-      <App appStatus={options(RUNNING)} pollIntervalMs={{ demo: 10 }} />,
+      <TestApp appStatus={options(RUNNING)} pollIntervalMs={{ demo: 10 }} />,
     );
 
     await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
@@ -51,7 +51,7 @@ describe('AppNotices', () => {
   it('says when the app is offline, and that it still works', async () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
 
-    const { container } = render(<App appStatus={options(RUNNING)} />);
+    const { container } = render(<TestApp appStatus={options(RUNNING)} />);
 
     expect(await screen.findByRole('status')).toHaveTextContent(
       /^Offline\. Running 1\.0\.0 \(aaa1111\) from this device/,
@@ -63,7 +63,7 @@ describe('AppNotices', () => {
     const user = userEvent.setup();
     const reload = vi.fn();
     const { container } = render(
-      <App appStatus={options(NEWER, { reload })} />,
+      <TestApp appStatus={options(NEWER, { reload })} />,
     );
 
     expect(await screen.findByRole('status')).toHaveTextContent(
@@ -87,7 +87,7 @@ describe('AppNotices', () => {
     }) as unknown as ServiceWorkerContainer;
 
     render(
-      <App
+      <TestApp
         appStatus={options(NEWER, {
           serviceWorker,
           serviceWorkerUrl: 'https://x.test/sw.js',
@@ -108,7 +108,7 @@ describe('AppNotices', () => {
     const reload = vi.fn();
 
     render(
-      <App
+      <TestApp
         appStatus={options(NEWER, { reload })}
         pollIntervalMs={{ demo: 10 }}
       />,

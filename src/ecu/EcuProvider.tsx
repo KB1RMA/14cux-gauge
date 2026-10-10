@@ -1,58 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { useEffect, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { DiagnosticsContext } from '../diagnostics/context';
-import { usePlatform } from '../platform/usePlatform';
-import { ecuConnections } from './connect';
 import { EcuSessionContext, HistoryContext } from './contexts';
-import { EcuSession, type EcuSessionOptions } from './session';
+import type { EcuSession } from './session';
 
-export interface EcuProviderProps extends Pick<
-  EcuSessionOptions,
-  'pollIntervalMs' | 'diagnostics'
-> {
+export interface EcuProviderProps {
   children: ReactNode;
   /**
-   * The controller to provide, taken once on mount, as `App` passes the one
-   * `createAppServices` built. Its owner ends it; without one the provider
-   * makes its own from the other props and the platform's serial ports, and
-   * closes it on unmount.
+   * The controller to provide, as `createAppServices` built it. Its owner
+   * ends it; the provider only exposes it.
    */
-  session?: EcuSession;
+  session: EcuSession;
 }
 
 /** Provides the ECU link's controller, its diagnostic log and its history. */
-export function EcuProvider({
-  children,
-  session,
-  pollIntervalMs,
-  diagnostics,
-}: EcuProviderProps) {
-  const { serial } = usePlatform();
-  const [provided] = useState(
-    () =>
-      session ??
-      new EcuSession({
-        pollIntervalMs,
-        diagnostics,
-        createConnection: ecuConnections(serial),
-      }),
-  );
-  const owned = provided !== session;
-
-  useEffect(
-    () => () => {
-      if (owned) {
-        provided.dispose();
-      }
-    },
-    [owned, provided],
-  );
-
+export function EcuProvider({ children, session }: EcuProviderProps) {
   return (
-    <DiagnosticsContext value={provided.log}>
-      <EcuSessionContext value={provided}>
-        <HistoryContext value={provided.history}>{children}</HistoryContext>
+    <DiagnosticsContext value={session.log}>
+      <EcuSessionContext value={session}>
+        <HistoryContext value={session.history}>{children}</HistoryContext>
       </EcuSessionContext>
     </DiagnosticsContext>
   );
