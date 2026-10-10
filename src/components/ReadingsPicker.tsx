@@ -13,7 +13,7 @@ import {
   ALWAYS_READ,
   offExcept,
   READING_PRESETS,
-} from '../readings/readingSettings';
+} from '../settings/readingSettings';
 import { useReadings } from '../readings/useReadings';
 import { MetricCheckbox } from './MetricCheckbox';
 import graphs from './GraphsView.module.css';

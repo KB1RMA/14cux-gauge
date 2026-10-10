@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { useLayoutEffect, useMemo, type ReactNode } from 'react';
+import type {
+  PalettePreference,
+  ThemePreference,
+  UsageCountsPreference,
+} from '../settings/preferences';
 import { useSetting } from '../settings/useSetting';
 import type { SpeedUnit, TemperatureUnit } from '../units';
-import {
-  PreferencesContext,
-  type PalettePreference,
-  type ThemePreference,
-  type UsageCountsPreference,
-} from './context';
+import { PreferencesContext } from './context';
 
 /** `theme.css` reads `data-theme` on the root element; no attribute follows the system. */
 function applyTheme(theme: ThemePreference): void {

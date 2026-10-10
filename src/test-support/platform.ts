@@ -9,6 +9,7 @@ export function memorySettings(): SettingsBackend {
   const stored = new Map<string, string>();
 
   return {
+    defaults: () => ({ usageCounts: 'on' }),
     read: (key) => stored.get(key) ?? null,
     write: (key, value) => {
       const raw = JSON.stringify(value);

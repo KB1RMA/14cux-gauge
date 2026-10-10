@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { browserAsksNotToTrack, goatCounter } from './goatCounter';
+import { goatCounter } from './goatCounter';
 
 function counterScripts(): HTMLScriptElement[] {
   return [
@@ -66,25 +66,5 @@ describe('goatCounter', () => {
     expect(() => {
       counter?.count('connected/demo');
     }).not.toThrow();
-  });
-});
-
-describe('browserAsksNotToTrack', () => {
-  const nav = (signals: object) => signals as Navigator;
-
-  it('honours Global Privacy Control and Do Not Track', () => {
-    expect(browserAsksNotToTrack(nav({ globalPrivacyControl: true }))).toBe(
-      true,
-    );
-    expect(browserAsksNotToTrack(nav({ doNotTrack: '1' }))).toBe(true);
-  });
-
-  it('is false without either signal', () => {
-    expect(browserAsksNotToTrack(nav({}))).toBe(false);
-    expect(
-      browserAsksNotToTrack(
-        nav({ globalPrivacyControl: false, doNotTrack: '0' }),
-      ),
-    ).toBe(false);
   });
 });

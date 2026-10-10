@@ -8,7 +8,7 @@ import { useHistory } from '../history/useHistory';
 import type { Metric } from '../metrics';
 import { usePreferences } from '../preferences/usePreferences';
 import { ChartCaption, ChartStats } from './ChartParts';
-import type { GraphWindow } from './graphSettings';
+import type { GraphWindow } from '../settings/graphSettings';
 import styles from './TimeSeriesChart.module.css';
 
 /**

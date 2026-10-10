@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import type { Transport } from '@kb1rma/libcomm14cux-ts';
+import type { SettingDefaults } from '../settings/settingDefaults';
 import type { AppStorage } from '../storage/openStorage';
 
 /**
@@ -94,6 +95,11 @@ export interface StoragePlatform {
  * write; the app must still work.
  */
 export interface SettingsBackend {
+  /**
+   * What a setting is when the user has not chosen, where that depends on
+   * the platform (such as the browser's privacy signals).
+   */
+  defaults(): SettingDefaults;
   /** The JSON stored for `key`: `null` if none, `undefined` if unreadable. */
   read(key: string): string | null | undefined;
   /** Saves `value`; returns the JSON stored, or `undefined` if it was not. */

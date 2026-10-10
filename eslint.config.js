@@ -216,8 +216,7 @@ export default [
   },
   {
     // `storage/` sits just above `model/`: it imports nothing from the
-    // services, hooks, components or platform above it. `settings/` joins
-    // this rule when #79 removes the imports in `settings/registry.ts`.
+    // services, hooks, components or platform above it.
     files: ['src/storage/**/*.{ts,tsx}'],
     ignores: ['src/storage/**/*.test.{ts,tsx}'],
     plugins: { '@typescript-eslint': tseslint.plugin },
@@ -244,6 +243,99 @@ export default [
                 'storage/ never touches the ECU library; only the controllers do. See AGENTS.md > State and data.',
             },
           ],
+        },
+      ],
+    },
+  },
+  {
+    // `settings/` is as low as `storage/`: it imports `model/`, `storage/`,
+    // the metric and unit definitions and itself, and only the types of the
+    // platform's settings backend. Nothing above it.
+    files: ['src/settings/**/*.{ts,tsx}'],
+    ignores: ['src/settings/**/*.test.{ts,tsx}'],
+    plugins: { '@typescript-eslint': tseslint.plugin },
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '../*',
+                '!../model',
+                '!../model/**',
+                '!../storage',
+                '!../storage/**',
+                '!../settings',
+                '!../settings/**',
+                '!../metrics',
+                '!../units',
+                '!../platform',
+                '!../platform/**',
+              ],
+              message:
+                'settings/ imports only model/, storage/, metrics, units and itself; services, hooks and components sit above it. See AGENTS.md > State and data.',
+            },
+            {
+              group: ['**/platform/*'],
+              allowTypeImports: true,
+              message:
+                'settings/ may only import types from the platform; the platform passes what it provides in. See AGENTS.md > State and data.',
+            },
+            {
+              group: ['@kb1rma/libcomm14cux-ts'],
+              message:
+                'settings/ never touches the ECU library; only the controllers do. See AGENTS.md > State and data.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Browser globals are read only in `src/platform/`; anything else the
+    // app needs from where it runs becomes a part of `Platform`. `document`
+    // stays allowed for rendering, and `crypto.subtle` is standard in
+    // Electron too. The ignored files read them today and are moved by the
+    // issue named beside each; remove the entry in that issue's PR.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: [
+      'src/platform/**',
+      'src/**/*.test.{ts,tsx}',
+      'src/test-support/**',
+      'src/test-setup.ts',
+      // The offline and update checks and usage counting stay as they are
+      // until a desktop build starts (#81).
+      'src/pwa/**',
+      'src/usage/**',
+      // The router part of #81.
+      'src/routing/useNavigateOnce.ts',
+      'src/components/SessionDetail.tsx',
+      // The diagnostic report's wording (#75).
+      'src/components/DownloadLogButton.tsx',
+    ],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        ...[
+          'localStorage',
+          'sessionStorage',
+          'indexedDB',
+          'navigator',
+          'location',
+        ].map((name) => ({
+          name,
+          message: `Read ${name} only in src/platform/; add what you need to Platform. See AGENTS.md > State and data.`,
+        })),
+      ],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'window',
+          property: 'location',
+          message:
+            'Navigate with React Router, not window.location. See AGENTS.md > State and data.',
         },
       ],
     },

@@ -7,7 +7,7 @@ import type {
   PalettePreference,
   ThemePreference,
   UsageCountsPreference,
-} from '../preferences/context';
+} from '../settings/preferences';
 import { usePreferences } from '../preferences/usePreferences';
 import type { SpeedUnit, TemperatureUnit } from '../units';
 import styles from './PreferencesMenu.module.css';

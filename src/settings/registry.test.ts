@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { SETTINGS } from './registry';
+import { settingParser } from './registry';
+
+const defaults = { usageCounts: 'on' } as const;
 
 describe('preferences', () => {
-  const parse = SETTINGS.preferences;
+  const parse = settingParser('preferences', defaults);
 
   it('defaults to °F, mph, the system theme and Coniston, counting usage', () => {
     expect(parse(undefined)).toEqual({
@@ -34,7 +36,7 @@ describe('preferences', () => {
   });
 
   it('keeps the default for values it does not recognise', () => {
-    const defaults = {
+    const unchosen = {
       temperatureUnit: 'F',
       speedUnit: 'mph',
       theme: 'system',
@@ -43,14 +45,21 @@ describe('preferences', () => {
     };
 
     expect(parse({ temperatureUnit: 'K', theme: 'sepia', palette: 3 })).toEqual(
-      defaults,
+      unchosen,
     );
-    expect(parse(['F'])).toEqual(defaults);
+    expect(parse(['F'])).toEqual(unchosen);
+  });
+
+  it('counts usage unless the platform defaults to not counting', () => {
+    const quiet = settingParser('preferences', { usageCounts: 'off' });
+
+    expect(quiet(undefined).usageCounts).toBe('off');
+    expect(quiet({ usageCounts: 'on' }).usageCounts).toBe('on');
   });
 });
 
 describe('readings', () => {
-  const parse = SETTINGS.readings;
+  const parse = settingParser('readings', defaults);
 
   it('reads everything by default', () => {
     expect(parse(undefined)).toEqual({ off: [] });
@@ -65,7 +74,7 @@ describe('readings', () => {
 });
 
 describe('graphs', () => {
-  const parse = SETTINGS.graphs;
+  const parse = settingParser('graphs', defaults);
 
   it('defaults to a one-minute window in a grid', () => {
     expect(parse(undefined)).toEqual({
@@ -96,8 +105,10 @@ describe('graphs', () => {
 
 describe('doubleSpeed', () => {
   it('is off unless true is stored', () => {
-    expect(SETTINGS.doubleSpeed(undefined)).toBe(false);
-    expect(SETTINGS.doubleSpeed('true')).toBe(false);
-    expect(SETTINGS.doubleSpeed(true)).toBe(true);
+    const parse = settingParser('doubleSpeed', defaults);
+
+    expect(parse(undefined)).toBe(false);
+    expect(parse('true')).toBe(false);
+    expect(parse(true)).toBe(true);
   });
 });

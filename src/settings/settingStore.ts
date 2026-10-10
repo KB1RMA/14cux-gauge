@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import type { SettingsBackend } from '../platform/platform';
-import { parseRawSetting, type SettingParser } from '../storage/settings';
-import { SETTINGS, type SettingKey, type SettingValue } from './registry';
+import { parseRawSetting, type SettingParser } from './parseSetting';
+import { settingParser, type SettingKey, type SettingValue } from './registry';
 
 const UNREAD = Symbol('unread');
 
@@ -131,7 +131,14 @@ export function settingStore<K extends SettingKey>(
   let store = stores.get(key);
 
   if (!store) {
-    store = new SettingStore<unknown>(backend, key, SETTINGS[key]);
+    store = new SettingStore<unknown>(
+      backend,
+      key,
+      // Asked for at each parse, not once, so a value read after the
+      // platform's defaults change (a new privacy signal) uses the new ones.
+      // A value already in use is not re-parsed until storage changes.
+      (stored) => settingParser(key, backend.defaults())(stored),
+    );
     stores.set(key, store);
   }
 
