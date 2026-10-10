@@ -348,8 +348,6 @@ export default [
       // until a desktop build starts (#81).
       'src/pwa/**',
       'src/usage/**',
-      // The diagnostic report's wording (#75).
-      'src/components/DownloadLogButton.tsx',
     ],
     rules: {
       'no-restricted-globals': [

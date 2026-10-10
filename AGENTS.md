@@ -168,7 +168,7 @@ Types and options that are stored (such as graph settings) live in `model/` or `
 - `src/model/` imports nothing from the app above it.
 - `src/storage/` imports only `model/` and itself, not the platform, services, hooks or components (its hooks live in `src/services/`). `src/settings/` imports only `model/`, `storage/`, `metrics`, `units` and itself, and only types from `platform/`; the platform passes in what the settings need, such as defaults.
 - `src/history/` and `src/replay/` (their non-hook files) import only `model/`, `metrics`, `units` and themselves, so the series model stays below the hooks and views that read it.
-- Outside `src/platform/`, `localStorage`, `sessionStorage`, `indexedDB`, `navigator`, `location` and `window.location` are lint errors. `src/pwa/`, `src/usage/` and a few files named in `eslint.config.js` are exempt until the issues named there land; remove an entry when its issue does.
+- Outside `src/platform/`, `localStorage`, `sessionStorage`, `indexedDB`, `navigator`, `location` and `window.location` are lint errors. `src/pwa/` and `src/usage/` are exempt until #81 moves them behind `Platform`; remove the entries in `eslint.config.js` then.
 - Hooks (`use*.ts`) and providers (`*Provider.tsx`) never import the ECU library or hold a `Lease`; only the controllers (`EcuSession`, `EcuWrites`, `RomReader`) do.
 
 ### Series

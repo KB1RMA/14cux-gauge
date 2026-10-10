@@ -144,7 +144,7 @@ describe('AppNotices', () => {
         appStatus={options(RUNNING)}
         platform={testPlatform({
           storage: { open: () => Promise.reject(new Error('no disk')) },
-          app: { reload },
+          app: { userAgent: 'TestBrowser/1.0', reload },
         })}
       />,
     );

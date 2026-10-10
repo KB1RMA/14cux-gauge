@@ -74,6 +74,11 @@ export interface FilePlatform {
 
 export interface AppPlatform {
   /**
+   * Names the browser or shell the app runs in, for the diagnostic report
+   * (the browser's user agent).
+   */
+  readonly userAgent: string;
+  /**
    * Restarts the app, as reloading the page does: the ECU connection and any
    * recording end. A function, not a method: it is passed on and called on
    * its own.
