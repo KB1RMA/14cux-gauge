@@ -4,13 +4,17 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { App, type AppProps } from '../App';
 import {
   createAppServices,
+  servicesOn,
   type AppServices,
   type AppServicesOptions,
 } from '../appServices';
-import { EcuProvider } from '../ecu/EcuProvider';
+import type { EcuSession } from '../ecu/session';
+import { NotificationsProvider } from '../notifications/NotificationsProvider';
 import { browserPlatform } from '../platform/browser';
 import { PlatformContext } from '../platform/context';
 import type { Platform } from '../platform/platform';
+import { EcuProvider } from '../ecu/EcuProvider';
+import { ServicesContext } from '../services/context';
 import { testPlatform } from './platform';
 
 /**
@@ -57,10 +61,28 @@ export function TestApp({
   return <App services={services} usageCounter={usageCounter} />;
 }
 
+/** `children` inside the platform, notifications and `services`. */
+function ProvidedServices({
+  services,
+  children,
+}: {
+  services: AppServices;
+  children: ReactNode;
+}) {
+  return (
+    <PlatformContext value={services.platform}>
+      <NotificationsProvider>
+        <ServicesContext value={services}>
+          <EcuProvider session={services.session}>{children}</EcuProvider>
+        </ServicesContext>
+      </NotificationsProvider>
+    </PlatformContext>
+  );
+}
+
 /**
- * Views under test that need the platform and the ECU session, on services
- * built here: `children` is rendered inside `PlatformContext` and
- * `EcuProvider`.
+ * Views under test that need the platform and the app's controllers, on
+ * services built here: `children` is rendered inside `ServicesProvider`.
  */
 export function TestServices({
   platform,
@@ -75,11 +97,35 @@ export function TestServices({
     pollIntervalMs,
   });
 
-  return (
-    <PlatformContext value={services.platform}>
-      <EcuProvider session={services.session}>{children}</EcuProvider>
-    </PlatformContext>
+  return <ProvidedServices services={services}>{children}</ProvidedServices>;
+}
+
+/**
+ * Like `TestServices`, on a session the test made (see `sessionOver`), so it
+ * can drive the connection itself. The services are ended with the view; the
+ * test ends the session.
+ */
+export function TestSessionServices({
+  session,
+  platform,
+  children,
+}: {
+  session: EcuSession;
+  platform?: Platform;
+  children: ReactNode;
+}) {
+  const [services] = useState(() =>
+    servicesOn(platform ?? testPlatform(), session),
   );
+
+  useEffect(
+    () => () => {
+      services.dispose();
+    },
+    [services],
+  );
+
+  return <ProvidedServices services={services}>{children}</ProvidedServices>;
 }
 
 /**

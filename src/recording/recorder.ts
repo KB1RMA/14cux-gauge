@@ -1,0 +1,232 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 14cux-gauge contributors
+import { recordedSource } from '../ecu/connect';
+import type { EcuSession } from '../ecu/session';
+import type { EcuWrites } from '../ecuWrite/ecuWrites';
+import type { SessionSummary } from '../model/session';
+import { defaultSessionName, describeStorageError } from '../sessions/format';
+import type { StorageService } from '../storage/storageService';
+import { SessionRecorder } from './sessionRecorder';
+
+export interface RecorderState {
+  /** The session being recorded, or `undefined` when not recording. */
+  active: SessionSummary | undefined;
+  /** Whether {@link Recorder.start} would record: connected, storage open. */
+  canRecord: boolean;
+  /** Why the last recording stopped by itself, if a write failed. */
+  error: string | undefined;
+  /**
+   * A recording the user has just stopped, to offer a name and notes for;
+   * cleared by {@link Recorder.dismissFinished}. Recordings that stop by
+   * themselves (the link dropped, a write failed) keep their default name.
+   */
+  finished: SessionSummary | undefined;
+}
+
+interface Active {
+  recorder: SessionRecorder;
+  unsubscribe(): void;
+}
+
+/**
+ * Records the live snapshots, and the writes to the ECU, into a session
+ * while the user asks it to. Recording stops by itself when the connection
+ * ends, keeping what was recorded, or if saving fails. Something that needs
+ * the link to itself (a ROM read) calls {@link Recorder.interrupt}.
+ */
+export class Recorder {
+  private state: RecorderState;
+  private current: Active | undefined;
+  private starting = false;
+  private unwatchConnection: (() => void) | undefined;
+  private readonly listeners = new Set<() => void>();
+
+  constructor(
+    private readonly session: EcuSession,
+    private readonly writes: EcuWrites,
+    private readonly storage: StorageService,
+  ) {
+    this.state = {
+      active: undefined,
+      canRecord: false,
+      error: undefined,
+      finished: undefined,
+    };
+  }
+
+  /** Calls `listener` when the recording, or whether one can start, changes. */
+  readonly subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+
+    const stops = [
+      this.session.subscribe(listener),
+      this.storage.subscribe(listener),
+    ];
+
+    return () => {
+      this.listeners.delete(listener);
+
+      for (const stop of stops) {
+        stop();
+      }
+    };
+  };
+
+  readonly getSnapshot = (): RecorderState => {
+    const connected = this.connected();
+    const storage = this.storage.getSnapshot();
+    const canRecord = connected && storage !== undefined;
+
+    if (canRecord !== this.state.canRecord) {
+      this.state = { ...this.state, canRecord };
+    }
+
+    return this.state;
+  };
+
+  /** Starts recording every snapshot into a new session. */
+  readonly start = async (): Promise<void> => {
+    const store = this.storage.getSnapshot()?.sessions;
+    const { connection } = this.session.getSnapshot();
+
+    if (
+      !store ||
+      connection.status !== 'connected' ||
+      this.current ||
+      this.starting
+    ) {
+      return;
+    }
+
+    const source = recordedSource(connection.source);
+
+    this.starting = true;
+    this.set({ error: undefined });
+
+    try {
+      const startedAt = Date.now();
+      const recorder = await SessionRecorder.start(
+        store,
+        { name: defaultSessionName(source, startedAt), source, startedAt },
+        {
+          onError: (cause) => {
+            this.set({ error: describeStorageError(cause) });
+            this.stopQuietly();
+          },
+        },
+      );
+
+      const stopSamples = this.session.onSnapshot((snapshot) => {
+        recorder.push(snapshot);
+      });
+      const stopWrites = this.writes.watch((entry) => {
+        recorder.recordWrite(entry);
+      });
+
+      this.current = {
+        recorder,
+        unsubscribe: () => {
+          stopSamples();
+          stopWrites();
+        },
+      };
+      this.set({ active: recorder.session });
+    } catch (cause) {
+      this.set({ error: describeStorageError(cause) });
+    } finally {
+      this.starting = false;
+    }
+
+    // Keep what was recorded when the connection ends, including when it
+    // ended while recording was starting.
+    if (this.current) {
+      if (this.connected()) {
+        this.unwatchConnection = this.session.subscribe(() => {
+          if (!this.connected()) {
+            this.stopQuietly();
+          }
+        });
+      } else {
+        this.stopQuietly();
+      }
+    }
+  };
+
+  /** Stops recording and sets `finished`. */
+  readonly stop = async (): Promise<void> => {
+    try {
+      this.set({ finished: await this.finish() });
+    } catch (cause) {
+      this.set({ error: describeStorageError(cause) });
+    }
+  };
+
+  /**
+   * Stops recording because something else needs the link (see
+   * `ROM_READ_HOLDER`). What was recorded is kept under its default name,
+   * with no prompt to rename it.
+   */
+  readonly interrupt = async (): Promise<void> => {
+    try {
+      await this.finish();
+    } catch (cause) {
+      this.set({ error: describeStorageError(cause) });
+    }
+  };
+
+  readonly dismissFinished = (): void => {
+    this.set({ finished: undefined });
+  };
+
+  /** Keeps what has been recorded, as when the app goes. */
+  dispose(): void {
+    this.stopQuietly();
+    this.listeners.clear();
+  }
+
+  private connected(): boolean {
+    return this.session.getSnapshot().connection.status === 'connected';
+  }
+
+  /** Stops recording; resolves with the finished session, if there was one. */
+  private async finish(): Promise<SessionSummary | undefined> {
+    const current = this.current;
+
+    if (!current) {
+      return undefined;
+    }
+
+    this.current = undefined;
+    this.unwatchConnection?.();
+    this.unwatchConnection = undefined;
+    current.unsubscribe();
+    this.set({ active: undefined });
+
+    return current.recorder.stop();
+  }
+
+  // Stopping by itself, the recording keeps what it has; a failure here has
+  // already been reported through the recorder's onError.
+  private stopQuietly(): void {
+    void this.finish().catch(() => undefined);
+  }
+
+  private set(change: Partial<RecorderState>): void {
+    const next = { ...this.state, ...change };
+
+    if (
+      next.active === this.state.active &&
+      next.error === this.state.error &&
+      next.finished === this.state.finished &&
+      next.canRecord === this.state.canRecord
+    ) {
+      return;
+    }
+
+    this.state = next;
+
+    for (const listener of [...this.listeners]) {
+      listener();
+    }
+  }
+}

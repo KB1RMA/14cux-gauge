@@ -280,21 +280,6 @@ describe('EcuSession', () => {
       expect(session.history.window('engineRpm').values).not.toContain(null);
     });
 
-    it('stops the recording with the stopper set last', async () => {
-      const { session } = await connectedSession(idling());
-      const first = vi.fn(() => Promise.resolve());
-      const second = vi.fn(() => Promise.resolve());
-      const removeFirst = session.setRecordingStopper(first);
-
-      session.setRecordingStopper(second);
-      // Removing one that was replaced leaves the newer one.
-      removeFirst();
-      await session.acquire(ROM_READ_HOLDER)?.ready;
-
-      expect(first).not.toHaveBeenCalled();
-      expect(second).toHaveBeenCalledOnce();
-    });
-
     it('lets one holder have it at a time', async () => {
       const { session } = await connectedSession(idling());
       const write = session.acquire(WRITE_HOLDER);
@@ -359,19 +344,17 @@ describe('EcuSession', () => {
       expect(session.acquire(ROM_READ_HOLDER)).toBeUndefined();
     });
 
-    it('stops any recording, then pauses polling, for a holder that asks', async () => {
+    it("runs a holder's first step, then pauses polling", async () => {
       const { session } = await connectedSession(idling(), 5);
       const order: string[] = [];
 
-      session.setRecordingStopper(() => {
+      const lease = session.acquire(ROM_READ_HOLDER, () => {
         order.push(
-          `recording stopped, polling ${session.getSnapshot().pollingPaused ? 'paused' : 'running'}`,
+          `first step done, polling ${session.getSnapshot().pollingPaused ? 'paused' : 'running'}`,
         );
 
         return Promise.resolve();
       });
-
-      const lease = session.acquire(ROM_READ_HOLDER);
 
       await lease?.ready;
       order.push(
@@ -379,7 +362,7 @@ describe('EcuSession', () => {
       );
 
       expect(order).toEqual([
-        'recording stopped, polling running',
+        'first step done, polling running',
         'ready, polling paused',
       ]);
       expect(session.getLive().snapshot).toBeUndefined();
@@ -390,17 +373,12 @@ describe('EcuSession', () => {
       await firstSnapshot(session);
     });
 
-    it('leaves polling and recording alone for a holder that does not', async () => {
+    it('leaves polling alone for a holder that does not pause it', async () => {
       const { session } = await connectedSession(idling());
-      const stopRecording = vi.fn(() => Promise.resolve());
-
-      session.setRecordingStopper(stopRecording);
-
       const lease = session.acquire(WRITE_HOLDER);
 
       await lease?.ready;
 
-      expect(stopRecording).not.toHaveBeenCalled();
       expect(session.getSnapshot().pollingPaused).toBe(false);
       expect(session.getLive().snapshot?.engineRpm).toBe(750);
     });
@@ -434,7 +412,7 @@ describe('EcuSession', () => {
 
     it('is given back before polling resumes when released early', async () => {
       const { session } = await connectedSession(idling(), 5);
-      const pausing: LinkHolder = { ...ROM_READ_HOLDER, stopsRecording: false };
+      const pausing: LinkHolder = ROM_READ_HOLDER;
       const lease = session.acquire(pausing);
 
       // Released before the pause took effect: polling must not stay paused.
@@ -458,7 +436,7 @@ describe('EcuSession', () => {
       await session.connect({ kind: 'demo' });
       await firstSnapshot(session);
 
-      const pausing: LinkHolder = { ...ROM_READ_HOLDER, stopsRecording: false };
+      const pausing: LinkHolder = ROM_READ_HOLDER;
       const early = session.acquire(pausing);
 
       early?.release();

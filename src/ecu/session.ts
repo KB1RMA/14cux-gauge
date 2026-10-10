@@ -49,12 +49,6 @@ export interface LinkHolder {
    * cleared, so no old value looks current.
    */
   pausesPolling: boolean;
-  /**
-   * Any recording ends before the holder starts. A recording would
-   * otherwise have a gap while polling is paused, which replay could draw
-   * across.
-   */
-  stopsRecording: boolean;
 }
 
 /** The link, held by one holder until it is released. */
@@ -62,8 +56,8 @@ export interface Lease {
   readonly link: EcuLink;
   readonly ecu: Ecu;
   /**
-   * Settles once the holder's policy has been applied: any recording
-   * stopped, polling paused.
+   * Settles once the holder's policy has been applied: the `before` step
+   * done, polling paused.
    */
   readonly ready: Promise<void>;
   /**
@@ -173,7 +167,6 @@ export class EcuSession {
   private active: Active | undefined;
   /** Identifies the lease held on the active connection, if any. */
   private lease: object | undefined;
-  private stopRecording: (() => Promise<void>) | undefined;
   private links = 0;
   // Bumped by every connect/disconnect, so a slow async step can tell that it
   // has been superseded.
@@ -226,20 +219,6 @@ export class EcuSession {
   /** What to read from the next pass on. */
   readonly select = (selection: ReadingSelection): void => {
     this.selection = selection;
-  };
-
-  /**
-   * Sets how a holder that `stopsRecording` stops the recording; returns a
-   * function that removes it.
-   */
-  readonly setRecordingStopper = (stop: () => Promise<void>): (() => void) => {
-    this.stopRecording = stop;
-
-    return () => {
-      if (this.stopRecording === stop) {
-        this.stopRecording = undefined;
-      }
-    };
   };
 
   /** The ECU on `link`, while that link is the one connected. */
@@ -358,8 +337,15 @@ export class EcuSession {
    * Takes the link for `holder`, or returns `undefined` if not connected or
    * if something else holds it. The link is taken at once, so two holders
    * can never both have it; wait for `ready` before using it.
+   *
+   * `before` runs first, ahead of pausing polling, and `ready` waits for it.
+   * A ROM read ends any recording this way: a recording would otherwise
+   * have a gap while polling is paused, which replay could draw across.
    */
-  readonly acquire = (holder: LinkHolder): Lease | undefined => {
+  readonly acquire = (
+    holder: LinkHolder,
+    before?: () => Promise<void>,
+  ): Lease | undefined => {
     const active = this.active;
 
     if (!active || this.state.link !== active.link || this.lease) {
@@ -391,8 +377,9 @@ export class EcuSession {
     this.update({ holder });
 
     const ready = (async () => {
-      if (holder.stopsRecording) {
-        await this.stopRecording?.();
+      // Only a holder with a first step waits, so one without pauses at once.
+      if (before) {
+        await before();
       }
 
       if (holder.pausesPolling && !released() && this.active === active) {

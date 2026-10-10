@@ -36,7 +36,15 @@ Graphs are for reading numbers, not for decoration. A technician must be able to
 - Graphs that are compared share the same time axis and cursor, as replay's timeline does.
 - Do not add visual effects that move a line away from its value: no curve smoothing, easing between samples or animated transitions of plotted data.
 
-### Tests
+#### Boundaries enforced by lint
+
+`eslint.config.js` restricts imports, as errors, so these cannot be crossed unnoticed. Fix the code, not the config.
+
+- Views (`src/components/`) never import the ECU library, storage, `settingStore`, `SampleHistory` or `EcuSession` as values; they use hooks (`useSessions`, `useRoms`, `useSetting`, `useHistory`, `useEcu`, `useEcuRead`).
+- `src/model/` imports nothing from the app above it.
+- Hooks (`use*.ts`) and providers (`*Provider.tsx`) never import the ECU library or hold a `Lease`; only the controllers (`EcuSession`, `EcuWrites`, `RomReader`) do.
+
+## Tests
 
 - Test every metric's formatting and conversion with literal expected strings, including rounding boundaries, negative values, zero and invalid readings.
 - Test that history, recordings and exports keep full-precision samples in library units.
