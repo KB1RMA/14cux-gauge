@@ -1,24 +1,27 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import {
-  LAYOUT_OPTIONS,
-  WINDOW_OPTIONS,
-  type GraphLayout,
-  type GraphSettings,
-  type GraphWindow,
-} from '../components/graphSettings';
+import * as z from 'zod/mini';
 import { METRIC_KEYS } from '../metrics';
-import type { PalettePreference, Preferences } from '../preferences/context';
-import { ALWAYS_READ, type ReadingSettings } from '../readings/readingSettings';
-import { asRecord, oneOf, type SettingParser } from '../storage/settings';
-import { browserAsksNotToTrack } from '../usage/goatCounter';
+import type { SettingDefaults } from '../platform/platform';
+import type { PalettePreference } from '../preferences/context';
+import { ALWAYS_READ } from '../readings/readingSettings';
+import { LAYOUT_OPTIONS, WINDOW_OPTIONS } from './graphSettings';
+import {
+  choice,
+  pickedFrom,
+  settingObject,
+  type SettingParser,
+} from './parseSetting';
 
 /**
- * Every setting the app stores, by key, with the parser that turns whatever
- * is stored into a valid value. A parser gives the setting's default when
+ * Every setting the app stores, by key, as a schema that turns whatever is
+ * stored into a valid value. A schema gives the setting's default when
  * nothing usable is stored. Stored values may come from an older or newer
- * version of the app, or have been edited by hand, so each parser accepts
+ * version of the app, or have been edited by hand, so each schema accepts
  * the shapes earlier versions stored.
+ *
+ * A schema is made from the platform's defaults, so parsing reads no
+ * browser globals.
  *
  * Read and change settings with `useSetting`.
  */
@@ -30,72 +33,59 @@ const PALETTES = [
   'racing-green',
 ] as const satisfies readonly PalettePreference[];
 
-function parsePreferences(stored: unknown): Preferences {
-  const p = asRecord(stored);
-
-  return {
-    temperatureUnit: oneOf(p['temperatureUnit'], ['F', 'C'], 'F'),
-    speedUnit: oneOf(p['speedUnit'], ['mph', 'kmh'], 'mph'),
-    theme: oneOf(p['theme'], ['system', 'light', 'dark'], 'system'),
-    palette: oneOf(p['palette'], PALETTES, 'coniston'),
-    // Off by default if the browser asks sites not to track; a choice made
-    // in Preferences overrides that.
-    usageCounts: oneOf(
-      p['usageCounts'],
-      ['on', 'off'],
-      browserAsksNotToTrack() ? 'off' : 'on',
-    ),
-  };
-}
-
-function parseReadingSettings(stored: unknown): ReadingSettings {
-  const s = asRecord(stored);
-  const off = Array.isArray(s['off']) ? (s['off'] as unknown[]) : [];
-
-  // Every reading by default.
-  return {
-    off: METRIC_KEYS.filter(
-      (key) => off.includes(key) && !ALWAYS_READ.includes(key),
-    ),
-  };
-}
-
-function parseGraphSettings(stored: unknown): GraphSettings {
-  const s = asRecord(stored);
-  const hidden = Array.isArray(s['hidden']) ? (s['hidden'] as unknown[]) : [];
-
-  return {
-    // Earlier versions stored the window as `windowSeconds`.
-    window: oneOf<GraphWindow>(
-      s['window'] ?? s['windowSeconds'],
-      WINDOW_OPTIONS.map((o) => o.value),
-      60,
-    ),
-    layout: oneOf<GraphLayout>(s['layout'], LAYOUT_OPTIONS, 'grid'),
-    hidden: METRIC_KEYS.filter((key) => hidden.includes(key)),
-  };
-}
-
-function parseDoubleSpeed(stored: unknown): boolean {
-  return stored === true;
-}
-
 export const SETTINGS = {
   /** Units, theme, palette and usage counts, chosen in Preferences. */
-  preferences: parsePreferences,
-  /** Which readings are polled and recorded. */
-  readings: parseReadingSettings,
+  preferences: (defaults: SettingDefaults) =>
+    settingObject({
+      temperatureUnit: choice(['F', 'C'], 'F'),
+      speedUnit: choice(['mph', 'kmh'], 'mph'),
+      theme: choice(['system', 'light', 'dark'], 'system'),
+      palette: choice(PALETTES, 'coniston'),
+      // The platform's default applies until a choice is made in Preferences.
+      usageCounts: choice(['on', 'off'], defaults.usageCounts),
+    }),
+  /** Which readings are polled and recorded; every reading by default. */
+  readings: () =>
+    settingObject({
+      // Never turns the MIL off.
+      off: pickedFrom(METRIC_KEYS, (key) => !ALWAYS_READ.includes(key)),
+    }),
   /** The time window, layout and hidden graphs, live and in replay. */
-  graphs: parseGraphSettings,
+  graphs: () =>
+    settingObject(
+      {
+        window: choice(
+          WINDOW_OPTIONS.map((o) => o.value),
+          60,
+        ),
+        layout: choice(LAYOUT_OPTIONS, 'grid'),
+        hidden: pickedFrom(METRIC_KEYS),
+      },
+      // Earlier versions stored the window as `windowSeconds`.
+      (fields) => ({
+        ...fields,
+        window: fields['window'] ?? fields['windowSeconds'],
+      }),
+    ),
   /**
    * Whether to connect at double the usual serial speed; remembered, since
    * it matches the user's ECU and rarely changes.
    */
-  doubleSpeed: parseDoubleSpeed,
-} as const satisfies Record<string, SettingParser<unknown>>;
+  doubleSpeed: () => z.catch(z.boolean(), false),
+} as const;
 
 export type SettingKey = keyof typeof SETTINGS;
 
-export type SettingValue<K extends SettingKey> = ReturnType<
-  (typeof SETTINGS)[K]
+export type SettingValue<K extends SettingKey> = z.output<
+  ReturnType<(typeof SETTINGS)[K]>
 >;
+
+/** The parser for the setting `key`, with the platform's `defaults`. */
+export function settingParser<K extends SettingKey>(
+  key: K,
+  defaults: SettingDefaults,
+): SettingParser<SettingValue<K>> {
+  const schema = SETTINGS[key](defaults) as z.ZodMiniType<SettingValue<K>>;
+
+  return (stored) => schema.parse(stored);
+}

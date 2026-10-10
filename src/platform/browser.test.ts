@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { browserPlatform } from './browser';
+import { blockStorage } from '../test-support/storage';
+import {
+  affectsSetting,
+  browserAsksNotToTrack,
+  browserPlatform,
+  readRawSetting,
+  writeSetting,
+} from './browser';
 
 /** Captures what is handed to the browser to download, and what is released. */
 function captureDownloads() {
@@ -194,5 +201,61 @@ describe('browserPlatform', () => {
 
     expect(platform.storage).toBe(storage);
     expect(platform.settings).toBe(browserPlatform().settings);
+  });
+});
+
+describe('browser settings', () => {
+  it('stores JSON under the cuxGauge prefix and reads it back', () => {
+    expect(writeSetting('graphs', { window: 300 })).toBe('{"window":300}');
+    expect(localStorage.getItem('cuxGauge.graphs')).toBe('{"window":300}');
+    expect(readRawSetting('graphs')).toBe('{"window":300}');
+    expect(readRawSetting('readings')).toBeNull();
+  });
+
+  it('works without storage', () => {
+    blockStorage();
+
+    expect(readRawSetting('window')).toBeUndefined();
+    expect(writeSetting('window', 30)).toBeUndefined();
+  });
+
+  it('tells which changes in another window affect a setting', () => {
+    const event = (key: string | null, storageArea: Storage = localStorage) =>
+      new StorageEvent('storage', { key, storageArea });
+
+    expect(affectsSetting(event('cuxGauge.graphs'), 'graphs')).toBe(true);
+    // Cleared.
+    expect(affectsSetting(event(null), 'graphs')).toBe(true);
+    expect(affectsSetting(event('cuxGauge.readings'), 'graphs')).toBe(false);
+    expect(affectsSetting(event('graphs'), 'graphs')).toBe(false);
+    expect(
+      affectsSetting(event('cuxGauge.graphs', sessionStorage), 'graphs'),
+    ).toBe(false);
+  });
+
+  it('counts usage by default', () => {
+    expect(browserPlatform().settings.defaults()).toEqual({
+      usageCounts: 'on',
+    });
+  });
+});
+
+describe('browserAsksNotToTrack', () => {
+  const nav = (signals: object) => signals as Navigator;
+
+  it('honours Global Privacy Control and Do Not Track', () => {
+    expect(browserAsksNotToTrack(nav({ globalPrivacyControl: true }))).toBe(
+      true,
+    );
+    expect(browserAsksNotToTrack(nav({ doNotTrack: '1' }))).toBe(true);
+  });
+
+  it('is false without either signal', () => {
+    expect(browserAsksNotToTrack(nav({}))).toBe(false);
+    expect(
+      browserAsksNotToTrack(
+        nav({ globalPrivacyControl: false, doNotTrack: '0' }),
+      ),
+    ).toBe(false);
   });
 });

@@ -11,7 +11,7 @@ import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { expectNoAxeViolations } from '../test-support/a11y';
 import { loadPlot } from '../charts/plotOptions';
 import { installCanvasStandIns } from '../test-support/canvas';
-import type { GraphWindow } from './graphSettings';
+import type { GraphWindow } from '../settings/graphSettings';
 import { TimeSeriesChart } from './TimeSeriesChart';
 
 function metric(key: MetricKey) {

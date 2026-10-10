@@ -78,12 +78,22 @@ export interface StoragePlatform {
   open: () => Promise<AppStorage>;
 }
 
+/** Settings whose default depends on where the app runs. */
+export interface SettingDefaults {
+  usageCounts: 'on' | 'off';
+}
+
 /**
  * Where small settings are kept, as JSON by key. Reads are synchronous, as
  * React reads settings while rendering. Storage may be missing or refuse a
  * write; the app must still work.
  */
 export interface SettingsBackend {
+  /**
+   * What a setting is when the user has not chosen, where that depends on
+   * the platform (such as the browser's privacy signals).
+   */
+  defaults(): SettingDefaults;
   /** The JSON stored for `key`: `null` if none, `undefined` if unreadable. */
   read(key: string): string | null | undefined;
   /** Saves `value`; returns the JSON stored, or `undefined` if it was not. */

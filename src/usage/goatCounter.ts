@@ -59,10 +59,3 @@ export function goatCounter(
     },
   };
 }
-
-/** Whether the browser sends Global Privacy Control or Do Not Track. */
-export function browserAsksNotToTrack(nav: Navigator = navigator): boolean {
-  const signals = nav as Navigator & { globalPrivacyControl?: boolean };
-
-  return signals.globalPrivacyControl === true || signals.doNotTrack === '1';
-}

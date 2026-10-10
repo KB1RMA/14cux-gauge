@@ -13,7 +13,7 @@ import {
   WINDOW_OPTIONS,
   type GraphLayout,
   type GraphWindow,
-} from './graphSettings';
+} from '../settings/graphSettings';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import styles from './GraphsView.module.css';
 
