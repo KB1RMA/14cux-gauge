@@ -124,21 +124,23 @@ Serving the JS bundle to a browser is distribution under the GPL.
 
 ## State and data
 
-The app is a set of plain TypeScript services under a thin React layer. Some older code does not follow these rules yet and is being moved under #76–#81. Follow the rules in new code; do not copy the older pattern.
+React renders the app and holds view state. Work that coordinates the ECU link or storage across views lives in plain TypeScript services underneath it, which React reads. Some older code does not follow these rules yet and is being moved under #76–#81. Follow the rules in new code; do not copy the older pattern.
 
-### Services own state
+### What lives where
 
-- State that outlives a view, or that touches the ECU or storage, lives in a plain TypeScript controller in `AppServices` (`src/appServices.ts`), not in a provider, hook or effect. A controller exposes `subscribe` / `getSnapshot` as `EcuSession` does, and React reads it with `useSyncExternalStore`.
-- Providers and hooks only adapt services for React. They do not coordinate work, hold leases or decide what happens next.
+- **Services** coordinate: work that holds or shares the ECU link (polling, writes, ROM reads), runs across views (recording), or must not race with other work. A service is a plain TypeScript controller in `AppServices` (`src/appServices.ts`) that exposes `subscribe` / `getSnapshot` as `EcuSession` does; React reads it with `useSyncExternalStore`.
+- **React** holds everything else: view state (tabs, dialogs, forms, focus, the replay position), small syncs between a setting and a service (as `ReadingsProvider` does), and work whose lifetime is a view's, such as "leaving the view stops the pump". Use an effect for that lifetime, but let the service do the ECU calls.
+- Do not move plain state out of React just because it is stored or read from storage; `useSetting` and the providers over the stores are fine for that. Keep services small, sharing at most `Listeners`; do not build a general event bus or state framework.
+- Providers and hooks never hold a `Lease` or call `Ecu` methods; they ask a service.
 - Every service is built once, in `createAppServices`, from the `Platform`. Do not give a context a default value or let a provider build its own instance. Tests build services with the helper in `src/test-support/`.
-- When a service needs to know that something happened, it subscribes to an event from the service that owns it. Do not work out events by comparing renders in an effect, and do not have a lower service call back up into React.
+- When code needs to know that something happened (a connection failing, a recording stopping), it subscribes to an event from the service that owns it. Do not work out events by comparing renders in an effect, and do not have a service call back up into React.
 - A result that belongs to a connection (a read, a write's outcome) is keyed by its `EcuLink`, so a new or lost connection never shows an old result.
 
 ### One touch point each
 
 - Only the services in `src/ecu/`, `src/ecuWrite/` and `src/roms/` call `Ecu` methods or hold a `Lease`. Views and hooks never receive an `Ecu`.
-- Only the stores in `src/storage/` talk to IndexedDB, and views reach stores only through services.
-- Only `src/platform/` reads browser globals (`navigator`, `window`, `location`, `localStorage`, `indexedDB`, the service worker, `document` outside rendering). Anything else the app needs from where it runs becomes a part of `Platform`.
+- Only the stores in `src/storage/` talk to IndexedDB, and views reach stores only through services or the providers over them.
+- Only `src/platform/` reads browser globals (`navigator`, `window`, `location`, `localStorage`, `indexedDB`, `document` outside rendering). The exception is `src/pwa/` (the offline and update checks) and usage counting, which stay as they are until a desktop build starts (#81). Anything new the app needs from where it runs becomes a part of `Platform`.
 - Navigation and the current location go through React Router, never `window.location`.
 
 ### Layers
@@ -155,7 +157,7 @@ Types and options that are stored (such as graph settings) live in `model/` or `
 - Changing a stored shape bumps its format version, and older formats are migrated when they are read. Never rewrite stored data in place to migrate it.
 - A record that cannot be read is listed as unreadable so the user can delete it. Never drop it silently. A record from a newer version is unreadable, not damaged.
 - Stored values are deliberately separate from the app's own types (as `RecordedSource` is from `EcuSource`), so a new way of connecting or a new option does not change what is stored without a format change.
-- Store contracts are async and structured-cloneable: plain objects, arrays and typed arrays, no class instances, functions or DOM objects. A store must work unchanged behind IPC in a desktop build. Return large data, such as a recording's samples, in pages or as typed-array columns, not one array of objects.
+- Store contracts are async and return plain data (objects, arrays, typed arrays), never class instances, functions or DOM objects, so a desktop build can later put a store in another process. Paging or typed-array columns for large results, such as a recording's samples, can wait until a store actually runs behind IPC.
 - Every persistent store tells other windows when what it holds changes, as settings do.
 
 ### Boundaries enforced by lint
