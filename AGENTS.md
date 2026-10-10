@@ -36,15 +36,7 @@ Graphs are for reading numbers, not for decoration. A technician must be able to
 - Graphs that are compared share the same time axis and cursor, as replay's timeline does.
 - Do not add visual effects that move a line away from its value: no curve smoothing, easing between samples or animated transitions of plotted data.
 
-#### Boundaries enforced by lint
-
-`eslint.config.js` restricts imports, as errors, so these cannot be crossed unnoticed. Fix the code, not the config.
-
-- Views (`src/components/`) never import the ECU library, storage, `settingStore`, `SampleHistory` or `EcuSession` as values; they use hooks (`useSessions`, `useRoms`, `useSetting`, `useHistory`, `useEcu`, `useEcuRead`).
-- `src/model/` imports nothing from the app above it.
-- Hooks (`use*.ts`) and providers (`*Provider.tsx`) never import the ECU library or hold a `Lease`; only the controllers (`EcuSession`, `EcuWrites`, `RomReader`) do.
-
-## Tests
+### Tests
 
 - Test every metric's formatting and conversion with literal expected strings, including rounding boundaries, negative values, zero and invalid readings.
 - Test that history, recordings and exports keep full-precision samples in library units.
@@ -165,6 +157,14 @@ Types and options that are stored (such as graph settings) live in `model/` or `
 - Stored values are deliberately separate from the app's own types (as `RecordedSource` is from `EcuSource`), so a new way of connecting or a new option does not change what is stored without a format change.
 - Store contracts are async and structured-cloneable: plain objects, arrays and typed arrays, no class instances, functions or DOM objects. A store must work unchanged behind IPC in a desktop build. Return large data, such as a recording's samples, in pages or as typed-array columns, not one array of objects.
 - Every persistent store tells other windows when what it holds changes, as settings do.
+
+### Boundaries enforced by lint
+
+`eslint.config.js` restricts imports, as errors, so these cannot be crossed unnoticed. Fix the code, not the config.
+
+- Views (`src/components/`) never import the ECU library, storage, `settingStore`, `SampleHistory` or `EcuSession` as values; they use hooks (`useSessions`, `useRoms`, `useSetting`, `useHistory`, `useEcu`, `useEcuRead`).
+- `src/model/` imports nothing from the app above it.
+- Hooks (`use*.ts`) and providers (`*Provider.tsx`) never import the ECU library or hold a `Lease`; only the controllers (`EcuSession`, `EcuWrites`, `RomReader`) do.
 
 ### Series
 

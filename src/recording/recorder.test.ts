@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
+import { MemoryRomStore } from '../storage/romStore';
 import { MemorySessionStore } from '../storage/sessionStore';
 import { connectedSession } from '../test-support/ecuSession';
 import { testPlatform } from '../test-support/platform';
@@ -104,5 +105,66 @@ describe('Recorder', () => {
 
     expect(recorder.getSnapshot().active).toBeUndefined();
     expect(await sessions.list()).toEqual([]);
+  });
+
+  it('stops when asked while it is still starting', async () => {
+    const { recorder, sessions } = await recorderOn();
+    const starting = recorder.start();
+
+    await recorder.stop();
+    await starting;
+
+    expect(recorder.getSnapshot().active).toBeUndefined();
+    expect(recorder.getSnapshot().finished).toBeDefined();
+    expect(await sessions.list()).toHaveLength(1);
+  });
+
+  it('is interrupted when it is still starting', async () => {
+    const { recorder, sessions } = await recorderOn();
+    const starting = recorder.start();
+
+    await recorder.interrupt();
+    await starting;
+
+    expect(recorder.getSnapshot().active).toBeUndefined();
+    expect((await sessions.list())[0]?.endedAt).not.toBeNull();
+  });
+
+  it('finishes the session before the storage closes with the services', async () => {
+    const sessions = new MemorySessionStore();
+    const order: string[] = [];
+    const finish = sessions.finish.bind(sessions);
+
+    sessions.finish = (id, endedAt) => {
+      order.push('finished');
+
+      return finish(id, endedAt);
+    };
+
+    const { session } = await connectedSession(new SimulatedTransport());
+    const services = await controllersOn(
+      session,
+      testPlatform({
+        storage: {
+          open: () =>
+            Promise.resolve({
+              sessions,
+              roms: new MemoryRomStore(),
+              persistent: true,
+              close: () => {
+                order.push('closed');
+              },
+            }),
+        },
+      }),
+    );
+
+    await services.recorder.start();
+    services.dispose();
+
+    await vi.waitFor(() => {
+      expect(order).toEqual(['finished', 'closed']);
+    });
+    expect((await sessions.list())[0]?.endedAt).not.toBeNull();
   });
 });

@@ -37,7 +37,9 @@ interface Active {
 export class Recorder {
   private state: RecorderState;
   private current: Active | undefined;
-  private starting = false;
+  /** Settles once a start in progress has finished, successfully or not. */
+  private starting: Promise<void> | undefined;
+  private readonly stopFollowing: () => void;
   private unwatchConnection: (() => void) | undefined;
   private readonly listeners = new Set<() => void>();
 
@@ -52,55 +54,66 @@ export class Recorder {
       error: undefined,
       finished: undefined,
     };
+
+    const stops = [
+      session.subscribe(this.refreshCanRecord),
+      storage.subscribe(this.refreshCanRecord),
+    ];
+
+    this.stopFollowing = () => {
+      for (const stop of stops) {
+        stop();
+      }
+    };
+
+    this.refreshCanRecord();
   }
 
   /** Calls `listener` when the recording, or whether one can start, changes. */
   readonly subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
 
-    const stops = [
-      this.session.subscribe(listener),
-      this.storage.subscribe(listener),
-    ];
-
     return () => {
       this.listeners.delete(listener);
-
-      for (const stop of stops) {
-        stop();
-      }
     };
   };
 
-  readonly getSnapshot = (): RecorderState => {
-    const connected = this.connected();
-    const storage = this.storage.getSnapshot();
-    const canRecord = connected && storage !== undefined;
+  readonly getSnapshot = (): RecorderState => this.state;
 
-    if (canRecord !== this.state.canRecord) {
-      this.state = { ...this.state, canRecord };
-    }
-
-    return this.state;
+  /** Follows the connection and the storage, which decide `canRecord`. */
+  private readonly refreshCanRecord = (): void => {
+    this.set({
+      canRecord: this.connected() && this.storage.getSnapshot() !== undefined,
+    });
   };
 
   /** Starts recording every snapshot into a new session. */
-  readonly start = async (): Promise<void> => {
+  readonly start = (): Promise<void> => {
+    if (this.starting) {
+      return this.starting;
+    }
+
+    const starting = this.begin().finally(() => {
+      if (this.starting === starting) {
+        this.starting = undefined;
+      }
+    });
+
+    this.starting = starting;
+
+    return starting;
+  };
+
+  private async begin(): Promise<void> {
     const store = this.storage.getSnapshot()?.sessions;
     const { connection } = this.session.getSnapshot();
 
-    if (
-      !store ||
-      connection.status !== 'connected' ||
-      this.current ||
-      this.starting
-    ) {
+    if (!store || connection.status !== 'connected' || this.current) {
       return;
     }
 
     const source = recordedSource(connection.source);
 
-    this.starting = true;
     this.set({ error: undefined });
 
     try {
@@ -133,8 +146,6 @@ export class Recorder {
       this.set({ active: recorder.session });
     } catch (cause) {
       this.set({ error: describeStorageError(cause) });
-    } finally {
-      this.starting = false;
     }
 
     // Keep what was recorded when the connection ends, including when it
@@ -150,10 +161,14 @@ export class Recorder {
         this.stopQuietly();
       }
     }
-  };
+  }
 
   /** Stops recording and sets `finished`. */
   readonly stop = async (): Promise<void> => {
+    // A start still opening the session is allowed to finish, so that this
+    // stops it rather than leaving it to start afterwards.
+    await this.starting;
+
     try {
       this.set({ finished: await this.finish() });
     } catch (cause) {
@@ -167,6 +182,8 @@ export class Recorder {
    * with no prompt to rename it.
    */
   readonly interrupt = async (): Promise<void> => {
+    await this.starting;
+
     try {
       await this.finish();
     } catch (cause) {
@@ -178,10 +195,15 @@ export class Recorder {
     this.set({ finished: undefined });
   };
 
-  /** Keeps what has been recorded, as when the app goes. */
-  dispose(): void {
-    this.stopQuietly();
+  /**
+   * Keeps what has been recorded, as when the app goes. Settles once the
+   * session is saved and finished, so the storage can be closed after it.
+   */
+  async dispose(): Promise<void> {
+    this.stopFollowing();
     this.listeners.clear();
+    await this.starting;
+    await this.finish().catch(() => undefined);
   }
 
   private connected(): boolean {

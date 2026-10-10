@@ -76,11 +76,15 @@ export function servicesOn(
     ),
     checksAppStatus: appStatus !== undefined,
     dispose: () => {
-      // Recording keeps what it has before the link closes.
-      recorder.dispose();
+      // Recording keeps what it has, and the storage stays open until that is
+      // saved: closing it first would lose the last samples.
+      const recorded = recorder.dispose();
+
       roms.dispose();
       session.dispose();
-      storage.dispose();
+      void recorded.finally(() => {
+        storage.dispose();
+      });
     },
   };
 }
