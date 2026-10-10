@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/KB1RMA/14cux-gauge/compare/v0.9.0...v0.9.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* show an error instead of a blank page when the app cannot start ([#97](https://github.com/KB1RMA/14cux-gauge/issues/97)) ([bad4ce7](https://github.com/KB1RMA/14cux-gauge/commit/bad4ce70e35e3e58c3cb7918a6662c2a6a433093))
+
 ## [0.9.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.8.0...v0.9.0) (2026-10-10)
 
 
