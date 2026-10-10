@@ -6,6 +6,7 @@ import {
   describeStorageError,
   formatDateTime,
   formatDuration,
+  formatPreciseDuration,
   sourceLabel,
 } from './format';
 
@@ -21,6 +22,15 @@ describe('session formatting', () => {
     expect(formatDuration(754_000)).toBe('12:34');
     expect(formatDuration(3_723_000)).toBe('1:02:03');
     expect(formatDuration(-50)).toBe('0:00');
+  });
+
+  it('formats a length of time as a clock to the tenth of a second', () => {
+    expect(formatPreciseDuration(0)).toBe('0:00.0');
+    expect(formatPreciseDuration(5_999)).toBe('0:05.9');
+    expect(formatPreciseDuration(5_830)).toBe('0:05.8');
+    expect(formatPreciseDuration(60_100)).toBe('1:00.1');
+    expect(formatPreciseDuration(3_723_400)).toBe('1:02:03.4');
+    expect(formatPreciseDuration(-50)).toBe('0:00.0');
   });
 
   it('describes a length of time in words', () => {

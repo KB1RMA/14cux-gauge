@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Copyright (C) 2026 14cux-gauge contributors */
 
-/* The overview strip, its window slider and zoom buttons. */
+/* The overview strip, the handles on its window and the zoom buttons. */
 .overview {
   display: grid;
   gap: 0.5rem;
@@ -20,6 +20,106 @@
 .strip :global(.u-over) {
   touch-action: none;
   cursor: grab;
+}
+
+/* The strip, with the window's handles laid over its plot area. */
+.frame {
+  position: relative;
+}
+
+/* The slider that holds the handles. Only the handles take the pointer, so
+   the strip under the rest of it can still be dragged and clicked. */
+.handles {
+  position: absolute;
+  left: var(--plot-left, 0);
+  top: var(--plot-top, 0);
+  width: var(--plot-width, 100%);
+  height: var(--plot-height, 0);
+  pointer-events: none;
+  touch-action: none;
+  user-select: none;
+}
+
+.handles[data-disabled] {
+  display: none;
+}
+
+/* Radix wraps each thumb in a span it places along the slider. */
+.handles > span {
+  top: 0;
+  bottom: 0;
+}
+
+/* No width of its own, so Radix centres it on its value, which is where
+   the window ends; the grip and the area that takes the pointer are drawn
+   around it. */
+.handle {
+  position: relative;
+  display: block;
+  width: 0;
+  height: 100%;
+  pointer-events: auto;
+  cursor: ew-resize;
+  outline: none;
+}
+
+.handle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -0.6rem;
+  width: 1.2rem;
+}
+
+.handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -0.35rem;
+  width: 0.7rem;
+  height: max(60%, 1.5rem);
+  transform: translateY(-50%);
+  background: var(--surface);
+  /* The grip is a control, so its edge needs 3:1 contrast. */
+  border: 2px solid var(--accent);
+  border-radius: 999px;
+}
+
+.handle:focus-visible::after {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The time a handle is at, shown below it over the time axis while it is
+   dragged or has the keyboard's focus. */
+.time {
+  position: absolute;
+  top: calc(100% + 0.2rem);
+  z-index: 1;
+  display: none;
+  padding: 0.1rem 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.start {
+  left: -0.35rem;
+}
+
+.end {
+  right: -0.35rem;
+}
+
+.held .time,
+.handle:focus-visible .time {
+  display: block;
 }
 
 .range {

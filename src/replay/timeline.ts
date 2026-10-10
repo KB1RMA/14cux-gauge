@@ -138,3 +138,14 @@ const SLIDER_STEPS = [
 export function sliderStep(duration: number): number {
   return SLIDER_STEPS.findLast((step) => step <= duration / 100) ?? 100;
 }
+
+/**
+ * Where a slider over a recording `duration` long ends: a whole number of
+ * its steps, so the last step reaches the last sample. It can run past the
+ * recording's end, so clamp what the slider gives back.
+ */
+export function sliderEnd(duration: number): number {
+  const step = sliderStep(duration);
+
+  return Math.max(Math.ceil(duration / step), 1) * step;
+}
