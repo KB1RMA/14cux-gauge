@@ -18,7 +18,13 @@ export function storageWith({
   persistent?: boolean;
 } = {}): () => Promise<AppStorage> {
   return () =>
-    Promise.resolve({ sessions, roms, persistent, close: () => undefined });
+    Promise.resolve({
+      sessions,
+      roms,
+      persistent,
+      onClosed: () => () => undefined,
+      close: () => undefined,
+    });
 }
 
 /**

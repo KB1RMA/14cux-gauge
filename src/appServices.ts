@@ -9,6 +9,7 @@ import {
   type AppStatusStoreOptions,
 } from './pwa/appStatusStore';
 import { defaultOptions } from './pwa/defaultOptions';
+import { StorageController } from './storage/storageController';
 
 /**
  * The controllers and stores the app runs on, built once from a platform.
@@ -16,6 +17,11 @@ import { defaultOptions } from './pwa/defaultOptions';
  */
 export interface AppServices {
   readonly platform: Platform;
+  /**
+   * The sessions and ROM image stores, opened once from `platform.storage`
+   * and closed by `dispose`.
+   */
+  readonly storage: StorageController;
   /** The ECU link, its poller, history and diagnostic log. */
   readonly session: EcuSession;
   /** Whether the app is offline, and whether a newer build is published. */
@@ -25,7 +31,7 @@ export interface AppServices {
    * outside a production build, where it reports online and up to date.
    */
   readonly checksAppStatus: boolean;
-  /** Closes the ECU connection, as on unload. */
+  /** Closes the ECU connection and the storage, as on unload. */
   dispose(): void;
 }
 
@@ -36,10 +42,7 @@ export interface AppServicesOptions {
   appStatus?: AppStatusStoreOptions | undefined;
 }
 
-/**
- * Builds the app's services on `platform`. Storage is opened later, by
- * `StorageProvider`, through `platform.storage`.
- */
+/** Builds the app's services on `platform`, and starts opening its storage. */
 export function createAppServices(
   platform: Platform,
   { pollIntervalMs, appStatus = defaultOptions() }: AppServicesOptions = {},
@@ -49,15 +52,19 @@ export function createAppServices(
     createConnection: ecuConnections(platform.serial),
   });
 
+  const storage = new StorageController(platform.storage.open);
+
   return {
     platform,
     session,
+    storage,
     appStatus: new AppStatusStore(
       appStatus ?? { build: BUILD_INFO, versionUrl: '' },
     ),
     checksAppStatus: appStatus !== undefined,
     dispose: () => {
       session.dispose();
+      storage.dispose();
     },
   };
 }

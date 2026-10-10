@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { WebSerialTransport } from '@kb1rma/libcomm14cux-ts';
+import type { ChangeChannel, OpenChangeChannel } from '../storage/listeners';
 import { openStorage } from '../storage/openStorage';
 import {
   affectsSetting,
@@ -8,6 +9,7 @@ import {
   writeSetting,
 } from '../storage/settings';
 import type {
+  AppPlatform,
   FilePlatform,
   Platform,
   SerialPlatform,
@@ -106,6 +108,46 @@ export const localStorageSettings: SettingsBackend = {
   },
 };
 
+/** Restarts by reloading the page. */
+export const browserApp: AppPlatform = {
+  reload: () => {
+    location.reload();
+  },
+};
+
+/**
+ * Change channels over `BroadcastChannel`, which an Electron renderer has
+ * too. Without it, windows do not hear each other and each refreshes only
+ * for its own changes.
+ */
+export const broadcastChannels: OpenChangeChannel = (name) => {
+  if (typeof BroadcastChannel === 'undefined') {
+    const none: ChangeChannel = {
+      post: () => undefined,
+      listen: () => undefined,
+      close: () => undefined,
+    };
+
+    return none;
+  }
+
+  const channel = new BroadcastChannel(name);
+
+  return {
+    post: () => {
+      channel.postMessage('changed');
+    },
+    listen: (listener) => {
+      channel.addEventListener('message', () => {
+        listener();
+      });
+    },
+    close: () => {
+      channel.close();
+    },
+  };
+};
+
 /**
  * The app as it runs in a browser: Web Serial, downloads, IndexedDB (or
  * memory without it) and `localStorage`. Pass `overrides` to swap a part.
@@ -114,8 +156,9 @@ export function browserPlatform(overrides: Partial<Platform> = {}): Platform {
   return {
     serial: webSerial,
     files: browserDownloads,
-    storage: { open: () => openStorage() },
+    storage: { open: () => openStorage(undefined, broadcastChannels) },
     settings: localStorageSettings,
+    app: browserApp,
     ...overrides,
   };
 }

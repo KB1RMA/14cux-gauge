@@ -6,6 +6,9 @@ import userEvent from '@testing-library/user-event';
 import { WRITE_HOLDER } from '../ecuWrite/writes';
 import { RecordingProvider } from '../recording/RecordingProvider';
 import { RomsProvider } from '../roms/RomsProvider';
+import { memoryStorage } from '../storage/openStorage';
+import { StorageController } from '../storage/storageController';
+import { StorageProvider } from '../storage/StorageProvider';
 import { connectedSession } from '../test-support/ecuSession';
 import { WriteHarness } from '../test-support/WriteHarness';
 import { RomImages } from './RomImages';
@@ -15,13 +18,22 @@ describe('RomImages', () => {
     const user = userEvent.setup();
     const { session } = await connectedSession(new SimulatedTransport());
 
+    const storage = new StorageController(() =>
+      Promise.resolve(memoryStorage()),
+    );
+
+    onTestFinished(() => {
+      storage.dispose();
+    });
     render(
       <WriteHarness session={session}>
-        <RecordingProvider>
-          <RomsProvider>
-            <RomImages />
-          </RomsProvider>
-        </RecordingProvider>
+        <StorageProvider controller={storage}>
+          <RecordingProvider>
+            <RomsProvider>
+              <RomImages />
+            </RomsProvider>
+          </RecordingProvider>
+        </StorageProvider>
       </WriteHarness>,
     );
 

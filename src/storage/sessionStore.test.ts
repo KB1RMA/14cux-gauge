@@ -8,6 +8,7 @@ import { plantRecords } from '../test-support/storedRecords';
 import { openDatabase } from './database';
 import { IndexedDbSessionStore } from './indexedDbSessionStore';
 import { MemoryRomStore } from './romStore';
+import { broadcastChannels } from '../platform/browser';
 import { openStorage } from './openStorage';
 import {
   MemorySessionStore,
@@ -692,5 +693,85 @@ describe('IndexedDbSessionStore stored records', () => {
       notes: '',
       formatVersion: 2,
     });
+  });
+});
+
+describe('IndexedDbSessionStore in two windows', () => {
+  async function twoWindows() {
+    const factory = new IDBFactory();
+    const dbs = [
+      await openDatabase({ factory }),
+      await openDatabase({ factory }),
+    ] as const;
+    const [first, second] = dbs.map(
+      (db) => new IndexedDbSessionStore(db, broadcastChannels),
+    ) as [IndexedDbSessionStore, IndexedDbSessionStore];
+
+    onTestFinished(() => {
+      first.close();
+      second.close();
+
+      for (const db of dbs) {
+        db.close();
+      }
+    });
+
+    return { first, second };
+  }
+
+  it('tells the other window of a create, finish, update and remove', async () => {
+    const { first, second } = await twoWindows();
+    const heard = vi.fn();
+
+    second.subscribe(heard);
+
+    const { id } = await first.create({
+      name: 'Idle',
+      source: 'demo',
+      startedAt: 1,
+    });
+
+    await vi.waitFor(() => {
+      expect(heard).toHaveBeenCalledTimes(1);
+    });
+    expect((await second.list()).map(({ name }) => name)).toEqual(['Idle']);
+
+    await first.finish(id, 9);
+    await vi.waitFor(() => {
+      expect(heard).toHaveBeenCalledTimes(2);
+    });
+    await first.update(id, { name: 'Renamed' });
+    await vi.waitFor(() => {
+      expect(heard).toHaveBeenCalledTimes(3);
+    });
+    expect((await second.list()).map(({ name }) => name)).toEqual(['Renamed']);
+
+    await first.remove(id);
+    await vi.waitFor(() => {
+      expect(heard).toHaveBeenCalledTimes(4);
+    });
+    expect(await second.list()).toEqual([]);
+  });
+
+  it('does not tell the other window of appends', async () => {
+    const { first, second } = await twoWindows();
+    const { id } = await first.create({
+      name: 'Idle',
+      source: 'demo',
+      startedAt: 1,
+    });
+    const heard = vi.fn();
+
+    await vi.waitFor(async () => {
+      expect(await second.list()).toHaveLength(1);
+    });
+    second.subscribe(heard);
+    await first.append(id, [snapshotAt(1)]);
+    // A later change arrives after any append report would have.
+    await first.finish(id, 2);
+    await vi.waitFor(() => {
+      expect(heard).toHaveBeenCalled();
+    });
+    expect(heard).toHaveBeenCalledTimes(1);
   });
 });

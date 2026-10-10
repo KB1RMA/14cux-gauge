@@ -115,12 +115,19 @@ export interface DatabaseOptions {
   factory?: IDBFactory;
   /** Database name; tests use their own. */
   name?: string;
+  /**
+   * Called after the connection has closed because another window is
+   * upgrading the database (or the browser dropped it). Nothing can be read
+   * or written through it afterwards.
+   */
+  onClosed?: () => void;
 }
 
 /** Opens the database, creating or upgrading it if needed. */
 export async function openDatabase({
   factory = indexedDB,
   name = DB_NAME,
+  onClosed,
 }: DatabaseOptions = {}): Promise<IDBDatabase> {
   const req = factory.open(name, DB_VERSION);
 
@@ -133,6 +140,13 @@ export async function openDatabase({
   // Another tab upgrading the schema must not be blocked by this one.
   db.onversionchange = () => {
     db.close();
+    onClosed?.();
+  };
+
+  // The browser closing the connection (storage cleared, say) is no
+  // different to the app.
+  db.onclose = () => {
+    onClosed?.();
   };
 
   return db;

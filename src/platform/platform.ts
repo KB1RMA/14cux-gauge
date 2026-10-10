@@ -5,7 +5,7 @@ import type { AppStorage } from '../storage/openStorage';
 
 /**
  * Everything the app needs from where it runs: serial ports, saving files,
- * storage for sessions and ROM images, and small settings. The browser build
+ * storage for sessions and ROM images, small settings, and restarting. The browser build
  * uses `browserPlatform()`; a desktop build can supply its own (a serial port
  * in the main process over IPC, a native Save dialog, files on disk) without
  * changing the views.
@@ -17,6 +17,7 @@ export interface Platform {
   files: FilePlatform;
   storage: StoragePlatform;
   settings: SettingsBackend;
+  app: AppPlatform;
 }
 
 /**
@@ -68,6 +69,15 @@ export interface FilePlatform {
     data: string | Uint8Array,
     type: string,
   ): Promise<SaveResult>;
+}
+
+export interface AppPlatform {
+  /**
+   * Restarts the app, as reloading the page does: the ECU connection and any
+   * recording end. A function, not a method: it is passed on and called on
+   * its own.
+   */
+  reload: () => void;
 }
 
 export interface StoragePlatform {

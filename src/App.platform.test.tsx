@@ -51,6 +51,7 @@ function desktopPlatform() {
     },
     storage: { open: storageWith() },
     settings: memorySettings(),
+    app: { reload: () => undefined },
   };
 
   return {

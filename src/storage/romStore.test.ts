@@ -4,6 +4,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import { InvalidRecordError } from '../model/record';
 import { plantRecords } from '../test-support/storedRecords';
 import { openDatabase } from './database';
+import { broadcastChannels } from '../platform/browser';
 import { IndexedDbRomStore } from './indexedDbRomStore';
 import { MemoryRomStore, type RomStore } from './romStore';
 
@@ -148,5 +149,42 @@ describe('IndexedDbRomStore stored records', () => {
 
     expect(await reopened.listUnreadable()).toEqual([]);
     reopened.close();
+  });
+});
+
+describe('IndexedDbRomStore in two windows', () => {
+  it('tells the other window of a save and a remove', async () => {
+    const factory = new IDBFactory();
+    const dbs = [
+      await openDatabase({ factory }),
+      await openDatabase({ factory }),
+    ] as const;
+    const [first, second] = dbs.map(
+      (db) => new IndexedDbRomStore(db, broadcastChannels),
+    ) as [IndexedDbRomStore, IndexedDbRomStore];
+    const heard = vi.fn();
+
+    onTestFinished(() => {
+      first.close();
+      second.close();
+
+      for (const db of dbs) {
+        db.close();
+      }
+    });
+    second.subscribe(heard);
+
+    const { id } = await first.save(rom(1000));
+
+    await vi.waitFor(() => {
+      expect(heard).toHaveBeenCalledTimes(1);
+    });
+    expect(await second.list()).toHaveLength(1);
+
+    await first.remove(id);
+    await vi.waitFor(() => {
+      expect(heard).toHaveBeenCalledTimes(2);
+    });
+    expect(await second.list()).toEqual([]);
   });
 });

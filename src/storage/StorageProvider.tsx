@@ -1,40 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { useEffect, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { StorageContext } from './context';
-import type { AppStorage } from './openStorage';
+import type { StorageController } from './storageController';
 
 export interface StorageProviderProps {
   children: ReactNode;
-  /** Opens the storage; `App` passes the platform's. */
-  open: () => Promise<AppStorage>;
+  /**
+   * The controller to provide, as `createAppServices` built it. Its owner
+   * closes it; the provider only exposes it.
+   */
+  controller: StorageController;
 }
 
-/** Opens the sessions and ROM image stores once, and closes them on unmount. */
-export function StorageProvider({ children, open }: StorageProviderProps) {
-  const [storage, setStorage] = useState<AppStorage | undefined>(undefined);
-
-  useEffect(() => {
-    let opened: AppStorage | undefined;
-    let unmounted = false;
-
-    void open().then((result) => {
-      opened = result;
-
-      if (unmounted) {
-        result.close();
-
-        return;
-      }
-
-      setStorage(result);
-    });
-
-    return () => {
-      unmounted = true;
-      opened?.close();
-    };
-  }, [open]);
-
-  return <StorageContext value={storage}>{children}</StorageContext>;
+/** Provides the storage controller to the providers built on it. */
+export function StorageProvider({
+  children,
+  controller,
+}: StorageProviderProps) {
+  return <StorageContext value={controller}>{children}</StorageContext>;
 }

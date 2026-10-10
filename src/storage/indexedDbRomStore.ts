@@ -8,7 +8,7 @@ import {
 } from '../model/rom';
 import { sortRecords, type UnreadableRecord } from '../model/record';
 import { completed, entries, request, ROMS } from './database';
-import { Listeners } from './listeners';
+import { Listeners, type OpenChangeChannel } from './listeners';
 import { newestRomFirst, summaryOf, type RomStore } from './romStore';
 
 /**
@@ -16,10 +16,25 @@ import { newestRomFirst, summaryOf, type RomStore } from './romStore';
  * connection opened by `openStorage`, which closes it.
  */
 export class IndexedDbRomStore implements RomStore {
-  private readonly listeners = new Listeners();
-  readonly subscribe = this.listeners.subscribe;
+  private readonly listeners: Listeners;
+  readonly subscribe: RomStore['subscribe'];
 
-  constructor(private readonly db: IDBDatabase) {}
+  /**
+   * `openChannel` lets stores over the same database, in other windows,
+   * hear of each other's saves and removes.
+   */
+  constructor(
+    private readonly db: IDBDatabase,
+    openChannel?: OpenChangeChannel,
+  ) {
+    this.listeners = new Listeners(openChannel?.(`${db.name}:roms`));
+    this.subscribe = this.listeners.subscribe;
+  }
+
+  /** Stops listening to other windows. The connection is closed by its owner. */
+  close(): void {
+    this.listeners.close();
+  }
 
   async save(rom: NewRom): Promise<RomSummary> {
     const summary = summaryOf(rom, crypto.randomUUID());

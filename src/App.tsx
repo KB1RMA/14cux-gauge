@@ -98,7 +98,7 @@ export function App({
               <EcuProvider session={provided.session}>
                 <ReadingsProvider>
                   <EcuWriteProvider>
-                    <StorageProvider open={provided.platform.storage.open}>
+                    <StorageProvider controller={provided.storage}>
                       <SessionsProvider>
                         <RecordingProvider>
                           <RomsProvider>
