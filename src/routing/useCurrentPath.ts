@@ -7,8 +7,7 @@ import { useLocation } from 'react-router';
  * A ref holding the router's current path, for handlers that run later than
  * the render that created them (a promise settling, a control reporting a
  * change before the router has re-rendered). It is empty once the component
- * has unmounted. Read `.current` when the handler
- * runs, not during render.
+ * has unmounted. Read `.current` when the handler runs, not during render.
  */
 export function useCurrentPath(): RefObject<string> {
   const { pathname } = useLocation();

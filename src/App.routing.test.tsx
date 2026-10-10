@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TestApp } from './test-support/TestApp';
 
@@ -71,6 +78,30 @@ describe('Addresses', () => {
     expect(
       await screen.findByRole('tab', { name: 'Fuel map', selected: true }),
     ).toBeInTheDocument();
+  });
+
+  it('adds one history entry when a tab reports itself twice before the view updates', async () => {
+    const user = userEvent.setup();
+
+    render(<TestApp pollIntervalMs={{ demo: 10 }} />);
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+    await screen.findByRole('heading', { name: 'Live data' });
+
+    const tabs = screen.getByRole('tablist', { name: 'Dashboard views' });
+    const graphs = within(tabs).getByRole('tab', { name: 'Graphs' });
+
+    // Pressing a tab reports it on mouse down and again as it takes focus,
+    // and both can arrive before React re-renders.
+    act(() => {
+      fireEvent.mouseDown(graphs, { button: 0, ctrlKey: false });
+      fireEvent.focus(graphs);
+    });
+    expect(window.location.hash).toBe('#/live/graphs');
+
+    await goBack();
+    await waitFor(() => {
+      expect(window.location.hash).toBe('#/live');
+    });
   });
 
   it('opens the session list at its address and the live view from the nav', async () => {
