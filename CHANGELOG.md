@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.7.0...v0.8.0) (2026-10-10)
+
+
+### Features
+
+* sessions and ROM images saved, renamed or deleted in one window now update in other windows ([#78](https://github.com/KB1RMA/14cux-gauge/issues/78)) ([d879d6b](https://github.com/KB1RMA/14cux-gauge/commit/d879d6bf122f18a07a59209e0e6689498387ada8))
+
+
+### Bug Fixes
+
+* draw the replay overview strip in the chosen temperature and speed units ([2e6a494](https://github.com/KB1RMA/14cux-gauge/commit/2e6a49454364a538415135ad10713edf09d1341f))
+* say when another window has taken the browser's storage, and offer to reload, instead of failing silently ([#78](https://github.com/KB1RMA/14cux-gauge/issues/78)) ([d879d6b](https://github.com/KB1RMA/14cux-gauge/commit/d879d6bf122f18a07a59209e0e6689498387ada8))
+
 ## [0.7.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.6.0...v0.7.0) (2026-10-09)
 
 
