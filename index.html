@@ -12,9 +12,236 @@
       content="Live data and fault codes for the Lucas 14CUX engine ECU, in the browser."
     />
     <title>14CUX Gauge</title>
+    <style>
+      /* SPDX-License-Identifier: GPL-3.0-only
+         Copyright (C) 2026 14cux-gauge contributors
+         The startup error stands alone: the app's stylesheet may not have
+         loaded. System colours keep its contrast in light and dark. */
+      #startup-error {
+        color-scheme: light dark;
+        background: Canvas;
+        color: CanvasText;
+        font-family: system-ui, sans-serif;
+        line-height: 1.5;
+        max-width: 40rem;
+        margin: 0 auto;
+        padding: 1rem;
+      }
+      #startup-error h1:focus {
+        outline: none;
+      }
+      #startup-error code {
+        overflow-wrap: anywhere;
+      }
+      #startup-error .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <main id="startup-error" aria-labelledby="startup-error-heading" hidden>
+      <h1 id="startup-error-heading" tabindex="-1">
+        14CUX Gauge could not start
+      </h1>
+      <p id="startup-error-reason"></p>
+      <p>
+        Reload to try again. If it keeps happening, this device may be holding
+        an old or incomplete offline copy of the app: clear it to load the
+        latest version. That needs an internet connection. Your recorded
+        sessions, ROM images and settings are kept.
+      </p>
+      <p id="startup-error-detail" hidden>Error: <code></code></p>
+      <p class="actions">
+        <button type="button" id="startup-error-reload">Reload</button>
+        <button type="button" id="startup-error-clear">
+          Clear the offline copy and reload
+        </button>
+      </p>
+      <p>
+        <a
+          href="https://github.com/KB1RMA/14cux-gauge/issues"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Report the problem<span> (opens in a new tab)</span></a
+        >
+      </p>
+    </main>
+    <script>
+      // SPDX-License-Identifier: GPL-3.0-only
+      // Copyright (C) 2026 14cux-gauge contributors
+      //
+      // Shows the startup error above in place of a blank page when the app
+      // does not start: its code could not be downloaded, the browser cannot
+      // run it, or it failed before it first rendered. React empties the page
+      // on an error no view caught and reports it, so that shows here too.
+      // Written as old-style script so that an old browser can run it.
+      (function () {
+        var CACHE_PREFIX = '14cux-gauge-';
+        var root = document.getElementById('root');
+        var panel = document.getElementById('startup-error');
+        var reason = document.getElementById('startup-error-reason');
+        var detail = document.getElementById('startup-error-detail');
+        var pending = null;
+
+        function blank() {
+          return !root.firstChild;
+        }
+
+        function show(text, error) {
+          // Another error may land before the first is shown; keep the first,
+          // which is usually the cause.
+          if (pending || !panel.hidden) {
+            return;
+          }
+
+          pending = { text: text, error: error };
+          // An error is not a failed start if the app renders anyway.
+          setTimeout(function () {
+            if (!blank()) {
+              pending = null;
+              return;
+            }
+
+            reason.textContent = pending.text;
+
+            if (pending.error) {
+              detail.querySelector('code').textContent = pending.error;
+              detail.hidden = false;
+            }
+
+            panel.hidden = false;
+            document.getElementById('startup-error-heading').focus();
+          }, 1000);
+        }
+
+        // Only this site's own files; another site's script (such as the
+        // usage counter) failing is no reason to call the app broken.
+        function ours(url) {
+          return (
+            typeof url === 'string' && url.indexOf(location.origin + '/') === 0
+          );
+        }
+
+        function message(error) {
+          return error && error.message ? String(error.message) : String(error);
+        }
+
+        if (!('noModule' in document.createElement('script'))) {
+          show(
+            'This browser is too old to run 14CUX Gauge. Update it, or try a recent Chrome, Edge, Firefox or Safari.',
+          );
+          return;
+        }
+
+        window.addEventListener(
+          'error',
+          function (event) {
+            if (!blank()) {
+              return;
+            }
+
+            var target = event.target;
+
+            // A file that failed to download. These do not bubble, hence
+            // listening in the capture phase.
+            if (target && target !== window && target.tagName) {
+              var code =
+                target.tagName === 'SCRIPT' ||
+                (target.tagName === 'LINK' && target.rel === 'modulepreload');
+
+              if (code && ours(target.src || target.href)) {
+                show(
+                  'Part of the app could not be downloaded.',
+                  'Could not load ' + (target.src || target.href),
+                );
+              }
+              return;
+            }
+
+            if (ours(event.filename)) {
+              show(
+                'The app stopped with an error while starting.',
+                message(event.error || event.message),
+              );
+            }
+          },
+          true,
+        );
+
+        window.addEventListener('unhandledrejection', function (event) {
+          if (blank()) {
+            show(
+              'The app stopped with an error while starting.',
+              message(event.reason),
+            );
+          }
+        });
+
+        document
+          .getElementById('startup-error-reload')
+          .addEventListener('click', function () {
+            location.reload();
+          });
+
+        // Removes this app's service worker and offline copy, then fetches
+        // the page past the browser's own cache, so the reload loads the
+        // published build. Recordings and settings live elsewhere and stay.
+        document
+          .getElementById('startup-error-clear')
+          .addEventListener('click', function () {
+            var scope = new URL('./', location.href).href;
+            var jobs = [];
+
+            if (navigator.serviceWorker) {
+              jobs.push(
+                navigator.serviceWorker
+                  .getRegistrations()
+                  .then(function (registrations) {
+                    return Promise.all(
+                      registrations
+                        .filter(function (registration) {
+                          return registration.scope === scope;
+                        })
+                        .map(function (registration) {
+                          return registration.unregister();
+                        }),
+                    );
+                  }),
+              );
+            }
+
+            if (window.caches) {
+              jobs.push(
+                caches.keys().then(function (names) {
+                  return Promise.all(
+                    names
+                      .filter(function (name) {
+                        return name.indexOf(CACHE_PREFIX) === 0;
+                      })
+                      .map(function (name) {
+                        return caches.delete(name);
+                      }),
+                  );
+                }),
+              );
+            }
+
+            Promise.all(jobs)
+              .then(function () {
+                return fetch(scope, { cache: 'reload' });
+              })
+              .catch(function () {
+                // Offline or blocked: reload anyway, which may still start.
+              })
+              .then(function () {
+                location.reload();
+              });
+          });
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
