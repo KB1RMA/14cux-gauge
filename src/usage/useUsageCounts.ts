@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { useEffect, useRef } from 'react';
-import type { ConnectionState } from '../ecu/connectionState';
-import { useEcu } from '../ecu/useEcu';
+import { useEffect } from 'react';
 import { usePreferences } from '../preferences/usePreferences';
-import { useRecording } from '../recording/useRecording';
+import { useServices } from '../services/useServices';
 import {
   connectionEvent,
   recordingEvents,
@@ -14,48 +12,60 @@ import type { UsageCounter } from './goatCounter';
 
 /**
  * Counts the visit and the connection and recording events in `events.ts`
- * while the user allows usage counts. Only an event's name is sent.
+ * while the user allows usage counts, as the session and the recorder report
+ * them. Only an event's name is sent.
  */
 export function useUsageCounts(counter: UsageCounter | undefined): void {
   const { usageCounts } = usePreferences();
-  const { state } = useEcu();
-  const { active: activeRecording, error: recordingError } = useRecording();
+  const { session, recorder } = useServices();
   const active = usageCounts === 'on' ? counter : undefined;
-  const connectionRef = useRef<ConnectionState>(state);
-  const recordingRef = useRef<RecordingState>({
-    recording: false,
-    error: undefined,
-  });
 
   useEffect(() => {
     active?.start();
   }, [active]);
 
-  // The refs move on even while counting is off, so turning it on counts
-  // only what happens from then.
+  // Counting starts from what each controller holds when it is turned on, so
+  // only what happens from then is counted.
   useEffect(() => {
-    const previous = connectionRef.current;
-
-    connectionRef.current = state;
-
-    const event = connectionEvent(previous, state);
-
-    if (active && event) {
-      active.count(event);
+    if (!active) {
+      return undefined;
     }
-  }, [active, state]);
+
+    let previous = session.getSnapshot().connection;
+
+    return session.subscribe(() => {
+      const { connection } = session.getSnapshot();
+      const event = connectionEvent(previous, connection);
+
+      previous = connection;
+
+      if (event) {
+        active.count(event);
+      }
+    });
+  }, [active, session]);
 
   useEffect(() => {
-    const previous = recordingRef.current;
-    const next = {
-      recording: activeRecording !== undefined,
-      error: recordingError,
+    if (!active) {
+      return undefined;
+    }
+
+    const stateOf = (): RecordingState => {
+      const { active: recording, error } = recorder.getSnapshot();
+
+      return { recording: recording !== undefined, error };
     };
 
-    recordingRef.current = next;
+    let previous = stateOf();
 
-    for (const event of recordingEvents(previous, next)) {
-      active?.count(event);
-    }
-  }, [active, activeRecording, recordingError]);
+    return recorder.subscribe(() => {
+      const next = stateOf();
+
+      for (const event of recordingEvents(previous, next)) {
+        active.count(event);
+      }
+
+      previous = next;
+    });
+  }, [active, recorder]);
 }

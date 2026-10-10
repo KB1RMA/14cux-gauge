@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { NotConnectedError } from '@kb1rma/libcomm14cux-ts';
 import {
   useCallback,
   useEffect,
@@ -10,9 +9,13 @@ import {
 } from 'react';
 import { useEcu } from '../ecu/useEcu';
 import type { FinishedOutcome } from '../model/write';
-import type { WriteHandle } from './context';
+import type { FuelPumpHandle } from './ecuWrites';
 import { useEcuWrite } from './useEcuWrite';
-import { failureOutcome, notConnectedOutcome } from './writes';
+import {
+  connectionLostOutcome,
+  failureOutcome,
+  notConnectedOutcome,
+} from './writes';
 
 /** How long one `runFuelPump` keeps the relay closed: about two seconds. */
 export const PUMP_RUN_MS = 2000;
@@ -24,7 +27,7 @@ export const PUMP_LIMIT_MS = 120_000;
 export type PumpMode = 'once' | 'continuous';
 
 interface PumpRun {
-  handle: WriteHandle;
+  handle: FuelPumpHandle;
   mode: PumpMode;
 }
 
@@ -39,7 +42,7 @@ function delay(ms: number): Promise<void> {
 
 /**
  * Runs the fuel pump test as one ECU write that lasts until the pump has
- * stopped. Both modes only ever call `Ecu.runFuelPump`; continuous mode calls
+ * stopped. Both modes only ever ask `EcuWrites` to run the pump; continuous mode calls
  * it again before each run ends. Every way a test ends (stop, the time limit,
  * an error, a lost or closed connection, leaving the view) simply stops
  * asking, so the pump stops within one run. The write is held until then, so
@@ -52,7 +55,7 @@ export function useFuelPumpRun(): {
   stop(): void;
 } {
   const { link } = useEcu();
-  const { begin } = useEcuWrite();
+  const { beginFuelPump } = useEcuWrite();
   const [pumpRun, setPumpRun] = useState<PumpRun | undefined>(undefined);
   // What a continuous run ending from outside its own loop reports.
   const stopMessageRef = useRef(LEFT_VIEW);
@@ -119,13 +122,13 @@ export function useFuelPumpRun(): {
 
     const run = async () => {
       // A connection that is already closed sends nothing.
-      if (!ran && !handle.ecu.isConnected()) {
+      if (!ran && !handle.isConnected()) {
         end(notConnectedOutcome('fuelPump'));
 
         return;
       }
 
-      const call = handle.ecu.runFuelPump();
+      const call = handle.renew();
 
       const settled = () => {
         lastSettled = Date.now();
@@ -174,26 +177,20 @@ export function useFuelPumpRun(): {
       } else if (linkRef.current === handle.link) {
         release({ status: 'done', message: stopMessageRef.current });
       } else {
-        release(
-          failureOutcome(
-            'fuelPump',
-            new NotConnectedError('Not connected to ECU'),
-            true,
-          ),
-        );
+        release(connectionLostOutcome('fuelPump'));
       }
     };
   }, [live]);
 
   const start = useCallback(
     (mode: PumpMode) => {
-      const handle = begin('fuelPump');
+      const handle = beginFuelPump();
 
       if (handle) {
         setPumpRun({ handle, mode });
       }
     },
-    [begin],
+    [beginFuelPump],
   );
   const stop = useCallback(() => {
     stopMessageRef.current = STOPPED;

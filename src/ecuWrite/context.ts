@@ -1,49 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import type { Ecu } from '@kb1rma/libcomm14cux-ts';
 import { createContext } from 'react';
-import type { EcuLink } from '../ecu/session';
-import type {
-  FinishedOutcome,
-  WriteId,
-  WriteLogEntry,
-  WriteOutcome,
-} from '../model/write';
+import type { EcuWritesState, FuelPumpHandle } from './ecuWrites';
 import type { WriteRequest } from './writes';
 
-/** A write that has started; it holds the link until `finish` is called. */
-export interface WriteHandle {
-  /** The connection the write was sent to. */
-  link: EcuLink;
-  ecu: Ecu;
-  /** Ends the write and records how it went. Later calls do nothing. */
-  finish(outcome: FinishedOutcome): void;
-}
-
-export interface EcuWriteValue {
-  /** The write running on the current connection, if any. */
-  running: WriteId | undefined;
-  /** How each write last went on the current connection. */
-  outcomes: Partial<Record<WriteId, WriteOutcome>>;
-  /** The write that started or ended most recently. */
-  latest: WriteId | undefined;
+export interface EcuWriteValue extends EcuWritesState {
   /**
-   * Starts a write that the caller ends itself, as a repeating test does.
-   * Returns `undefined`, and starts nothing, if not connected or if
+   * Starts the fuel pump test's write, which the caller renews and ends
+   * itself. Returns `undefined`, and starts nothing, if not connected or if
    * something else (another write, a ROM read) holds the link.
    */
-  begin(id: WriteId): WriteHandle | undefined;
+  beginFuelPump(): FuelPumpHandle | undefined;
   /**
    * Runs a one-off write. Settles `true` if it succeeded, `false` if it
    * failed or could not start.
    */
   run(request: WriteRequest): Promise<boolean>;
-  /**
-   * Calls `watcher` as each write starts and again as it ends, on any
-   * connection, first with the write running on the current connection, if
-   * there is one. Returns a function that stops watching.
-   */
-  watch(watcher: (entry: WriteLogEntry) => void): () => void;
 }
 
 export const EcuWriteContext = createContext<EcuWriteValue | undefined>(

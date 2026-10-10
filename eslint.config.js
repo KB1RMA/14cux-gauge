@@ -147,19 +147,100 @@ export default [
     },
   },
   {
-    // Views read and change stored data only through the providers'
-    // narrow APIs (`useSessions`, `useRoms`) and `useSetting`.
+    // State and data boundaries (AGENTS.md > State and data). The type-aware
+    // rule is used because several boundaries still allow type imports.
+    // Each directory has one object listing all its restrictions: a later
+    // object setting the same rule for the same files would replace this one.
     files: ['src/components/**/*.{ts,tsx}'],
     ignores: ['src/components/**/*.test.{ts,tsx}'],
+    plugins: { '@typescript-eslint': tseslint.plugin },
     rules: {
-      'no-restricted-imports': [
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
         'error',
         {
           patterns: [
             {
-              group: ['**/storage/*'],
+              group: ['@kb1rma/libcomm14cux-ts'],
               message:
-                'Use useSessions, useRoms or useSetting instead of reaching storage directly.',
+                'Views never import the ECU library. Read with useEcuRead and write through useEcuWrite; see AGENTS.md > State and data.',
+            },
+            {
+              group: ['**/storage/*'],
+              allowTypeImports: true,
+              message:
+                'Use useSessions, useRoms or useSetting instead of reaching storage directly; see AGENTS.md > State and data.',
+            },
+            {
+              group: ['**/settings/settingStore'],
+              message:
+                'Read settings with useSetting; see AGENTS.md > State and data.',
+            },
+            {
+              group: ['**/history/sampleHistory'],
+              allowTypeImports: true,
+              message:
+                'Read the history with useHistory; see AGENTS.md > State and data.',
+            },
+            {
+              group: ['**/ecu/session'],
+              allowTypeImports: true,
+              message:
+                'Use the useEcu and useEcuRead hooks instead of the session class; see AGENTS.md > State and data.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // `model/` is the bottom layer: it imports nothing from the app above it.
+    files: ['src/model/**/*.ts'],
+    ignores: ['src/model/**/*.test.ts'],
+    plugins: { '@typescript-eslint': tseslint.plugin },
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['../*'],
+              message:
+                'model/ imports nothing above it; move the dependency down or the code up. See AGENTS.md > State and data.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Hooks and providers adapt the controllers for React. Only the
+    // controllers (src/ecu, src/ecuWrite/ecuWrites.ts, src/roms/romReader.ts)
+    // call `Ecu` methods or hold a `Lease`.
+    files: ['src/**/use*.{ts,tsx}', 'src/**/*Provider.tsx'],
+    ignores: [
+      'src/components/**',
+      'src/**/*.test.{ts,tsx}',
+      'src/test-support/**',
+    ],
+    plugins: { '@typescript-eslint': tseslint.plugin },
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@kb1rma/libcomm14cux-ts'],
+              message:
+                'Hooks and providers never touch the ECU library; ask a controller (EcuWrites, RomReader, EcuSession). See AGENTS.md > State and data.',
+            },
+            {
+              group: ['**/ecu/session'],
+              importNames: ['Lease'],
+              message:
+                'Only controllers hold a Lease; see AGENTS.md > State and data.',
             },
           ],
         },

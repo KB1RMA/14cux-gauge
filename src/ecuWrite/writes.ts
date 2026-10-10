@@ -49,7 +49,6 @@ export const WRITES: Record<WriteId, WriteText> = {
 export const WRITE_HOLDER: LinkHolder = {
   kind: 'write',
   pausesPolling: false,
-  stopsRecording: false,
 };
 
 export type IdleAirDirection = 'open' | 'close';
@@ -118,6 +117,18 @@ export function failureOutcome(
         status: 'partial',
         message: `${text.partial}. ${describeError(error)}`,
       };
+}
+
+/**
+ * The outcome of a repeating write whose connection closed under it, after
+ * it had already written to the ECU: partial, whatever the error.
+ */
+export function connectionLostOutcome(id: WriteId): FinishedOutcome {
+  return failureOutcome(
+    id,
+    new NotConnectedError('Not connected to ECU'),
+    true,
+  );
 }
 
 /** The words for an outcome, or for a write still running. */

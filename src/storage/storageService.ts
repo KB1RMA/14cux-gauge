@@ -16,34 +16,36 @@ export type StorageStatus =
 const OPENING: StorageStatus = { status: 'opening' };
 
 /**
- * Opens the app's storage once, when built, and closes it on `dispose`. It
- * exposes `subscribe` / `getSnapshot` for `useSyncExternalStore`, so views
- * say when storage is not usable rather than letting calls fail.
+ * Opens the sessions and ROM image stores once, as the services are built,
+ * and closes them with the services. `getSnapshot` is `undefined` until they
+ * are open, and again if they close or could not be opened; `getStatus` says
+ * which. Plain TypeScript, so the controllers that use the stores and React
+ * (through `useSyncExternalStore`) share one copy.
  */
-export class StorageController {
-  private snapshot: StorageStatus = OPENING;
-  private readonly listeners = new Set<() => void>();
-  private stopWatching: (() => void) | undefined;
+export class StorageService {
+  private current: StorageStatus = OPENING;
   private disposed = false;
+  private stopWatching: (() => void) | undefined;
+  private readonly listeners = new Set<() => void>();
 
+  /** @param open - Opens the storage; the platform's `storage.open`. */
   constructor(open: () => Promise<AppStorage>) {
     // `open` may throw as well as reject.
     void new Promise<AppStorage>((resolve) => {
       resolve(open());
     }).then(
-      (storage) => {
+      (opened) => {
         if (this.disposed) {
-          storage.close();
+          opened.close();
 
           return;
         }
 
-        this.stopWatching = storage.onClosed(() => {
-          this.stopWatching?.();
+        this.stopWatching = opened.onClosed(() => {
           this.stopWatching = undefined;
           this.set({ status: 'closed' });
         });
-        this.set({ status: 'open', storage });
+        this.set({ status: 'open', storage: opened });
       },
       () => {
         if (!this.disposed) {
@@ -61,26 +63,28 @@ export class StorageController {
     };
   };
 
-  readonly getSnapshot = (): StorageStatus => this.snapshot;
+  /** The open storage, or `undefined` unless it is open. */
+  readonly getSnapshot = (): AppStorage | undefined =>
+    this.current.status === 'open' ? this.current.storage : undefined;
 
-  /** Releases the storage, now or as soon as it has finished opening. */
+  /** Whether storage is opening, open, closed by another window or failed. */
+  readonly getStatus = (): StorageStatus => this.current;
+
+  /** Closes the storage, now or as soon as it has finished opening. */
   dispose(): void {
-    if (this.disposed) {
-      return;
-    }
-
     this.disposed = true;
+    this.listeners.clear();
     this.stopWatching?.();
 
-    if (this.snapshot.status === 'open') {
-      this.snapshot.storage.close();
+    if (this.current.status === 'open') {
+      this.current.storage.close();
     }
 
-    this.listeners.clear();
+    this.current = OPENING;
   }
 
   private set(next: StorageStatus): void {
-    this.snapshot = next;
+    this.current = next;
 
     for (const listener of [...this.listeners]) {
       listener();

@@ -15,13 +15,12 @@ export const ROM_SIZE: number = DataSize.ROM;
 
 /**
  * How a ROM read holds the link. It takes about half a minute, with nothing
- * else on the link, so polling pauses; a recording would have a gap that
- * replay could draw across, so it ends first.
+ * else on the link, so polling pauses. A recording would have a gap that
+ * replay could draw across, so `RomReader` ends it before taking the link.
  */
 export const ROM_READ_HOLDER: LinkHolder = {
   kind: 'romRead',
   pausesPolling: true,
-  stopsRecording: true,
 };
 
 /** Bytes read per request: 64 steps, so progress moves smoothly. */
