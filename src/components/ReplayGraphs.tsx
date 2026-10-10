@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import type { TimelineMark } from '../charts/timelinePlugins';
 import type { LiveSnapshot } from '../model/snapshot';
-import { historyOf } from '../history/pushSnapshot';
+import { useRecordedSeries } from '../history/useRecordedSeries';
 import { METRIC_KEYS, METRICS, type MetricKey } from '../metrics';
 import type { Replay } from '../replay/useReplay';
 import { useSetting } from '../settings/useSetting';
@@ -40,7 +40,7 @@ export function ReplayGraphs({
   const syncId = useId();
   // Every sample, once, in the same series model as the live graphs: the
   // charts read the stretch they show from it as they zoom.
-  const [series] = useState(() => historyOf(samples));
+  const series = useRecordedSeries(samples);
   const overviewKey = recorded.includes(OVERVIEW_METRIC)
     ? OVERVIEW_METRIC
     : recorded[0];

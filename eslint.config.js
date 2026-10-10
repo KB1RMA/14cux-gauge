@@ -177,10 +177,10 @@ export default [
                 'Read settings with useSetting; see AGENTS.md > State and data.',
             },
             {
-              group: ['**/history/sampleHistory'],
+              group: ['**/history/sampleHistory', '**/history/pushSnapshot'],
               allowTypeImports: true,
               message:
-                'Read the history with useHistory; see AGENTS.md > State and data.',
+                'Read the history with useHistory and a recording with useRecordedSeries; see AGENTS.md > State and data.',
             },
             {
               group: ['**/ecu/session'],
@@ -287,6 +287,45 @@ export default [
               group: ['@kb1rma/libcomm14cux-ts'],
               message:
                 'settings/ never touches the ECU library; only the controllers do. See AGENTS.md > State and data.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // `history/` and `replay/` hold the series model, which live graphs and
+    // replay share. Below the hooks and components that read it, they import
+    // only `model/`, the metric and unit definitions and themselves. Their
+    // hooks (`use*.ts`) are the adapters and may import the services above.
+    files: ['src/history/**/*.ts', 'src/replay/**/*.ts'],
+    ignores: ['src/history/use*.ts', 'src/replay/use*.ts', 'src/**/*.test.ts'],
+    plugins: { '@typescript-eslint': tseslint.plugin },
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '../*',
+                '!../model',
+                '!../model/**',
+                '!../metrics',
+                '!../units',
+                '!../history',
+                '!../history/**',
+                '!../replay',
+                '!../replay/**',
+              ],
+              message:
+                'history/ and replay/ import only model/, metrics, units and themselves; hooks, services and components sit above them. See AGENTS.md > State and data.',
+            },
+            {
+              group: ['@kb1rma/libcomm14cux-ts'],
+              message:
+                'history/ and replay/ never touch the ECU library; only the controllers do. See AGENTS.md > State and data.',
             },
           ],
         },
