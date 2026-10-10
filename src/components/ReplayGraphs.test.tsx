@@ -13,6 +13,10 @@ import { expectNoAxeViolations } from '../test-support/a11y';
 import { installCanvasStandIns } from '../test-support/canvas';
 import { snapshotAt } from '../test-support/snapshots';
 import { TestPlatform } from '../test-support/TestApp';
+import { HistoryContext } from '../ecu/contexts';
+import { historyOf } from '../history/pushSnapshot';
+import { TimeSeriesChart } from './TimeSeriesChart';
+import { METRICS } from '../metrics';
 import { ReplayControls } from './ReplayControls';
 import { ReplayGraphs } from './ReplayGraphs';
 
@@ -489,5 +493,49 @@ describe('ReplayGraphs drawing', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('shows the same lowest and highest as the live graph for the same samples', async () => {
+    const recording = Array.from({ length: 40 }, (_, i) =>
+      snapshotAt(START + i * 100, {
+        // A single-sample spike at 2.5 s and a dip at 3 s.
+        engineRpm: i === 25 ? 4321.5 : i === 30 ? 480 : 900 + i,
+        mainVoltage: i >= 10 && i < 20 ? null : 13.8,
+      }),
+    );
+    const engine = METRICS.find((m) => m.key === 'engineRpm');
+
+    if (!engine) {
+      throw new Error('No engine speed metric');
+    }
+
+    const live = render(
+      <TestPlatform platform={browserPlatform()}>
+        <PreferencesProvider>
+          <HistoryContext value={historyOf(recording)}>
+            <TimeSeriesChart metric={engine} timeWindow="session" />
+          </HistoryContext>
+        </PreferencesProvider>
+      </TestPlatform>,
+    );
+
+    await vi.waitFor(() => {
+      expect(live.container.querySelectorAll('.u-over')).toHaveLength(1);
+    });
+
+    const liveStats = ['Min', 'Max'].map((term) =>
+      stat('Engine speed (rpm)', term),
+    );
+
+    live.unmount();
+
+    const replay = renderReplay(recording);
+
+    await plotArea(replay.container, 0);
+
+    expect(liveStats).toEqual(['480 rpm', '4322 rpm']);
+    expect(['Min', 'Max'].map((t) => stat('Engine speed (rpm)', t))).toEqual(
+      liveStats,
+    );
   });
 });

@@ -185,4 +185,49 @@ describe('SampleHistory', () => {
       });
     });
   });
+
+  describe('reading a stretch', () => {
+    function filled() {
+      const history = new SampleHistory(['rpm'], 100);
+
+      // 0..50 ms in 10 ms steps; the reading at 30 ms is invalid.
+      for (let i = 0; i <= 5; i++) {
+        history.push(i * 10, { rpm: i === 3 ? null : 100 + i });
+      }
+
+      return history;
+    }
+
+    it('limits a window at both ends, inclusive', () => {
+      expect(filled().window('rpm', 10, 40)).toEqual({
+        times: [10, 20, 30, 40],
+        values: [101, 102, null, 104],
+      });
+    });
+
+    it('limits thinned samples at both ends, and can keep one either side', () => {
+      const history = filled();
+
+      expect(history.thinned('rpm', 15, 1, 35).times).toEqual([20, 30]);
+      expect(history.thinned('rpm', 15, 1, 35, true)).toEqual({
+        times: [10, 20, 30, 40],
+        values: [101, 102, null, 104],
+      });
+      // No sample beyond the ends to keep.
+      expect(
+        history.thinned('rpm', -Infinity, 1, Infinity, true).times,
+      ).toEqual([0, 10, 20, 30, 40, 50]);
+    });
+
+    it('reads the last sample at or before a time', () => {
+      const history = filled();
+
+      expect(history.valueAt('rpm', -1)).toBeUndefined();
+      expect(history.valueAt('rpm', 0)).toBe(100);
+      expect(history.valueAt('rpm', 25)).toBe(102);
+      expect(history.valueAt('rpm', 30)).toBeNull();
+      expect(history.valueAt('rpm', 999)).toBe(105);
+      expect(new SampleHistory(['rpm'], 4).valueAt('rpm', 0)).toBeUndefined();
+    });
+  });
 });

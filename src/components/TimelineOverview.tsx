@@ -14,11 +14,12 @@ import {
   type Overlay,
   type TimelineMark,
 } from '../charts/timelinePlugins';
-import type { Metric } from '../metrics';
+import { chartData } from '../history/chartSeries';
+import type { ReadonlySeries } from '../history/sampleHistory';
+import type { Metric, MetricKey } from '../metrics';
 import {
   MIN_WINDOW_MS,
   sliderStep,
-  visibleSeries,
   wholeWindow,
   zoomWindow,
 } from '../replay/timeline';
@@ -72,20 +73,17 @@ function ViewButton({
  * the highlight on the strip moves it; clicking the strip moves the
  * playhead.
  *
- * `times` are seconds into the recording, `samples` the overview metric's
- * samples at those times, and `writes` the writes to the ECU made during it;
- * none may change.
+ * `series` holds the recording's samples, and `writes` the writes to the ECU
+ * made during it; neither may change.
  */
 export function TimelineOverview({
   metric,
-  times,
-  samples,
+  series,
   replay,
   writes = NO_MARKS,
 }: {
   metric: Metric;
-  times: readonly number[];
-  samples: readonly (number | null)[];
+  series: ReadonlySeries<MetricKey>;
   replay: Replay;
   writes?: readonly TimelineMark[];
 }) {
@@ -155,11 +153,21 @@ export function TimelineOverview({
             playhead.plugin,
           ],
         },
-        visibleSeries(times, samples, 0, seconds, width),
+        chartData(
+          series,
+          metric.key,
+          {
+            since: -Infinity,
+            origin: series.earliestTime ?? 0,
+            buckets: width,
+            edges: true,
+          },
+          (value) => value,
+        ),
         container,
       );
     });
-  }, [metric, times, samples, writes]);
+  }, [metric, series, writes]);
 
   useEffect(() => {
     windowRef.current?.update();

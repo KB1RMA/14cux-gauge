@@ -4,6 +4,7 @@ import { useEffect, useId, useRef } from 'react';
 import type uPlot from 'uplot';
 import { mountPlot } from '../charts/mountPlot';
 import { plotOptions } from '../charts/plotOptions';
+import { chartData, extremes } from '../history/chartSeries';
 import { useHistory } from '../history/useHistory';
 import type { Metric } from '../metrics';
 import { usePreferences } from '../preferences/usePreferences';
@@ -20,20 +21,6 @@ const BUCKETS = 1000;
 /** The session window's shortest span, so a new session is not stretched. */
 const MIN_SESSION_SECONDS = 30;
 
-function summarise(values: readonly (number | null)[]) {
-  let min: number | undefined;
-  let max: number | undefined;
-
-  for (const value of values) {
-    if (value !== null) {
-      min = min === undefined ? value : Math.min(min, value);
-      max = max === undefined ? value : Math.max(max, value);
-    }
-  }
-
-  return { now: values.at(-1), min, max };
-}
-
 /**
  * One metric's recent history as a scrolling line graph, with its latest,
  * lowest and highest values as text. The canvas is hidden from assistive
@@ -41,7 +28,7 @@ function summarise(values: readonly (number | null)[]) {
  *
  * `timeWindow` is the seconds shown, or `'session'` for every sample held. The
  * samples are thinned to a few per pixel, keeping each one's extremes
- * (see `SampleHistory.thinned`), so the lowest and highest are exact.
+ * (see `SampleHistory.thinned`, which replay draws through too), so the lowest and highest are exact.
  */
 export function TimeSeriesChart({
   metric,
@@ -65,18 +52,15 @@ export function TimeSeriesChart({
           (latest - (history.earliestTime ?? latest)) / 1000,
         )
       : timeWindow;
-  // A power of two, so the bucket size changes rarely as a session grows.
-  const bucketMs = 2 ** Math.ceil(Math.log2((span * 1000) / BUCKETS));
-  const { times, values } = history.thinned(
+  const convert = (value: number) => metric.toDisplay(value, units);
+  const [times, shown] = chartData(
+    history,
     metric.key,
-    latest - span * 1000,
-    bucketMs,
-  );
-  const shown = values.map((v) =>
-    v === null ? null : metric.toDisplay(v, units),
+    { since: latest - span * 1000, origin: latest, buckets: BUCKETS },
+    convert,
   );
   const unit = metric.unit(units);
-  const summary = summarise(shown);
+  const summary = { now: shown.at(-1), ...extremes(shown) };
   const format = (value: number) =>
     unit ? `${metric.format(value)} ${unit}` : metric.format(value);
 
@@ -110,7 +94,7 @@ export function TimeSeriesChart({
   // hand it to a chart already drawn.
   useEffect(() => {
     spanRef.current = span;
-    dataRef.current = [times.map((time) => (time - latest) / 1000), shown];
+    dataRef.current = [times, shown];
     // Rescales y to fit the data, and x to the window.
     chartRef.current?.setData(dataRef.current, true);
   });

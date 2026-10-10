@@ -10,6 +10,41 @@ export interface SeriesWindow {
 }
 
 /**
+ * What the graphs read: samples of several series on one time base, oldest
+ * first, whether they were taken live or loaded from a recording. Values are
+ * in the library's units at full precision, and `null` marks a reading that
+ * is missing or invalid, which is a gap and never a value.
+ */
+export interface ReadonlySeries<K extends string> {
+  /** Number of samples held. */
+  readonly size: number;
+  /** Time of the oldest sample, or `undefined` if empty. */
+  readonly earliestTime: number | undefined;
+  /** Time of the newest sample, or `undefined` if empty. */
+  readonly latestTime: number | undefined;
+  /** The samples of `key` from `since` to `until` inclusive. */
+  window(key: K, since?: number, until?: number): SeriesWindow;
+  /**
+   * The samples of `key` from `since` to `until` inclusive, thinned for
+   * drawing in buckets `bucketMs` wide: every extreme is kept and every gap
+   * stays a gap. With `edges`, the sample just outside each end is kept too,
+   * so a line runs to the edges of the window.
+   */
+  thinned(
+    key: K,
+    since: number,
+    bucketMs: number,
+    until?: number,
+    edges?: boolean,
+  ): SeriesWindow;
+  /**
+   * The last sample of `key` at or before `time`: `null` if it was invalid,
+   * `undefined` if there is none yet.
+   */
+  valueAt(key: K, time: number): number | null | undefined;
+}
+
+/**
  * An in-memory ring buffer of recent samples, one column per series, so the
  * graphs can show the session without the memory use growing without limit.
  * It grows as samples arrive, up to `capacity`; once full, the oldest
@@ -21,7 +56,7 @@ export interface SeriesWindow {
 /** Samples held before the buffers first grow. */
 const INITIAL_LENGTH = 1024;
 
-export class SampleHistory<K extends string> {
+export class SampleHistory<K extends string> implements ReadonlySeries<K> {
   readonly capacity: number;
   private times: Float64Array;
   // NaN marks an invalid reading; it never occurs in a real sample.
@@ -105,8 +140,8 @@ export class SampleHistory<K extends string> {
     this.changed();
   }
 
-  /** The samples of `key` taken at or after `since`, oldest first. */
-  window(key: K, since = -Infinity): SeriesWindow {
+  /** The samples of `key` from `since` to `until` inclusive, oldest first. */
+  window(key: K, since = -Infinity, until = Infinity): SeriesWindow {
     const column = this.columns.get(key);
     const times: number[] = [];
     const values: (number | null)[] = [];
@@ -115,7 +150,9 @@ export class SampleHistory<K extends string> {
       return { times, values };
     }
 
-    for (let i = this.firstAtOrAfter(since); i < this.count; i++) {
+    const end = this.firstAfter(until);
+
+    for (let i = this.firstAtOrAfter(since); i < end; i++) {
       const index = this.slot(i);
       const value = column[index] ?? Number.NaN;
 
@@ -127,15 +164,22 @@ export class SampleHistory<K extends string> {
   }
 
   /**
-   * The samples of `key` taken at or after `since`, thinned for drawing.
-   * Samples are grouped into buckets `bucketMs` wide, aligned to multiples
+   * The samples of `key` from `since` to `until` inclusive, thinned for
+   * drawing. Samples are grouped into buckets `bucketMs` wide, aligned to multiples
    * of it so a bucket keeps the same samples as the window scrolls. Each run
    * of valid samples in a bucket keeps only its first, lowest, highest and
    * last sample, in time order, so every point is a real sample and no
    * extreme is lost. Each run of invalid samples becomes one `null`, so gaps
-   * stay gaps.
+   * stay gaps. With `edges`, the sample just outside each end is kept as
+   * well (thinned with the rest), so a line runs to the edges of the window.
    */
-  thinned(key: K, since: number, bucketMs: number): SeriesWindow {
+  thinned(
+    key: K,
+    since: number,
+    bucketMs: number,
+    until = Infinity,
+    edges = false,
+  ): SeriesWindow {
     const column = this.columns.get(key);
     const times: number[] = [];
     const values: (number | null)[] = [];
@@ -169,7 +213,14 @@ export class SampleHistory<K extends string> {
       first = -1;
     };
 
-    for (let i = this.firstAtOrAfter(since); i < this.count; i++) {
+    const margin = edges ? 1 : 0;
+    const end = Math.min(this.firstAfter(until) + margin, this.count);
+
+    for (
+      let i = Math.max(this.firstAtOrAfter(since) - margin, 0);
+      i < end;
+      i++
+    ) {
       const time = this.times[this.slot(i)] ?? 0;
       const v = value(i);
       const b = Math.floor(time / bucketMs);
@@ -206,6 +257,19 @@ export class SampleHistory<K extends string> {
     flush();
 
     return { times, values };
+  }
+
+  valueAt(key: K, time: number): number | null | undefined {
+    const column = this.columns.get(key);
+    const i = this.firstAfter(time) - 1;
+
+    if (!column || i < 0) {
+      return undefined;
+    }
+
+    const value = column[this.slot(i)] ?? Number.NaN;
+
+    return Number.isNaN(value) ? null : value;
   }
 
   readonly subscribe = (listener: () => void): (() => void) => {
@@ -254,13 +318,23 @@ export class SampleHistory<K extends string> {
 
   /** Logical index of the first sample at or after `time` (binary search). */
   private firstAtOrAfter(time: number): number {
+    return this.countWhile((t) => t < time);
+  }
+
+  /** Logical index of the first sample after `time`. */
+  private firstAfter(time: number): number {
+    return this.countWhile((t) => t <= time);
+  }
+
+  /** How many of the oldest samples' times pass `before` (binary search). */
+  private countWhile(before: (time: number) => boolean): number {
     let low = 0;
     let high = this.count;
 
     while (low < high) {
       const mid = (low + high) >>> 1;
 
-      if ((this.times[this.slot(mid)] ?? 0) < time) {
+      if (before(this.times[this.slot(mid)] ?? 0)) {
         low = mid + 1;
       } else {
         high = mid;
