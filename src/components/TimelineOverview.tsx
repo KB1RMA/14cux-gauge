@@ -2,7 +2,13 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { ZoomInIcon, ZoomOutIcon } from '@radix-ui/react-icons';
 import { Slider } from 'radix-ui';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import type uPlot from 'uplot';
 import { mountPlot } from '../charts/mountPlot';
 import { overviewPlotOptions } from '../charts/plotOptions';
@@ -74,18 +80,21 @@ function ViewButton({
 
 /**
  * A handle on one end of the window. While it is dragged, or has the
- * keyboard's focus, it shows the time it is at, inside the window so the
- * time stays on the strip at either end of the recording.
+ * keyboard's focus, it shows the time it is at, running toward the middle of
+ * the strip so the time stays on the strip wherever the handle is.
  */
 function Handle({
   label,
   side,
   ms,
+  max,
   step,
 }: {
   label: string;
   side: 'start' | 'end';
   ms: number;
+  /** Where the slider ends. */
+  max: number;
   step: number;
 }) {
   const [held, setHeld] = useState(false);
@@ -93,6 +102,7 @@ function Handle({
   // Pressing a handle focuses it; only focus from the keyboard shows the
   // time once the pointer lets go.
   const pressedRef = useRef(false);
+  const toward = ms < max / 2 ? 'toRight' : 'toLeft';
 
   const release = () => {
     pressedRef.current = false;
@@ -101,7 +111,7 @@ function Handle({
 
   return (
     <Slider.Thumb
-      className={styles['handle']}
+      className={`${styles['handle'] ?? ''} ${styles[side] ?? ''}`}
       aria-label={label}
       aria-valuetext={describeTime(ms, step)}
       onPointerDown={() => {
@@ -123,7 +133,7 @@ function Handle({
       {(held || keyed) && (
         // The value is in aria-valuetext; this is its look.
         <span
-          className={`${styles['time'] ?? ''} ${styles[side] ?? ''}`}
+          className={`${styles['time'] ?? ''} ${styles[toward] ?? ''}`}
           aria-hidden="true"
         >
           {formatPreciseDuration(ms)}
@@ -187,6 +197,7 @@ export function TimelineOverview({
   const whole = view.start <= 0 && view.end >= duration;
   const narrowest = view.end - view.start <= Math.min(MIN_WINDOW_MS, duration);
   const step = sliderStep(duration);
+  const max = sliderEnd(duration);
   // Zoom around the playhead while it is in view, else the window's middle.
   const anchor =
     position >= view.start && position <= view.end
@@ -283,9 +294,15 @@ export function TimelineOverview({
         <div ref={plotRef} className={styles['strip']} aria-hidden="true" />
         <Slider.Root
           className={styles['handles']}
+          // How much of the slider the window takes, to size the handles.
+          style={
+            {
+              '--window-fraction': (view.end - view.start) / max,
+            } as CSSProperties
+          }
           min={0}
           // The view is clamped back to the recording.
-          max={sliderEnd(duration)}
+          max={max}
           step={step}
           minStepsBetweenThumbs={Math.max(
             Math.ceil(Math.min(MIN_WINDOW_MS, duration) / step),
@@ -304,9 +321,16 @@ export function TimelineOverview({
             label="Graphs from"
             side="start"
             ms={view.start}
+            max={max}
             step={step}
           />
-          <Handle label="Graphs to" side="end" ms={view.end} step={step} />
+          <Handle
+            label="Graphs to"
+            side="end"
+            ms={view.end}
+            max={max}
+            step={step}
+          />
         </Slider.Root>
       </div>
       <div className={styles['range']}>
