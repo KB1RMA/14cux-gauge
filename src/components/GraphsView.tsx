@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { RowsIcon, ViewGridIcon } from '@radix-ui/react-icons';
+import { useId } from 'react';
 import { Toolbar } from 'radix-ui';
 import { useHistory } from '../history/useHistory';
 import { METRIC_KEYS } from '../metrics';
@@ -113,11 +114,15 @@ function TruncatedNote() {
   );
 }
 
-/** Live graphs of the chosen readings over the chosen time window. */
+/**
+ * Live graphs of the chosen readings over the chosen time window, sharing
+ * the pointer's crosshair.
+ */
 export function GraphsView() {
   const [settings, setSettings] = useSetting('graphs');
   const { chosen } = useReadings();
   const notChosen = METRIC_KEYS.filter((key) => !chosen.includes(key));
+  const syncId = useId();
 
   return (
     <div className={styles['graphs']}>
@@ -149,6 +154,7 @@ export function GraphsView() {
             key={metric.key}
             metric={metric}
             timeWindow={settings.window}
+            syncKey={syncId}
           />
         )}
       />

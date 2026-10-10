@@ -6,6 +6,7 @@ import { installCanvasStandIns } from '../test-support/canvas';
 import {
   canPlot,
   formatAgo,
+  formatAgoPrecise,
   formatTimelineTick,
   loadPlot,
   OVERVIEW_HEIGHT,
@@ -47,6 +48,17 @@ describe('formatAgo', () => {
     expect(formatAgo(-3600)).toBe('−1 h');
     expect(formatAgo(-5400)).toBe('−90 min');
     expect(formatAgo(-7200)).toBe('−2 h');
+  });
+});
+
+describe('formatAgoPrecise', () => {
+  it('reads a live sample’s time to the tenth of a second before now', () => {
+    expect(formatAgoPrecise(0)).toBe('now');
+    expect(formatAgoPrecise(-0.1)).toBe('−0:00.1');
+    expect(formatAgoPrecise(-12.3)).toBe('−0:12.3');
+    expect(formatAgoPrecise(-59.99)).toBe('−0:59.9');
+    expect(formatAgoPrecise(-125)).toBe('−2:05.0');
+    expect(formatAgoPrecise(-3723.4)).toBe('−1:02:03.4');
   });
 });
 
@@ -117,6 +129,22 @@ describe('plotOptions', () => {
       '−150 s',
       'now',
     ]);
+  });
+
+  it('shows a crosshair, shared with the graphs that have the same sync key', () => {
+    const alone = plotOptions(plot, metric('engineRpm'), {
+      width: 400,
+      windowSeconds: 60,
+    });
+    const shared = plotOptions(plot, metric('engineRpm'), {
+      width: 400,
+      windowSeconds: 60,
+      syncKey: 'live',
+    });
+
+    expect(alone.cursor).toMatchObject({ show: true, x: true, y: false });
+    expect(alone.cursor?.sync).toBeUndefined();
+    expect(shared.cursor).toMatchObject({ sync: { key: 'live' } });
   });
 
   it('reads a changing time window each time the data is set', () => {
