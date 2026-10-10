@@ -164,9 +164,10 @@ Types and options that are stored (such as graph settings) live in `model/` or `
 
 `eslint.config.js` restricts imports, as errors, so these cannot be crossed unnoticed. Fix the code, not the config.
 
-- Views (`src/components/`) never import the ECU library, storage, `settingStore`, `SampleHistory` or `EcuSession` as values; they use hooks (`useSessions`, `useRoms`, `useSetting`, `useHistory`, `useEcu`, `useEcuRead`).
+- Views (`src/components/`) never import the ECU library, storage, `settingStore`, `SampleHistory` (nor `historyOf`) or `EcuSession` as values; they use hooks (`useSessions`, `useRoms`, `useSetting`, `useHistory`, `useRecordedSeries`, `useEcu`, `useEcuRead`).
 - `src/model/` imports nothing from the app above it.
 - `src/storage/` imports only `model/` and itself, not the platform, services, hooks or components (its hooks live in `src/services/`). `src/settings/` imports only `model/`, `storage/`, `metrics`, `units` and itself, and only types from `platform/`; the platform passes in what the settings need, such as defaults.
+- `src/history/` and `src/replay/` (their non-hook files) import only `model/`, `metrics`, `units` and themselves, so the series model stays below the hooks and views that read it.
 - Outside `src/platform/`, `localStorage`, `sessionStorage`, `indexedDB`, `navigator`, `location` and `window.location` are lint errors. `src/pwa/`, `src/usage/` and a few files named in `eslint.config.js` are exempt until the issues named there land; remove an entry when its issue does.
 - Hooks (`use*.ts`) and providers (`*Provider.tsx`) never import the ECU library or hold a `Lease`; only the controllers (`EcuSession`, `EcuWrites`, `RomReader`) do.
 

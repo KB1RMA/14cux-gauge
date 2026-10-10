@@ -2,14 +2,10 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import {
   clampWindow,
-  countUpTo,
   followPlayback,
   panWindow,
-  rangeOf,
   sliderStep,
   revealPosition,
-  valueAt,
-  visibleSeries,
   wholeWindow,
   windowBetween,
   zoomWindow,
@@ -193,86 +189,6 @@ describe('followPlayback', () => {
 
     expect(followPlayback(elsewhere, 3000, 3100, 10_000)).toBe(elsewhere);
     expect(followPlayback(view, 8000, 8100, 10_000)).toBe(view);
-  });
-});
-
-const times = [0, 1, 2, 3, 4, 5];
-const values = [10, 30, null, 20, 50, 40];
-
-describe('countUpTo and valueAt', () => {
-  it('finds the samples taken at or before a time', () => {
-    expect(countUpTo(times, -1)).toBe(0);
-    expect(countUpTo(times, 2)).toBe(3);
-    expect(countUpTo(times, 2.5)).toBe(3);
-    expect(countUpTo(times, 99)).toBe(6);
-  });
-
-  it('reads the last value at or before a time', () => {
-    expect(valueAt(times, values, -1)).toBeUndefined();
-    expect(valueAt(times, values, 1.9)).toBe(30);
-    expect(valueAt(times, values, 2)).toBeNull();
-    expect(valueAt(times, values, 99)).toBe(40);
-  });
-});
-
-describe('rangeOf', () => {
-  it('finds the lowest and highest valid values in a stretch', () => {
-    expect(rangeOf(times, values, 1, 3)).toEqual({ min: 20, max: 30 });
-    expect(rangeOf(times, values, 0, 5)).toEqual({ min: 10, max: 50 });
-  });
-
-  it('has neither when the stretch has no valid values', () => {
-    expect(rangeOf(times, values, 2, 2)).toEqual({
-      min: undefined,
-      max: undefined,
-    });
-    expect(rangeOf(times, values, 10, 20)).toEqual({
-      min: undefined,
-      max: undefined,
-    });
-  });
-});
-
-describe('visibleSeries', () => {
-  it('takes the samples in the stretch, and one either side', () => {
-    expect(visibleSeries(times, values, 1.5, 3.5, 100)).toEqual([
-      [1, 2, 3, 4],
-      [30, null, 20, 50],
-    ]);
-  });
-
-  it('stops at the first and last samples', () => {
-    expect(visibleSeries(times, values, 0, 5, 100)).toEqual([times, values]);
-    expect(visibleSeries([], [], 0, 5, 100)).toEqual([[], []]);
-  });
-
-  it('reduces too many samples to the low and high of each stretch, in order', () => {
-    const many = Array.from({ length: 12 }, (_, i) => i);
-    const wave = [5, 9, 1, 5, 5, 5, 3, 3, 3, 8, 2, 4];
-
-    // Three stretches, each four samples long; a tie keeps the first.
-    expect(visibleSeries(many, wave, 0, 11, 6)).toEqual([
-      [1, 2, 4, 6, 9, 10],
-      [9, 1, 5, 3, 8, 2],
-    ]);
-  });
-
-  it('keeps one point for a flat stretch, and a gap for an invalid one', () => {
-    const many = Array.from({ length: 8 }, (_, i) => i);
-    const flat = [7, 7, 7, 7, null, null, null, null];
-
-    expect(visibleSeries(many, flat, 0, 7, 4)).toEqual([
-      [0, 4],
-      [7, null],
-    ]);
-  });
-
-  it('draws a stretch with no samples at all as nothing', () => {
-    // Two samples far apart: the stretches between them are empty.
-    expect(visibleSeries([0, 0, 100, 100], [1, 2, 3, 4], 0, 100, 2)).toEqual([
-      [0, 100],
-      [1, 4],
-    ]);
   });
 });
 

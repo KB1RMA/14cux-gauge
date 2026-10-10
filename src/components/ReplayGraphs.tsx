@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import type { TimelineMark } from '../charts/timelinePlugins';
 import type { LiveSnapshot } from '../model/snapshot';
-import { METRIC_KEYS, METRICS, sampleOf, type MetricKey } from '../metrics';
+import { useRecordedSeries } from '../history/useRecordedSeries';
+import { METRIC_KEYS, METRICS, type MetricKey } from '../metrics';
 import type { Replay } from '../replay/useReplay';
 import { useSetting } from '../settings/useSetting';
 import { GraphGroups } from './GraphGroups';
@@ -37,21 +38,9 @@ export function ReplayGraphs({
 }) {
   const [settings, setSettings] = useSetting('graphs');
   const syncId = useId();
-  // Every sample, in columns, once: the charts slice these as they zoom.
-  const [{ times, columns }] = useState(() => {
-    const start = samples[0]?.timestamp ?? 0;
-
-    return {
-      times: samples.map((sample) => (sample.timestamp - start) / 1000),
-      columns: new Map(
-        METRIC_KEYS.map((key) => [
-          key,
-          samples.map((sample) => sampleOf(sample, key)),
-        ]),
-      ) as ReadonlyMap<MetricKey, (number | null)[]>,
-    };
-  });
-  const column = (key: MetricKey) => columns.get(key) ?? [];
+  // Every sample, once, in the same series model as the live graphs: the
+  // charts read the stretch they show from it as they zoom.
+  const series = useRecordedSeries(samples);
   const overviewKey = recorded.includes(OVERVIEW_METRIC)
     ? OVERVIEW_METRIC
     : recorded[0];
@@ -62,8 +51,7 @@ export function ReplayGraphs({
       {overview ? (
         <TimelineOverview
           metric={overview}
-          times={times}
-          samples={column(overview.key)}
+          series={series}
           replay={replay}
           writes={writes}
         />
@@ -90,8 +78,7 @@ export function ReplayGraphs({
           <TimelineChart
             key={metric.key}
             metric={metric}
-            times={times}
-            samples={column(metric.key)}
+            series={series}
             replay={replay}
             syncKey={syncId}
             writes={writes}
