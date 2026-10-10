@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.9.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.8.0...v0.9.0) (2026-10-10)
+
+
+### Features
+
+* resize the replay window by dragging handles on its ends ([#94](https://github.com/KB1RMA/14cux-gauge/issues/94)) ([de56801](https://github.com/KB1RMA/14cux-gauge/commit/de56801370c870c0e4910f58d98816644e6b94eb))
+
+
+### Bug Fixes
+
+* show an error and a Reload button in place of a view that fails, instead of a blank page ([3d022d9](https://github.com/KB1RMA/14cux-gauge/commit/3d022d936338d1157249fc47809662d2fd96870d))
+
+
+### Performance Improvements
+
+* load the dashboard and sessions views on demand, so the app starts faster ([3d022d9](https://github.com/KB1RMA/14cux-gauge/commit/3d022d936338d1157249fc47809662d2fd96870d))
+
 ## [0.8.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.7.0...v0.8.0) (2026-10-10)
 
 
