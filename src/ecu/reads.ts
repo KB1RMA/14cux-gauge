@@ -2,6 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import {
   Ecu,
+  FAULT_CODE_NUMBERS,
   FUEL_MAP_COLUMNS,
   FUEL_MAP_ROWS,
   InvalidReadingError,
@@ -11,7 +12,7 @@ import {
   type TuneRevision,
 } from '@kb1rma/libcomm14cux-ts';
 
-export { FUEL_MAP_COLUMNS, FUEL_MAP_ROWS };
+export { FAULT_CODE_NUMBERS, FUEL_MAP_COLUMNS, FUEL_MAP_ROWS };
 export type {
   FaultCodeName,
   FaultCodes as FaultCodeFlags,

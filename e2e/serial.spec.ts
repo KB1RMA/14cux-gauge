@@ -47,7 +47,7 @@ test.describe('Serial ECU over Web Serial', () => {
       page
         .getByRole('list', { name: 'Stored fault codes' })
         .getByRole('listitem'),
-    ).toHaveText([/^Purge valve leak\b/]);
+    ).toHaveText(['88 · Purge valve leak purgeValveLeak']);
 
     await page.getByRole('button', { name: 'Clear fault codes' }).click();
     await page
