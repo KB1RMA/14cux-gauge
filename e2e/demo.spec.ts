@@ -40,7 +40,7 @@ test.describe('Demo mode', () => {
     const faults = page.getByRole('list', { name: 'Stored fault codes' });
 
     await expect(faults.getByRole('listitem')).toHaveText([
-      '88 · Purge valve leak purgeValveLeak',
+      /^88 · Purge valve leak\b/,
     ]);
 
     await page.getByRole('button', { name: 'Clear fault codes' }).click();

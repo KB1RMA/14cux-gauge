@@ -52,8 +52,9 @@ function faultNumber(name: FaultCodeName): string {
   return String(FAULT_CODE_NUMBERS[name]).padStart(2, '0');
 }
 
+// In the library's order, which is the firmware's fault priority order.
 function activeFaults(codes: FaultCodeFlags): FaultCodeName[] {
-  return (Object.keys(FAULT_LABELS) as FaultCodeName[]).filter(
+  return (Object.keys(FAULT_CODE_NUMBERS) as FaultCodeName[]).filter(
     (name) => codes[name],
   );
 }
@@ -95,7 +96,8 @@ export function FaultCodes() {
         <ul aria-label="Stored fault codes" className={styles['faults']}>
           {faults.map((name) => (
             <li key={name}>
-              {faultNumber(name)} · {FAULT_LABELS[name]}
+              {faultNumber(name)} <span aria-hidden="true">·</span>{' '}
+              {FAULT_LABELS[name]}
               {FAULT_NOTES[name] ? ` (${FAULT_NOTES[name]})` : null}{' '}
               <code>{name}</code>
             </li>

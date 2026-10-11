@@ -108,7 +108,7 @@ describe('FaultCodes', () => {
     ]);
   });
 
-  it('shows code 25 for a misfire set by older firmware', async () => {
+  it('shows code 25 when only the older firmware misfire bit is set (#101)', async () => {
     const user = userEvent.setup();
     const transport = new SimulatedTransport();
 
