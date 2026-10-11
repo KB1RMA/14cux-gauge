@@ -2,6 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { useCallback, useId, useState } from 'react';
 import {
+  FAULT_CODE_NUMBERS,
   readFaultCodes,
   type FaultCodeFlags,
   type FaultCodeName,
@@ -16,6 +17,7 @@ const FAULT_LABELS: Record<FaultCodeName, string> = {
   romChecksumFailure: 'ROM checksum failure',
   lambdaSensorOdd: 'Lambda sensor, odd bank',
   lambdaSensorEven: 'Lambda sensor, even bank',
+  misfireGeneral: 'Misfire',
   misfireOddBank: 'Misfire, odd bank',
   misfireEvenBank: 'Misfire, even bank',
   airflowMeter: 'Airflow meter',
@@ -39,8 +41,20 @@ const FAULT_LABELS: Record<FaultCodeName, string> = {
   ramChecksumFailure: 'RAM checksum failure',
 };
 
+// Codes that only some firmware sets, so a technician knows why an ECU may
+// never show them.
+const FAULT_NOTES: Partial<Record<FaultCodeName, string>> = {
+  misfireGeneral: 'set only by firmware before R3360',
+};
+
+// Two digits, as the factory lists and the fault code display write them ("02").
+function faultNumber(name: FaultCodeName): string {
+  return String(FAULT_CODE_NUMBERS[name]).padStart(2, '0');
+}
+
+// In the library's order, which is the firmware's fault priority order.
 function activeFaults(codes: FaultCodeFlags): FaultCodeName[] {
-  return (Object.keys(FAULT_LABELS) as FaultCodeName[]).filter(
+  return (Object.keys(FAULT_CODE_NUMBERS) as FaultCodeName[]).filter(
     (name) => codes[name],
   );
 }
@@ -82,7 +96,10 @@ export function FaultCodes() {
         <ul aria-label="Stored fault codes" className={styles['faults']}>
           {faults.map((name) => (
             <li key={name}>
-              {FAULT_LABELS[name]} <code>{name}</code>
+              {faultNumber(name)} <span aria-hidden="true">·</span>{' '}
+              {FAULT_LABELS[name]}
+              {FAULT_NOTES[name] ? ` (${FAULT_NOTES[name]})` : null}{' '}
+              <code>{name}</code>
             </li>
           ))}
         </ul>
