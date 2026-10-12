@@ -55,7 +55,7 @@ export function StatusBar() {
   const { snapshot, stats } = useLiveData();
   const { chosen } = useReadings();
   const recording = useRecording();
-  const { active } = recording;
+  const { active, starting } = recording;
   const reconnectRef = useRef<HTMLButtonElement>(null);
   const detailsRef = useRef<HTMLButtonElement>(null);
   const failed = state.status === 'error';
@@ -105,8 +105,14 @@ export function StatusBar() {
           // One button that changes, so focus stays on it.
           <button
             type="button"
-            disabled={!active && !recording.canRecord}
+            disabled={!active && !starting && !recording.canRecord}
+            // Not `disabled` while starting, which would drop focus from it.
+            aria-disabled={starting || undefined}
             onClick={() => {
+              if (starting) {
+                return;
+              }
+
               void (active ? recording.stop() : recording.start());
             }}
           >
@@ -115,7 +121,11 @@ export function StatusBar() {
             ) : (
               <DotFilledIcon aria-hidden="true" className={styles['recDot']} />
             )}
-            {active ? 'Stop recording' : 'Record'}
+            {active
+              ? 'Stop recording'
+              : starting
+                ? 'Starting recording…'
+                : 'Record'}
           </button>
         ) : null}
         {failed ? (

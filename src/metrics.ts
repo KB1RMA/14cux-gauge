@@ -554,6 +554,18 @@ export function recordedKeys(snapshots: readonly LiveSnapshot[]): MetricKey[] {
   );
 }
 
+/**
+ * The rev limit: a setting the ECU holds, not a live reading, so it has no
+ * tile, but it reads the same in the ECU info, a recording and its export.
+ * Whole rpm, as engine speed is: the library works it out from the limit's
+ * spark period, which is far coarser than 1 rpm at these speeds.
+ */
+export const RPM_LIMIT = {
+  label: 'Rev limit',
+  unit: 'rpm',
+  format: fixed(0),
+} as const;
+
 /** Formats a sample for display, with the user's units. */
 export function formatSample(
   metric: Metric,
