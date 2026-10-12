@@ -6,6 +6,7 @@ import {
   injectorDuty,
   METRIC_GROUPS,
   METRICS,
+  RPM_LIMIT,
   meterSpan,
   metricsInGroup,
   readingsFor,
@@ -164,6 +165,14 @@ describe('metrics', () => {
     expect(recordedKeys([{ timestamp: 0, engineRpm: 750 }])).toEqual([
       'engineRpm',
     ]);
+  });
+
+  it('shows the rev limit in whole rpm, as engine speed is', () => {
+    expect(RPM_LIMIT.unit).toBe('rpm');
+    expect(RPM_LIMIT.format(5000)).toBe('5000');
+    expect(RPM_LIMIT.format(4999.5)).toBe('5000');
+    expect(RPM_LIMIT.format(4999.49)).toBe('4999');
+    expect(RPM_LIMIT.format(0)).toBe('0');
   });
 
   it('converts temperatures and speeds to the chosen units', () => {

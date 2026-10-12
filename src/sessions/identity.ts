@@ -2,6 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { activeFaults, type FaultDescription } from '../faultCodes';
 import { hex } from '../hex';
+import { RPM_LIMIT } from '../metrics';
 import type { EcuIdentity, IdentityRead } from '../model/identity';
 
 /**
@@ -77,7 +78,7 @@ export function identityRows(identity: EcuIdentity): IdentityRow[] {
     row('Checksum fixer', tune, ({ checksumFixer }) =>
       formatChecksumFixer(checksumFixer),
     ),
-    row('Rev limit', identity.rpmLimit, String, 'rpm'),
+    row(RPM_LIMIT.label, identity.rpmLimit, RPM_LIMIT.format, RPM_LIMIT.unit),
     row('Fuel map', identity.fuelMap, String),
   ];
 }

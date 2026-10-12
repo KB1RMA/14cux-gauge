@@ -3,6 +3,7 @@
 import {
   FAULT_CODE_NUMBERS,
   type FaultCodeName,
+  type FaultCodes,
 } from '@kb1rma/libcomm14cux-ts';
 
 /**
@@ -81,14 +82,17 @@ export function describeFault(name: string): FaultDescription {
  * fault priority order; any it does not know follow, in the order given.
  */
 export function activeFaults(
-  flags: Readonly<Record<string, boolean>>,
+  flags: FaultCodes | Readonly<Record<string, boolean>>,
 ): FaultDescription[] {
+  const set = new Set(
+    Object.entries(flags)
+      .filter(([, on]) => on === true)
+      .map(([name]) => name),
+  );
   const known = (Object.keys(FAULT_CODE_NUMBERS) as FaultCodeName[]).filter(
-    (name) => flags[name] === true,
+    (name) => set.has(name),
   );
-  const unknown = Object.keys(flags).filter(
-    (name) => !isKnown(name) && flags[name] === true,
-  );
+  const unknown = [...set].filter((name) => !isKnown(name));
 
   return [...known, ...unknown].map(describeFault);
 }

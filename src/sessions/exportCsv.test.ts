@@ -16,24 +16,28 @@ const samples: LiveSnapshot[] = [
 
 const SERIAL = { source: 'serial', identity: IDENTITY } as const;
 
-/** The rows after the identity section and its blank line. */
+/** The rows after the identity section and its blank (all empty) line. */
 function sampleRows(csv: string): string {
-  return csv.slice(csv.indexOf('\r\n\r\n') + 4);
+  const lines = csv.split('\r\n');
+
+  return lines
+    .slice(lines.findIndex((line) => /^,*$/.test(line)) + 1)
+    .join('\r\n');
 }
 
 describe('sessionCsv', () => {
   it('opens with the ECU’s identity and fault codes, each with when it was read', () => {
     expect(sessionCsv(SERIAL, samples, IMPERIAL)).toBe(
-      'ECU at start of recording,Value,Read at (UTC)\r\n' +
-        'Source,Serial ECU,\r\n' +
-        'Tune number,3360,2026-10-05T14:00:00.000Z\r\n' +
-        'Tune ident,0x0021,2026-10-05T14:00:00.000Z\r\n' +
-        'Checksum fixer,0x5C,2026-10-05T14:00:00.000Z\r\n' +
-        'Rev limit (rpm),5800,2026-10-05T14:00:00.020Z\r\n' +
-        'Fuel map,5,2026-10-05T14:00:00.040Z\r\n' +
-        'Fault code,29 ROM checksum failure (romChecksumFailure),2026-10-05T14:00:00.060Z\r\n' +
-        'Fault code,14 Coolant temperature sensor (coolantTempSensor),2026-10-05T14:00:00.060Z\r\n' +
-        '\r\n' +
+      'ECU at start of recording,Value,Read at (UTC),,\r\n' +
+        'Source,Serial ECU,,,\r\n' +
+        'Tune number,3360,2026-10-05T14:00:00.000Z,,\r\n' +
+        'Tune ident,0x0021,2026-10-05T14:00:00.000Z,,\r\n' +
+        'Checksum fixer,0x5C,2026-10-05T14:00:00.000Z,,\r\n' +
+        'Rev limit (rpm),5800,2026-10-05T14:00:00.020Z,,\r\n' +
+        'Fuel map,5,2026-10-05T14:00:00.040Z,,\r\n' +
+        'Fault code,29 ROM checksum failure (romChecksumFailure),2026-10-05T14:00:00.060Z,,\r\n' +
+        'Fault code,14 Coolant temperature sensor (coolantTempSensor),2026-10-05T14:00:00.060Z,,\r\n' +
+        ',,,,\r\n' +
         'Time since start (s),Time (UTC),Engine speed (rpm),Coolant (°F),MIL\r\n' +
         '0,2026-10-05T14:00:00.000Z,750,212,0\r\n' +
         '1.5,2026-10-05T14:00:01.500Z,,32.5,1\r\n',
@@ -113,10 +117,10 @@ describe('sessionCsv', () => {
     expect(
       sessionCsv({ source: 'serial', identity: null }, samples, IMPERIAL),
     ).toBe(
-      'ECU at start of recording,Value,Read at (UTC)\r\n' +
-        'Source,Serial ECU,\r\n' +
-        'ECU identity,Not recorded,\r\n' +
-        '\r\n' +
+      'ECU at start of recording,Value,Read at (UTC),,\r\n' +
+        'Source,Serial ECU,,,\r\n' +
+        'ECU identity,Not recorded,,,\r\n' +
+        ',,,,\r\n' +
         'Time since start (s),Time (UTC),Engine speed (rpm),Coolant (°F),MIL\r\n' +
         '0,2026-10-05T14:00:00.000Z,750,212,0\r\n' +
         '1.5,2026-10-05T14:00:01.500Z,,32.5,1\r\n',
@@ -133,7 +137,8 @@ describe('sessionCsv', () => {
 
   it('writes only the header for no samples', () => {
     expect(sampleRows(sessionCsv(SERIAL, [], IMPERIAL))).toBe(
-      'Time since start (s),Time (UTC)\r\n',
+      // Padded to the width of the identity rows above it.
+      'Time since start (s),Time (UTC),\r\n',
     );
   });
 });

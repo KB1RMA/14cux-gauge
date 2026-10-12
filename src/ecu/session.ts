@@ -130,6 +130,8 @@ interface Active {
   connection: EcuConnection;
   poller?: Poller;
   unwatch?: () => void;
+  /** Reads run by `readNow` that have not finished. */
+  reads: Set<Promise<unknown>>;
 }
 
 /**
@@ -232,7 +234,8 @@ export class EcuSession {
    * Runs an on-demand read on the connected ECU, beside polling, as a
    * service needs one (a recording reads the ECU's identity as it starts).
    * Resolves `undefined` without reading when not connected, or while a
-   * holder has the link to itself.
+   * holder has the link to itself. A holder that takes the link meanwhile
+   * waits for the read to finish (see `pausePolling`).
    */
   readonly readNow = async <T>(read: EcuRead<T>): Promise<T | undefined> => {
     const active = this.active;
@@ -245,7 +248,15 @@ export class EcuSession {
       return undefined;
     }
 
-    return read(active.connection.ecu);
+    const reading = read(active.connection.ecu);
+
+    active.reads.add(reading);
+
+    try {
+      return await reading;
+    } finally {
+      active.reads.delete(reading);
+    }
   };
 
   readonly connect = async (source: EcuSource): Promise<void> => {
@@ -268,7 +279,11 @@ export class EcuSession {
     );
 
     const connection = this.options.createConnection(source, this.log);
-    const active: Active = { link: { id: ++this.links }, connection };
+    const active: Active = {
+      link: { id: ++this.links },
+      connection,
+      reads: new Set(),
+    };
 
     this.active = active;
 
@@ -443,6 +458,11 @@ export class EcuSession {
    */
   private async pausePolling(active: Active): Promise<() => void> {
     const poller = active.poller;
+
+    // A read started before the holder took the link finishes first, so the
+    // holder has the link to itself once this settles. Its outcome is the
+    // reader's to handle.
+    await Promise.allSettled(active.reads);
 
     if (!poller) {
       return () => undefined;

@@ -61,24 +61,41 @@ async function settle<T>(read: () => Promise<T>): Promise<Outcome<T>> {
 
 /**
  * The tune revision read on each connection, which has its own `Ecu`. It is
- * in the ROM, so it cannot change while connected: the ECU info and every
- * recording on the connection share one read, and keep when it was made. A
- * failed read is not kept, so the next asks the ECU again.
+ * in the ROM, so it cannot change while connected: every recording on the
+ * connection shares the last read, and keeps when it was made. The ECU info
+ * reads it afresh when asked, which replaces the kept read, so a value that
+ * looks wrong can be checked again. A failed read is not kept: the read
+ * before it stays, or if there was none the next asks the ECU again.
  */
 const tuneRevisions = new WeakMap<Ecu, Promise<Outcome<TuneRevision>>>();
 
-function readTuneRevision(ecu: Ecu): Promise<Outcome<TuneRevision>> {
+function readTuneRevision(
+  ecu: Ecu,
+  { fresh }: { fresh: boolean },
+): Promise<Outcome<TuneRevision>> {
   const kept = tuneRevisions.get(ecu);
 
-  if (kept) {
+  if (kept && !fresh) {
     return kept;
   }
 
   const reading = settle(() => ecu.getTuneRevision());
 
   tuneRevisions.set(ecu, reading);
-  void reading.then((outcome) => {
-    if (!outcome.ok && tuneRevisions.get(ecu) === reading) {
+  void reading.then(async (outcome) => {
+    if (outcome.ok || tuneRevisions.get(ecu) !== reading) {
+      return;
+    }
+
+    const before = await kept;
+
+    if (tuneRevisions.get(ecu) !== reading) {
+      return;
+    }
+
+    if (kept && before?.ok) {
+      tuneRevisions.set(ecu, kept);
+    } else {
       tuneRevisions.delete(ecu);
     }
   });
@@ -87,7 +104,7 @@ function readTuneRevision(ecu: Ecu): Promise<Outcome<TuneRevision>> {
 }
 
 export const readTuneInfo: EcuRead<TuneInfo> = async (ecu) => {
-  const tune = await readTuneRevision(ecu);
+  const tune = await readTuneRevision(ecu, { fresh: true });
 
   if (!tune.ok) {
     throw tune.error;
@@ -166,7 +183,10 @@ function identityRead<T>(
  * why.
  */
 export const readIdentity: EcuRead<EcuIdentity> = async (ecu) => {
-  const revision = identityRead(await readTuneRevision(ecu), false);
+  const revision = identityRead(
+    await readTuneRevision(ecu, { fresh: false }),
+    false,
+  );
   const tune =
     revision.status === 'read'
       ? {
@@ -184,6 +204,7 @@ export const readIdentity: EcuRead<EcuIdentity> = async (ecu) => {
     true,
   );
   const faultCodes = identityRead(
+    // Copied into a plain record, as it is stored.
     await settle(async (): Promise<Record<string, boolean>> => ({
       ...(await ecu.getFaultCodes()),
     })),

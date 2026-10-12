@@ -71,8 +71,9 @@ function identitySection(
  * {@link identitySection}) and a blank line, then has one row per sample,
  * with the readings in the user's display units. Values are converted but
  * not rounded, so the file keeps the recorded precision. A reading that was
- * invalid, or not taken, is left empty rather than written as 0. Lines end
- * in CRLF, as RFC 4180 says.
+ * invalid, or not taken, is left empty rather than written as 0. Every
+ * line has the same number of fields, the leading rows padded with empty
+ * ones, and lines end in CRLF, as RFC 4180 says.
  *
  * Sample columns: seconds since the first sample, the sample's ISO 8601 UTC
  * time, then each metric the recording has, headed "Label (unit)".
@@ -104,8 +105,17 @@ export function sessionCsv(
     }),
   ]);
 
-  return [...identitySection(session), [], header, ...rows]
-    .map((row) => row.map(field).join(','))
+  const all = [...identitySection(session), [], header, ...rows];
+  // Every line has the same number of fields, as RFC 4180 asks, so tools
+  // that check the width read the leading rows too.
+  const width = Math.max(...all.map((row) => row.length));
+
+  return all
+    .map((row) =>
+      [...row, ...Array<string>(width - row.length).fill('')]
+        .map(field)
+        .join(','),
+    )
     .join('\r\n')
     .concat('\r\n');
 }

@@ -69,6 +69,6 @@ export type EcuIdentity = z.infer<typeof ecuIdentitySchema>;
 
 /** One value of an {@link EcuIdentity}, whatever became of its read. */
 export type IdentityRead<T> =
-  | { status: 'read'; readAt: number; value: T }
-  | { status: 'invalid'; readAt: number }
-  | { status: 'failed'; readAt: number; message: string };
+  | (Omit<z.infer<ReturnType<typeof readSchema>>, 'value'> & { value: T })
+  | z.infer<typeof invalidSchema>
+  | z.infer<typeof failedSchema>;

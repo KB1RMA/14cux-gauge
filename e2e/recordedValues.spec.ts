@@ -132,13 +132,24 @@ test.describe('Recorded values', () => {
 
     await page.getByRole('button', { name: 'Export CSV' }).click();
 
-    const [identity = '', samples = ''] = (
-      await readFile(await (await download).path(), 'utf8')
-    ).split('\r\n\r\n');
+    const all = (await readFile(await (await download).path(), 'utf8'))
+      .trimEnd()
+      .split('\r\n');
+    // The identity rows end at a line of empty fields; every line has the
+    // width of a sample row. (Some headings hold a quoted comma, so the
+    // width is taken from a row of numbers.)
+    const blank = all.findIndex((line) => /^,*$/.test(line));
+    const width = all.at(-1)?.split(',').length;
+
+    expect(
+      all
+        .filter((_, index) => index !== blank + 1)
+        .map((line) => line.split(',').length),
+    ).toEqual(all.slice(1).map(() => width));
 
     // What the recording was taken from, each with when it was read.
     expect(
-      identity.split('\r\n').map((line) => line.split(',').slice(0, 2)),
+      all.slice(0, blank).map((line) => line.split(',').slice(0, 2)),
     ).toEqual([
       ['ECU at start of recording', 'Value'],
       ['Source', 'Serial ECU'],
@@ -150,7 +161,7 @@ test.describe('Recorded values', () => {
       ['Fault code', '88 Purge valve leak (purgeValveLeak)'],
     ]);
 
-    const lines = samples.trimEnd().split('\r\n');
+    const lines = all.slice(blank + 1);
     const header = lines[0]?.split(',') ?? [];
     const rows = lines.slice(1).map((line) => line.split(','));
 

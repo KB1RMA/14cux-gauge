@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
+import type { EcuIdentity } from '../model/identity';
 import type { SessionSummary } from '../model/session';
 import { formatTimeOfDay } from '../sessions/format';
 import {
@@ -21,6 +22,36 @@ function ReadAt({ at }: { at: number }) {
   );
 }
 
+/** The identity a session kept, and the fault codes set at its start. */
+function RecordedIdentity({ identity }: { identity: EcuIdentity }) {
+  const faults = recordedFaults(identity);
+
+  return (
+    <>
+      <dl className={styles['identity']}>
+        {identityRows(identity).map((row) => (
+          <div key={row.label}>
+            <dt>{row.label}</dt>
+            <dd>
+              {withUnit(row)} <ReadAt at={row.readAt} />
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <h4 className={styles['minorTitle']}>
+        Fault codes <ReadAt at={faults.readAt} />
+      </h4>
+      {faults.status === 'failed' ? (
+        <p>{notRead(faults.message)}</p>
+      ) : faults.faults.length === 0 ? (
+        <p>No fault codes stored.</p>
+      ) : (
+        <FaultList faults={faults.faults} label="Fault codes at the start" />
+      )}
+    </>
+  );
+}
+
 /**
  * What a session was recorded from: the ECU's tune, rev limit and fuel map,
  * and the fault codes set when recording started, each with when it was read.
@@ -31,7 +62,6 @@ export function SessionIdentity({
   session: Pick<SessionSummary, 'source' | 'identity'>;
 }) {
   const { identity } = session;
-  const faults = identity && recordedFaults(identity);
 
   return (
     <section aria-labelledby="identity-title">
@@ -43,37 +73,13 @@ export function SessionIdentity({
           Simulated: recorded from the demo ECU, not a real one.
         </p>
       ) : null}
-      {identity === null || faults === null ? (
+      {identity === null ? (
         <p className={styles['hint']}>
           {NOT_RECORDED}. This session was recorded before the app kept the
           ECU’s identity and fault codes.
         </p>
       ) : (
-        <>
-          <dl className={styles['identity']}>
-            {identityRows(identity).map((row) => (
-              <div key={row.label}>
-                <dt>{row.label}</dt>
-                <dd>
-                  {withUnit(row)} <ReadAt at={row.readAt} />
-                </dd>
-              </div>
-            ))}
-          </dl>
-          <h4 className={styles['minorTitle']}>
-            Fault codes <ReadAt at={faults.readAt} />
-          </h4>
-          {faults.status === 'failed' ? (
-            <p>{notRead(faults.message)}</p>
-          ) : faults.faults.length === 0 ? (
-            <p>No fault codes stored.</p>
-          ) : (
-            <FaultList
-              faults={faults.faults}
-              label="Fault codes at the start"
-            />
-          )}
-        </>
+        <RecordedIdentity identity={identity} />
       )}
     </section>
   );

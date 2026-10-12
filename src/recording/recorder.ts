@@ -4,6 +4,7 @@ import { recordedSource } from '../ecu/connect';
 import { identityNotRead, readIdentity } from '../ecu/reads';
 import type { EcuSession } from '../ecu/session';
 import type { EcuWrites } from '../ecuWrite/ecuWrites';
+import type { WriteLogEntry } from '../model/write';
 import type { SessionSummary } from '../model/session';
 import { defaultSessionName, describeStorageError } from '../sessions/format';
 import type { StorageService } from '../storage/storageService';
@@ -14,6 +15,11 @@ export interface RecorderState {
   active: SessionSummary | undefined;
   /** Whether {@link Recorder.start} would record: connected, storage open. */
   canRecord: boolean;
+  /**
+   * Whether a recording is starting: reading the ECU's identity and opening
+   * the session, which can take a second or so on a real ECU.
+   */
+  starting: boolean;
   /** Why the last recording stopped by itself, if a write failed. */
   error: string | undefined;
   /**
@@ -52,6 +58,7 @@ export class Recorder {
     this.state = {
       active: undefined,
       canRecord: false,
+      starting: false,
       error: undefined,
       finished: undefined,
     };
@@ -115,10 +122,22 @@ export class Recorder {
 
     const source = recordedSource(connection.source);
 
-    this.set({ error: undefined });
+    this.set({ error: undefined, starting: true });
+
+    // Writes made while the identity is read belong to the recording: one
+    // that clears the fault codes explains why codes it shows as set at the
+    // start are gone. They are kept until the session is open.
+    const early: WriteLogEntry[] = [];
+
+    let recordWrite = (entry: WriteLogEntry): void => {
+      early.push(entry);
+    };
+
+    const stopWrites = this.writes.watch((entry) => {
+      recordWrite(entry);
+    });
 
     try {
-      const startedAt = Date.now();
       // Read as each recording starts, so every recording says what it was
       // taken from. The tune is read once per connection (see
       // `readIdentity`), so most recordings start after only the reads of
@@ -126,6 +145,9 @@ export class Recorder {
       const identity =
         (await this.session.readNow(readIdentity)) ??
         identityNotRead('The ECU was busy or no longer connected.', Date.now());
+      // After the identity is read, so the recording starts when its samples
+      // do, not before the reads.
+      const startedAt = Date.now();
       const recorder = await SessionRecorder.start(
         store,
         {
@@ -145,9 +167,14 @@ export class Recorder {
       const stopSamples = this.session.onSnapshot((snapshot) => {
         recorder.push(snapshot);
       });
-      const stopWrites = this.writes.watch((entry) => {
+
+      recordWrite = (entry) => {
         recorder.recordWrite(entry);
-      });
+      };
+
+      for (const entry of early) {
+        recorder.recordWrite(entry);
+      }
 
       this.current = {
         recorder,
@@ -156,9 +183,10 @@ export class Recorder {
           stopWrites();
         },
       };
-      this.set({ active: recorder.session });
+      this.set({ active: recorder.session, starting: false });
     } catch (cause) {
-      this.set({ error: describeStorageError(cause) });
+      stopWrites();
+      this.set({ error: describeStorageError(cause), starting: false });
     }
 
     // Keep what was recorded when the connection ends, including when it
@@ -253,7 +281,8 @@ export class Recorder {
       next.active === this.state.active &&
       next.error === this.state.error &&
       next.finished === this.state.finished &&
-      next.canRecord === this.state.canRecord
+      next.canRecord === this.state.canRecord &&
+      next.starting === this.state.starting
     ) {
       return;
     }

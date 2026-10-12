@@ -2,6 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { libraryVersion, readTuneInfo } from '../ecu/reads';
 import { useEcuRead } from '../ecu/useEcuRead';
+import { RPM_LIMIT } from '../metrics';
 import {
   formatChecksumFixer,
   formatTuneIdent,
@@ -47,8 +48,8 @@ export function EcuInfo() {
         </dt>
         <dd>{tune ? formatChecksumFixer(tune.checksumFixer) : '…'}</dd>
         <dt>
-          Rev limit
-          <InfoPopover label="Rev limit">
+          {RPM_LIMIT.label}
+          <InfoPopover label={RPM_LIMIT.label}>
             <p>The engine speed this tune limits the engine to.</p>
           </InfoPopover>
         </dt>
@@ -59,7 +60,7 @@ export function EcuInfo() {
               ? NOT_VALID
               : info.rpmLimit === undefined
                 ? 'Unavailable'
-                : `${info.rpmLimit} rpm`}
+                : `${RPM_LIMIT.format(info.rpmLimit)} ${RPM_LIMIT.unit}`}
         </dd>
         <dt>comm14cux-ts</dt>
         <dd>{libraryVersion()}</dd>

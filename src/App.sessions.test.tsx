@@ -660,11 +660,16 @@ describe('Recording and browsing sessions', () => {
 
     const text = await blobs[0]?.text();
 
-    const [identity, rows] = text?.split('\r\n\r\n') ?? [];
+    const lines = text?.split('\r\n') ?? [];
+    // The identity rows end at a line of empty fields.
+    const blank = lines.findIndex((line) => /^,*$/.test(line));
 
-    // The demo ECU's synthetic tune, rev limit, fuel map and stored fault.
+    // The demo ECU's synthetic tune, rev limit, fuel map and stored fault:
+    // each row's label and value, without its read time or padding.
     expect(
-      identity?.split('\r\n').map((line) => line.replace(/,[^,]*$/, '')),
+      lines
+        .slice(0, blank)
+        .map((line) => line.split(',').slice(0, 2).join(',')),
     ).toEqual([
       'ECU at start of recording,Value',
       'Source,Demo ECU (simulated)',
@@ -675,7 +680,7 @@ describe('Recording and browsing sessions', () => {
       'Fuel map,5',
       'Fault code,88 Purge valve leak (purgeValveLeak)',
     ]);
-    expect(rows?.split('\r\n')[0]).toMatch(
+    expect(lines[blank + 1]).toMatch(
       /^Time since start \(s\),Time \(UTC\),Engine speed \(rpm\),/,
     );
     vi.restoreAllMocks();

@@ -189,6 +189,98 @@ describe('Recorder', () => {
     }
   });
 
+  it('keeps the tune the ECU info read last, or the one before if a new read fails', async () => {
+    const transport = new SimulatedTransport();
+    const first = Date.UTC(2026, 9, 5, 14, 0, 0);
+    const second = first + 60_000;
+
+    transport.loadRom(buildSyntheticRom());
+
+    const { recorder, session, sessions } = await recorderOn(transport);
+    const getTuneRevision = vi.spyOn(connectedEcu(session), 'getTuneRevision');
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(first);
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+
+    // Asked for again in the ECU info, it reads the ECU each time.
+    await session.readNow(readTuneInfo);
+    vi.setSystemTime(second);
+    await session.readNow(readTuneInfo);
+
+    expect(getTuneRevision).toHaveBeenCalledTimes(2);
+
+    vi.setSystemTime(second + 60_000);
+    getTuneRevision.mockRejectedValueOnce(
+      new TimeoutError('The ECU stopped responding.'),
+    );
+    await expect(session.readNow(readTuneInfo)).rejects.toThrow(TimeoutError);
+    await recorder.start();
+    await recorder.stop();
+
+    expect((await sessions.list())[0]?.identity?.tune).toEqual({
+      status: 'read',
+      readAt: second,
+      value: { tuneNumber: 1234, tuneIdent: 0xde70, checksumFixer: 0xa5 },
+    });
+  });
+
+  it('starts once the ECU’s identity is read, keeping writes made meanwhile', async () => {
+    const transport = new SimulatedTransport();
+    const startAt = Date.UTC(2026, 9, 5, 14, 0, 0);
+    const readDone = startAt + 800;
+
+    transport.memory[MemoryOffset.FaultCodes] = 0x02; // lambda sensor, odd bank
+
+    const { recorder, session, sessions, writes } = await recorderOn(transport);
+    const ecu = connectedEcu(session);
+    const getFaultCodes = ecu.getFaultCodes.bind(ecu);
+    let clearing: Promise<boolean> | undefined;
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(startAt);
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    // The last identity read: the user clears the codes as it finishes.
+    vi.spyOn(ecu, 'getFaultCodes').mockImplementationOnce(async () => {
+      const codes = await getFaultCodes();
+
+      clearing = writes.run({ id: 'clearFaultCodes' });
+      vi.setSystemTime(readDone);
+
+      return codes;
+    });
+
+    const starting = recorder.start();
+
+    expect(recorder.getSnapshot().starting).toBe(true);
+    await starting;
+    expect(recorder.getSnapshot().starting).toBe(false);
+    expect(await clearing).toBe(true);
+    await recorder.stop();
+
+    const [saved] = await sessions.list();
+
+    expect(saved?.startedAt).toBe(readDone);
+    expect(saved?.identity?.rpmLimit.readAt).toBe(startAt);
+
+    const flags =
+      saved?.identity?.faultCodes.status === 'read'
+        ? saved.identity.faultCodes.value
+        : {};
+
+    expect(flags['lambdaSensorOdd']).toBe(true);
+    expect(await sessions.readWrites(saved?.id ?? '')).toMatchObject([
+      {
+        write: 'clearFaultCodes',
+        outcome: { status: 'done', message: 'Fault codes cleared.' },
+      },
+    ]);
+  });
+
   it('reads the tune again when it could not be read before', async () => {
     const { recorder, session, sessions } = await recorderOn();
 

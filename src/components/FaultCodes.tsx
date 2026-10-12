@@ -15,7 +15,7 @@ export function FaultCodes() {
   const blockedId = useId();
   const { value, reading, error, read, clearError } =
     useEcuRead(readFaultCodes);
-  const faults = value && activeFaults({ ...value });
+  const faults = value && activeFaults(value);
   const [confirming, setConfirming] = useState(false);
   const clearing = writes.running === 'clearFaultCodes';
   const blocked = writes.running !== undefined && !clearing;
