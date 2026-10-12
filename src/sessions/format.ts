@@ -51,6 +51,11 @@ export function formatDateTime(ms: number): string {
   }).format(ms);
 }
 
+/** A time of day to the second in the user's locale, such as "14:32:05". */
+export function formatTimeOfDay(ms: number): string {
+  return new Intl.DateTimeFormat(undefined, { timeStyle: 'medium' }).format(ms);
+}
+
 /** The name a recording gets until the user chooses one. */
 export function defaultSessionName(
   kind: RecordedSource,

@@ -255,3 +255,37 @@
   font-weight: normal;
   color: var(--accent);
 }
+
+/* What a session was recorded from (SessionIdentity). */
+.identity {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+.identity div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.5rem;
+}
+
+.identity dt {
+  color: var(--text-muted);
+}
+
+.identity dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.minorTitle {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+}
+
+.readAt {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: normal;
+}

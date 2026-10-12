@@ -280,6 +280,36 @@ describe('EcuSession', () => {
       expect(session.history.window('engineRpm').values).not.toContain(null);
     });
 
+    it('lets a read already running finish before a holder has the link', async () => {
+      const { session } = await connectedSession(idling());
+      let finish = (): void => undefined;
+      const reading = session.readNow(
+        () =>
+          new Promise<string>((resolve) => {
+            finish = () => {
+              resolve('read');
+            };
+          }),
+      );
+      const lease = session.acquire(ROM_READ_HOLDER);
+      const settled = (promise: Promise<unknown> | undefined) =>
+        Promise.race([
+          promise?.then(() => 'ready'),
+          new Promise((resolve) => setTimeout(resolve, 50, 'waiting')),
+        ]);
+
+      // Polling is paused for the holder only once the read is done.
+      expect(await settled(lease?.ready)).toBe('waiting');
+      expect(session.getSnapshot().pollingPaused).toBe(false);
+
+      finish();
+
+      expect(await reading).toBe('read');
+      expect(await settled(lease?.ready)).toBe('ready');
+      expect(session.getSnapshot().pollingPaused).toBe(true);
+      lease?.release();
+    });
+
     it('lets one holder have it at a time', async () => {
       const { session } = await connectedSession(idling());
       const write = session.acquire(WRITE_HOLDER);

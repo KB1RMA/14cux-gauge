@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import * as z from 'zod/mini';
+import { ecuIdentitySchema } from './identity';
 import { fieldsOf, InvalidRecordError, parseRecord } from './record';
 import { recordedSourceSchema } from './source';
 
@@ -18,9 +19,11 @@ import { recordedSourceSchema } from './source';
  *
  * 1: the first format. 2: adds `notes`. 3: keeps the writes to the ECU made
  * while recording. Sessions in format 2 stay in it: whether any writes were
- * made during them is not known.
+ * made during them is not known. 4: keeps the ECU's identity and fault codes
+ * from the start of the recording; older sessions read with `identity: null`,
+ * as it was not recorded.
  */
-export const SESSION_FORMAT_VERSION = 3;
+export const SESSION_FORMAT_VERSION = 4;
 
 const summaryFields = {
   id: z.string(),
@@ -33,16 +36,32 @@ const summaryFields = {
   sampleCount: z.int(),
 };
 
-export const sessionSummarySchema = z.object({
-  ...summaryFields,
+const notesField = {
   /** Free text the user keeps with the session; empty if none. */
   notes: z.string(),
-  formatVersion: z.literal([2, SESSION_FORMAT_VERSION]),
+};
+
+export const sessionSummarySchema = z.object({
+  ...summaryFields,
+  ...notesField,
+  /**
+   * The ECU's identity and fault codes when recording started; `null` in a
+   * session from before they were recorded (format 3 and older).
+   */
+  identity: z.nullable(ecuIdentitySchema),
+  formatVersion: z.literal([2, 3, SESSION_FORMAT_VERSION]),
 });
 
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 
 export type SessionFormatVersion = SessionSummary['formatVersion'];
+
+/** A summary in formats 2 and 3: no identity. */
+const format2Schema = z.object({
+  ...summaryFields,
+  ...notesField,
+  formatVersion: z.literal([2, 3]),
+});
 
 /** A summary as the first release of the app stored it: no notes. */
 const format1Schema = z.object({
@@ -63,8 +82,13 @@ export function readSession(raw: unknown): SessionSummary {
     return {
       ...parseRecord(format1Schema, raw, 'session'),
       notes: '',
+      identity: null,
       formatVersion: 2,
     };
+  }
+
+  if (formatVersion === 2 || formatVersion === 3) {
+    return { ...parseRecord(format2Schema, raw, 'session'), identity: null };
   }
 
   if (
@@ -80,12 +104,33 @@ export function readSession(raw: unknown): SessionSummary {
   return parseRecord(sessionSummarySchema, raw, 'session');
 }
 
+/**
+ * `session` as its format stores it: a session from before identities were
+ * recorded is written back without one, so changing it (a rename, notes)
+ * never adds a field its format does not have.
+ */
+export function storedSession(
+  session: SessionSummary,
+): Omit<SessionSummary, 'identity'> &
+  Partial<Pick<SessionSummary, 'identity'>> {
+  if (session.formatVersion >= 4) {
+    return session;
+  }
+
+  const { identity: _identity, ...older } = session;
+
+  return older;
+}
+
 /** Whether `session` kept its writes to the ECU (format 3 on). */
 export function keepsWrites(session: SessionSummary): boolean {
   return session.formatVersion >= 3;
 }
 
-export type NewSession = Pick<SessionSummary, 'name' | 'source' | 'startedAt'>;
+export type NewSession = Pick<
+  SessionSummary,
+  'name' | 'source' | 'startedAt' | 'identity'
+>;
 
 /** The parts of a session the user can edit. */
 export type SessionChanges = Partial<Pick<SessionSummary, 'name' | 'notes'>>;

@@ -38,7 +38,12 @@ but never the ones above it. From top to bottom:
    - **EcuWrites** sends commands that change something in the ECU, such as
      clearing fault codes or running the fuel pump. The app always asks you to
      confirm first.
-   - **Recorder** saves readings into a session while you record.
+   - **Recorder** saves readings into a session while you record. When a
+     recording starts, it first asks EcuSession to read which ECU it is:
+     the tune, rev limit, fuel map and stored fault codes. The tune is in
+     the ROM and cannot change, so a recording uses the last time it was
+     read on this connection. The recording's start time is taken after
+     these reads, and any write made during them is still saved with it.
    - **RomReader** copies the ECU's program, called the ROM image, so you can
      keep it.
    - **ScreenWake** keeps the screen from going to sleep while an ECU is
@@ -100,8 +105,13 @@ a drop to zero.
 These are kept in the browser's database:
 
 - **Sessions.** Each one has a name, notes, start and end times, the number of
-  samples, and whether it came from a real ECU or the demo. Its snapshots are
-  saved beside it in batches.
+  samples, and whether it came from a real ECU or the demo. It also keeps
+  which ECU it came from: the tune number, ident, checksum fixer, rev limit,
+  fuel map and the fault codes that were set, each with the time it was
+  read. The tune is the last one read on the connection; the rest are read
+  when recording starts. A value that could not be read says
+  why. Sessions saved before this was kept say "Not recorded". Its snapshots
+  are saved beside it in batches.
 - **Writes.** Each command sent to the ECU during a recording, with when it
   started and ended and how it went: done, failed, or only partly done.
 - **ROM images.** The copied program, with its tune number, size, a
@@ -308,6 +318,20 @@ sequenceDiagram
   Session-->>Recorder: snapshot event, while recording
   Recorder->>Store: append full-precision samples<br/>(buffered, saved about once a second)
 ```
+
+As a recording starts, the `Recorder` asks `EcuSession.readNow` to run
+`readIdentity` (in `ecu/reads.ts`) beside polling, and stores the result in
+the session's summary (format 4). `readNow` reads nothing while a ROM read
+has the link to itself, and the identity then says it was not read. A holder
+that takes the link while a `readNow` read is running waits for it before
+polling pauses. The tune revision is in the ROM, so `reads.ts` keeps the last
+read of it for each connection's `Ecu`, with the time it was read. Every
+recording on that connection uses it; the ECU info reads it afresh when
+asked, which replaces it. A failed read never replaces a good one. The rev
+limit, fuel map and fault codes are in the ECU's RAM and are read as each
+recording starts. While this happens `RecorderState.starting` is set, the
+`Recorder` already watches `EcuWrites`, and the session's `startedAt` is
+taken once the reads are done.
 
 ECU writes (clearing faults, actuator tests) go the other way: a view behind
 `ConfirmDialog` calls `useEcuWrite`, which asks `EcuWrites`; `EcuWrites` takes

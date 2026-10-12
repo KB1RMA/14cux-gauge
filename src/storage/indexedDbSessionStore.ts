@@ -9,6 +9,7 @@ import {
 } from '../model/record';
 import {
   readSession,
+  storedSession,
   type NewSession,
   type SessionChanges,
   type SessionSummary,
@@ -115,10 +116,12 @@ export class IndexedDbSessionStore implements SessionStore {
     const chunk: ChunkRecord = { sessionId: id, samples: [...samples] };
 
     tx.objectStore(CHUNKS).add(chunk);
-    sessions.put({
-      ...summary,
-      sampleCount: summary.sampleCount + samples.length,
-    });
+    sessions.put(
+      storedSession({
+        ...summary,
+        sampleCount: summary.sampleCount + samples.length,
+      }),
+    );
     await done;
   }
 
@@ -128,7 +131,7 @@ export class IndexedDbSessionStore implements SessionStore {
     const sessions = tx.objectStore(SESSIONS);
     const finished = { ...(await this.summaryIn(sessions, id, tx)), endedAt };
 
-    sessions.put(finished);
+    sessions.put(storedSession(finished));
     await done;
     this.listeners.notify();
 
@@ -144,7 +147,7 @@ export class IndexedDbSessionStore implements SessionStore {
       changes,
     );
 
-    sessions.put(updated);
+    sessions.put(storedSession(updated));
     await done;
     this.listeners.notify();
 

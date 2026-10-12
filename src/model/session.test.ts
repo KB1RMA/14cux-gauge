@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
+import { IDENTITY } from '../test-support/identity';
 import { InvalidRecordError } from './record';
-import { keepsWrites, readSession } from './session';
+import { keepsWrites, readSession, storedSession } from './session';
 
 const FORMAT_2 = {
   id: 'a',
@@ -34,23 +35,67 @@ describe('readSession', () => {
       endedAt: null,
       sampleCount: 1,
       notes: '',
+      identity: null,
       formatVersion: 2,
     });
   });
 
-  it('reads formats 2 and 3 as they are', () => {
-    expect(readSession(FORMAT_2)).toEqual(FORMAT_2);
+  it('reads formats 2 and 3 as not having recorded the identity', () => {
+    expect(readSession(FORMAT_2)).toEqual({ ...FORMAT_2, identity: null });
     expect(readSession({ ...FORMAT_2, formatVersion: 3 })).toEqual({
       ...FORMAT_2,
+      identity: null,
       formatVersion: 3,
     });
   });
 
-  it('rejects a session from a newer version of the app', () => {
+  it('reads the identity kept in format 4', () => {
+    const format4 = { ...FORMAT_2, identity: IDENTITY, formatVersion: 4 };
+
+    expect(readSession(format4)).toEqual(format4);
+  });
+
+  it('reads an identity with values that could not be read', () => {
+    const identity = {
+      tune: { status: 'failed', readAt: 1, message: 'The ECU stopped.' },
+      rpmLimit: { status: 'invalid', readAt: 2 },
+      fuelMap: { status: 'invalid', readAt: 3 },
+      faultCodes: { status: 'failed', readAt: 4, message: 'Closed.' },
+    };
+
+    expect(
+      readSession({ ...FORMAT_2, identity, formatVersion: 4 }).identity,
+    ).toEqual(identity);
+  });
+
+  it('rejects an identity that is not in its shape', () => {
+    const format4 = { ...FORMAT_2, identity: IDENTITY, formatVersion: 4 };
+
+    expect(() =>
+      readSession({
+        ...format4,
+        identity: {
+          ...IDENTITY,
+          tune: { status: 'invalid', readAt: 1 },
+        },
+      }),
+    ).toThrow(/^The stored session could not be read: identity\.tune/);
+    expect(() =>
+      readSession({
+        ...format4,
+        identity: { ...IDENTITY, fuelMap: { status: 'read', readAt: 1 } },
+      }),
+    ).toThrow(InvalidRecordError);
     expect(() => readSession({ ...FORMAT_2, formatVersion: 4 })).toThrow(
+      InvalidRecordError,
+    );
+  });
+
+  it('rejects a session from a newer version of the app', () => {
+    expect(() => readSession({ ...FORMAT_2, formatVersion: 5 })).toThrow(
       new InvalidRecordError(
         'session',
-        'format 4 is from a newer version of the app',
+        'format 5 is from a newer version of the app',
       ),
     );
   });
@@ -81,5 +126,17 @@ describe('keepsWrites', () => {
     expect(keepsWrites(readSession({ ...FORMAT_2, formatVersion: 3 }))).toBe(
       true,
     );
+  });
+});
+
+describe('storedSession', () => {
+  it('stores an older session without an identity, as its format has none', () => {
+    expect(storedSession(readSession(FORMAT_2))).toEqual(FORMAT_2);
+  });
+
+  it('stores the identity of a format 4 session', () => {
+    const format4 = { ...FORMAT_2, identity: IDENTITY, formatVersion: 4 };
+
+    expect(storedSession(readSession(format4))).toEqual(format4);
   });
 });

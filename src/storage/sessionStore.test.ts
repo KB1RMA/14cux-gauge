@@ -3,6 +3,7 @@
 import { IDBFactory } from 'fake-indexeddb';
 import type { WriteLogEntry } from '../model/write';
 import { InvalidRecordError } from '../model/record';
+import { IDENTITY } from '../test-support/identity';
 import { snapshotAt } from '../test-support/snapshots';
 import { plantRecords } from '../test-support/storedRecords';
 import { openDatabase } from './database';
@@ -79,6 +80,7 @@ describe.each(backends)('%s', (_name, open) => {
       name: 'Idle check',
       source: 'demo',
       startedAt: 1000,
+      identity: IDENTITY,
     });
 
     expect(session).toEqual({
@@ -89,7 +91,25 @@ describe.each(backends)('%s', (_name, open) => {
       endedAt: null,
       sampleCount: 0,
       notes: '',
-      formatVersion: 3,
+      identity: {
+        tune: {
+          status: 'read',
+          readAt: 1_791_208_800_000,
+          value: { tuneNumber: 3360, tuneIdent: 33, checksumFixer: 92 },
+        },
+        rpmLimit: { status: 'read', readAt: 1_791_208_800_020, value: 5800 },
+        fuelMap: { status: 'read', readAt: 1_791_208_800_040, value: 5 },
+        faultCodes: {
+          status: 'read',
+          readAt: 1_791_208_800_060,
+          value: {
+            romChecksumFailure: true,
+            lambdaSensorOdd: false,
+            coolantTempSensor: true,
+          },
+        },
+      },
+      formatVersion: 4,
     });
     expect(await store.get(session.id)).toEqual(session);
     expect(await store.readSamples(session.id)).toEqual([]);
@@ -101,6 +121,7 @@ describe.each(backends)('%s', (_name, open) => {
       name: 'Drive',
       source: 'serial',
       startedAt: 0,
+      identity: null,
     });
 
     await store.append(id, [snapshotAt(0), snapshotAt(100)]);
@@ -120,11 +141,13 @@ describe.each(backends)('%s', (_name, open) => {
       name: 'A',
       source: 'demo',
       startedAt: 1,
+      identity: null,
     });
     const newer = await store.create({
       name: 'B',
       source: 'demo',
       startedAt: 2,
+      identity: null,
     });
 
     await store.append(older.id, [snapshotAt(1)]);
@@ -140,6 +163,7 @@ describe.each(backends)('%s', (_name, open) => {
       name: 'A',
       source: 'demo',
       startedAt: 1,
+      identity: null,
     });
     const finished = await store.finish(id, 5000);
 
@@ -152,6 +176,7 @@ describe.each(backends)('%s', (_name, open) => {
       name: 'Drive',
       source: 'serial',
       startedAt: 0,
+      identity: null,
     });
 
     await store.append(id, [snapshotAt(0)]);
@@ -177,11 +202,13 @@ describe.each(backends)('%s', (_name, open) => {
       name: 'K',
       source: 'demo',
       startedAt: 1,
+      identity: null,
     });
     const drop = await store.create({
       name: 'D',
       source: 'demo',
       startedAt: 2,
+      identity: null,
     });
 
     await store.append(keep.id, [snapshotAt(1)]);
@@ -199,11 +226,13 @@ describe.each(backends)('%s', (_name, open) => {
       name: 'Pump test',
       source: 'serial',
       startedAt: 1000,
+      identity: null,
     });
     const other = await store.create({
       name: 'Other',
       source: 'serial',
       startedAt: 0,
+      identity: null,
     });
 
     expect(await store.readWrites(id)).toEqual([]);
@@ -230,6 +259,7 @@ describe.each(backends)('%s', (_name, open) => {
       name: 'Copy',
       source: 'demo',
       startedAt: 0,
+      identity: null,
     });
     const write = { ...CLEARED, outcome: { ...CLEARED.outcome } };
 
@@ -266,6 +296,7 @@ describe('IndexedDbSessionStore persistence', () => {
       name: 'Saved',
       source: 'serial',
       startedAt: 10,
+      identity: IDENTITY,
     });
 
     await first.append(id, [snapshotAt(10)]);
@@ -273,7 +304,11 @@ describe('IndexedDbSessionStore persistence', () => {
 
     const second = await openIndexedDb(factory);
 
-    expect((await second.get(id))?.sampleCount).toBe(1);
+    expect(await second.get(id)).toMatchObject({
+      sampleCount: 1,
+      identity: IDENTITY,
+      formatVersion: 4,
+    });
     expect(await second.readSamples(id)).toEqual([snapshotAt(10)]);
     second.close();
   });
@@ -336,6 +371,7 @@ describe('IndexedDbSessionStore upgrades', () => {
         endedAt: 20,
         sampleCount: 1,
         notes: '',
+        identity: null,
         formatVersion: 2,
       },
     ]);
@@ -385,7 +421,12 @@ describe('IndexedDbSessionStore failures', () => {
 
   it('rejects when a write fails', async () => {
     const store = await openIndexedDb(new IDBFactory());
-    const session = { name: 'A', source: 'demo', startedAt: 0 } as const;
+    const session = {
+      name: 'A',
+      source: 'demo',
+      startedAt: 0,
+      identity: null,
+    } as const;
     const uuid = vi
       .spyOn(crypto, 'randomUUID')
       .mockReturnValue('00000000-0000-4000-8000-000000000000');
@@ -411,6 +452,7 @@ describe('openStorage', () => {
       name: 'Idle',
       source: 'demo',
       startedAt: 5,
+      identity: null,
     });
 
     await storage.roms.save({
@@ -471,6 +513,7 @@ describe.each(backends)('%s changes', (_name, open) => {
       name: 'A',
       source: 'demo',
       startedAt: 0,
+      identity: null,
     });
 
     expect(listener).toHaveBeenCalledTimes(1);
@@ -487,7 +530,12 @@ describe.each(backends)('%s changes', (_name, open) => {
     expect(listener).toHaveBeenCalledTimes(4);
 
     unsubscribe();
-    await store.create({ name: 'B', source: 'demo', startedAt: 1 });
+    await store.create({
+      name: 'B',
+      source: 'demo',
+      startedAt: 1,
+      identity: null,
+    });
 
     expect(listener).toHaveBeenCalledTimes(4);
   });
@@ -514,6 +562,7 @@ describe.each(backends)('%s precision', (_name, open) => {
       name: 'Precision',
       source: 'serial',
       startedAt: 1,
+      identity: null,
     });
     const sample = snapshotAt(1_700_000_000_123, {
       throttle: 0.123456789012,
@@ -578,7 +627,7 @@ describe('IndexedDbSessionStore stored records', () => {
     const factory = new IDBFactory();
 
     await plantRecords(factory, {
-      sessions: [GOOD, { ...GOOD, id: 'newer', formatVersion: 4 }],
+      sessions: [GOOD, { ...GOOD, id: 'newer', formatVersion: 5 }],
     });
 
     const store = await openIndexedDb(factory);
@@ -587,11 +636,11 @@ describe('IndexedDbSessionStore stored records', () => {
     expect(await store.listUnreadable()).toEqual([
       {
         id: 'newer',
-        detail: 'format 4 is from a newer version of the app',
+        detail: 'format 5 is from a newer version of the app',
       },
     ]);
     await expect(store.update('newer', { name: 'Renamed' })).rejects.toThrow(
-      'The stored session could not be read: format 4 is from a newer version of the app',
+      'The stored session could not be read: format 5 is from a newer version of the app',
     );
     store.close();
   });
@@ -729,6 +778,7 @@ describe('IndexedDbSessionStore in two windows', () => {
       name: 'Idle',
       source: 'demo',
       startedAt: 1,
+      identity: null,
     });
 
     await vi.waitFor(() => {
@@ -759,6 +809,7 @@ describe('IndexedDbSessionStore in two windows', () => {
       name: 'Idle',
       source: 'demo',
       startedAt: 1,
+      identity: null,
     });
     const heard = vi.fn();
 

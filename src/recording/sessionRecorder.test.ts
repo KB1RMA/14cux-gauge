@@ -5,7 +5,12 @@ import { MemorySessionStore } from '../storage/sessionStore';
 import { snapshotAt } from '../test-support/snapshots';
 import { SessionRecorder } from './sessionRecorder';
 
-const NEW_SESSION = { name: 'Test', source: 'demo', startedAt: 0 } as const;
+const NEW_SESSION = {
+  name: 'Test',
+  source: 'demo',
+  startedAt: 0,
+  identity: null,
+} as const;
 
 function pumpWrite(id: string, endedAt: number | null): WriteLogEntry {
   return {
