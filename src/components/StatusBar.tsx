@@ -7,6 +7,8 @@ import { useEcu } from '../ecu/useEcu';
 import { useLiveData } from '../ecu/useLiveData';
 import { METRICS } from '../metrics';
 import { useReadings } from '../readings/useReadings';
+import { useScreenWake } from '../screen/useScreenWake';
+import type { ScreenWakeStatus } from '../screen/screenWake';
 import { useRecording } from '../recording/useRecording';
 import { formatDuration, sourceLabel } from '../sessions/format';
 import { FailureDialog } from './FailureDialog';
@@ -22,7 +24,35 @@ function sourceName(state: ActiveState): string {
   return `${sourceLabel('serial')} (${state.source.doubleSpeed ? '15625' : '7812'} baud)`;
 }
 
+/** What to add about the screen, for a connection; nothing if not asked. */
+function describeScreen(status: ScreenWakeStatus): string {
+  switch (status) {
+    case 'on':
+      return ' · Screen kept on';
+    case 'unsupported':
+      return ' · Screen may sleep: this browser cannot keep it on';
+    case 'refused':
+      return ' · Screen may sleep: the browser refused to keep it on';
+    case 'released':
+      return ' · Screen may sleep: the browser ended keeping it on';
+    case 'inactive':
+      return '';
+  }
+}
+
 function describe(
+  state: ActiveState,
+  recording: boolean,
+  paused: boolean,
+  recordingError: string | undefined,
+  screen: ScreenWakeStatus,
+): string {
+  const main = describeConnection(state, recording, paused, recordingError);
+
+  return state.status === 'connected' ? main + describeScreen(screen) : main;
+}
+
+function describeConnection(
   state: ActiveState,
   recording: boolean,
   paused: boolean,
@@ -55,6 +85,7 @@ export function StatusBar() {
   const { snapshot, stats } = useLiveData();
   const { chosen } = useReadings();
   const recording = useRecording();
+  const screenWake = useScreenWake();
   const { active, starting } = recording;
   const reconnectRef = useRef<HTMLButtonElement>(null);
   const detailsRef = useRef<HTMLButtonElement>(null);
@@ -80,7 +111,13 @@ export function StatusBar() {
       {/* Only the connection state is a live region; the sample rate below
           changes several times a second and must not be announced. */}
       <output className={styles['text']}>
-        {describe(state, active !== undefined, pollingPaused, recording.error)}
+        {describe(
+          state,
+          active !== undefined,
+          pollingPaused,
+          recording.error,
+          screenWake,
+        )}
       </output>
       {/* Not announced: it changes every second. */}
       {active ? (

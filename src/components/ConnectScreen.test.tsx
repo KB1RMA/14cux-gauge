@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
+import { SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { vi } from 'vitest';
 import { browserPlatform } from '../platform/browser';
 import { expectNoAxeViolations } from '../test-support/a11y';
 import { TestServices } from '../test-support/TestApp';
@@ -13,6 +15,7 @@ function platform(serial: boolean) {
     serial: {
       available: () => serial,
       requestPort: () => Promise.reject(new Error('Not offered in this test')),
+      grantedPorts: () => Promise.resolve([]),
       open: () => {
         throw new Error('Not opened in this test');
       },
@@ -80,5 +83,115 @@ describe('ConnectScreen', () => {
     expect(
       screen.getByRole('checkbox', { name: /Double-speed firmware/ }),
     ).toBeChecked();
+  });
+});
+
+describe('ConnectScreen reconnecting', () => {
+  /** A platform with `granted` ports already allowed; records which opens. */
+  function platformWith(granted: string[]) {
+    const opened: string[] = [];
+    const requested = vi.fn();
+    const ports = granted.map((description) => ({ description }));
+
+    return {
+      opened,
+      requested,
+      platform: browserPlatform({
+        serial: {
+          available: () => true,
+          requestPort: () => {
+            requested();
+
+            return Promise.reject(new Error('Not offered in this test'));
+          },
+          grantedPorts: () => Promise.resolve(ports),
+          open: (port) => {
+            opened.push(port.description);
+
+            return {
+              transport: new SimulatedTransport(),
+              onLost: () => () => undefined,
+            };
+          },
+        },
+      }),
+    };
+  }
+
+  it('offers an allowed port without the picker, and connects to it only when asked', async () => {
+    const user = userEvent.setup();
+    const { platform, opened, requested } = platformWith(['Test adapter']);
+
+    render(
+      <TestServices platform={platform}>
+        <ConnectScreen />
+      </TestServices>,
+    );
+
+    const reconnect = await screen.findByRole('button', {
+      name: 'Reconnect to Test adapter',
+    });
+
+    // Nothing connects on its own.
+    expect(opened).toEqual([]);
+
+    await user.click(reconnect);
+
+    await vi.waitFor(() => {
+      expect(opened).toEqual(['Test adapter']);
+    });
+    expect(requested).not.toHaveBeenCalled();
+  });
+
+  it('tells several allowed ports apart', async () => {
+    const { platform } = platformWith(['Same adapter', 'Same adapter']);
+
+    render(
+      <TestServices platform={platform}>
+        <ConnectScreen />
+      </TestServices>,
+    );
+
+    expect(
+      await screen.findByRole('button', {
+        name: 'Reconnect to Same adapter (port 1)',
+      }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', {
+        name: 'Reconnect to Same adapter (port 2)',
+      }),
+    ).toBeEnabled();
+  });
+
+  it('offers no reconnect when no port has been allowed', async () => {
+    const { platform } = platformWith([]);
+
+    const { container } = render(
+      <TestServices platform={platform}>
+        <ConnectScreen />
+      </TestServices>,
+    );
+
+    expect(
+      await screen.findByRole('button', { name: 'Connect to ECU' }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole('button', { name: /^Reconnect/ }),
+    ).not.toBeInTheDocument();
+    await expectNoAxeViolations(container);
+  });
+
+  it('has no accessibility violations with a port to reconnect to', async () => {
+    const { platform } = platformWith(['Test adapter']);
+
+    const { container } = render(
+      <TestServices platform={platform}>
+        <ConnectScreen />
+      </TestServices>,
+    );
+
+    await screen.findByRole('button', { name: 'Reconnect to Test adapter' });
+    await expectNoAxeViolations(container);
   });
 });

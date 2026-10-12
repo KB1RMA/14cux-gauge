@@ -25,6 +25,7 @@ import {
   SESSIONS_PATH,
   type LiveTab,
 } from './routing/paths';
+import { useSyncKeepScreenOn } from './screen/useScreenWake';
 import { ServicesContext } from './services/context';
 import { ReadingsProvider } from './readings/ReadingsProvider';
 import { RecordingProvider } from './recording/RecordingProvider';
@@ -64,6 +65,7 @@ function Live({ tab }: { tab: LiveTab }) {
 
 function Main({ usageCounter }: { usageCounter: UsageCounter | undefined }) {
   useUsageCounts(usageCounter);
+  useSyncKeepScreenOn();
 
   // Fetch the other views once the first has rendered, so they show at once
   // when opened, and while the build on the server still matches this page.

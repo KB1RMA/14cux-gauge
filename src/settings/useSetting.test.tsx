@@ -107,6 +107,7 @@ describe('useSetting', () => {
       theme: 'dark',
       palette: 'arles',
       usageCounts: 'off',
+      keepScreenOn: false,
     });
     expect(renderHook(() => useSetting('readings')).result.current[0]).toEqual({
       off: ['fuelTempF'],

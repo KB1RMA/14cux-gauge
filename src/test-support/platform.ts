@@ -33,6 +33,7 @@ export function testPlatform(overrides: Partial<Platform> = {}): Platform {
     serial: {
       available: () => true,
       requestPort: () => Promise.resolve({ description: 'Test adapter' }),
+      grantedPorts: () => Promise.resolve([]),
       open: () => ({
         transport: new SimulatedTransport(),
         onLost: () => () => undefined,
@@ -42,6 +43,20 @@ export function testPlatform(overrides: Partial<Platform> = {}): Platform {
     storage: { open: storageWith() },
     settings: memorySettings(),
     app: { userAgent: 'TestBrowser/1.0', reload: () => undefined },
+    screen: {
+      wakeLock: {
+        available: () => false,
+        request: () => Promise.reject(new Error('No wake lock in this test')),
+        onVisible: () => () => undefined,
+      },
+      fullscreen: {
+        available: () => false,
+        active: () => false,
+        enter: () => Promise.reject(new Error('No full screen in this test')),
+        exit: () => Promise.resolve(),
+        watch: () => () => undefined,
+      },
+    },
     ...overrides,
   };
 }

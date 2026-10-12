@@ -6,10 +6,13 @@ import { openStorage } from '../storage/openStorage';
 import type {
   AppPlatform,
   FilePlatform,
+  FullscreenPlatform,
   Platform,
+  ScreenPlatform,
   SerialPlatform,
   SerialPortHandle,
   SettingsBackend,
+  WakeLockPlatform,
 } from './platform';
 
 const SETTING_PREFIX = 'cuxGauge.';
@@ -91,6 +94,10 @@ export const webSerial: SerialPlatform = {
   available: () => 'serial' in navigator,
   requestPort: async () =>
     new WebSerialPortHandle(await navigator.serial.requestPort()),
+  grantedPorts: async () =>
+    (await navigator.serial.getPorts()).map(
+      (port) => new WebSerialPortHandle(port),
+    ),
   open(handle, { baudRate }) {
     if (!(handle instanceof WebSerialPortHandle)) {
       throw new TypeError('That port did not come from Web Serial.');
@@ -113,6 +120,73 @@ export const webSerial: SerialPlatform = {
       },
     };
   },
+};
+
+/** Keeps the screen on with the Screen Wake Lock API. */
+export const browserWakeLock: WakeLockPlatform = {
+  // Asked each time, as with Web Serial.
+  available: () => 'wakeLock' in navigator,
+  async request() {
+    const sentinel = await navigator.wakeLock.request('screen');
+
+    return {
+      release: () => sentinel.release(),
+      onReleased(listener) {
+        const onRelease = () => {
+          listener();
+        };
+
+        sentinel.addEventListener('release', onRelease);
+
+        return () => {
+          sentinel.removeEventListener('release', onRelease);
+        };
+      },
+    };
+  },
+  onVisible(listener) {
+    const onChange = () => {
+      if (document.visibilityState === 'visible') {
+        listener();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onChange);
+    };
+  },
+};
+
+/** Full screen with the Fullscreen API, for the whole page. */
+export const browserFullscreen: FullscreenPlatform = {
+  // iPhone browsers have no Fullscreen API for pages.
+  available: () =>
+    document.fullscreenEnabled === true &&
+    typeof document.documentElement.requestFullscreen === 'function',
+  active: () => document.fullscreenElement !== null,
+  enter: () => document.documentElement.requestFullscreen(),
+  exit: () =>
+    document.fullscreenElement === null
+      ? Promise.resolve()
+      : document.exitFullscreen(),
+  watch(listener) {
+    const onChange = () => {
+      listener();
+    };
+
+    document.addEventListener('fullscreenchange', onChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange);
+    };
+  },
+};
+
+export const browserScreen: ScreenPlatform = {
+  wakeLock: browserWakeLock,
+  fullscreen: browserFullscreen,
 };
 
 /** Saves files through the browser's normal download. */
@@ -224,6 +298,7 @@ export function browserPlatform(overrides: Partial<Platform> = {}): Platform {
     },
     settings: localStorageSettings,
     app: browserApp,
+    screen: browserScreen,
     ...overrides,
   };
 }

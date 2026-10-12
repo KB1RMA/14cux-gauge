@@ -62,6 +62,9 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       setUsageCounts: (usageCounts: UsageCountsPreference) => {
         setPreferences((p) => ({ ...p, usageCounts }));
       },
+      setKeepScreenOn: (keepScreenOn: boolean) => {
+        setPreferences((p) => ({ ...p, keepScreenOn }));
+      },
     }),
     [preferences, setPreferences],
   );

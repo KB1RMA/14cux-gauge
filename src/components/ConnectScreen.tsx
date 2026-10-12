@@ -7,6 +7,7 @@ import { describeError, isPortPickerCancelled } from '../ecu/errors';
 import { describeRawError } from '../diagnostics/diagnosticLog';
 import { useDiagnostics } from '../diagnostics/useDiagnostics';
 import { useEcu } from '../ecu/useEcu';
+import { useGrantedPorts } from '../ecu/useGrantedPorts';
 import { usePlatform } from '../platform/usePlatform';
 import type { SerialPortHandle } from '../platform/platform';
 import { useSetting } from '../settings/useSetting';
@@ -20,6 +21,7 @@ export function ConnectScreen() {
   const log = useDiagnostics();
   const { serial } = usePlatform();
   const [doubleSpeed, setDoubleSpeed] = useSetting('doubleSpeed');
+  const grantedPorts = useGrantedPorts();
   const [pickerError, setPickerError] = useState<string | undefined>(undefined);
   const supported = serial.available();
   const busy = state.status === 'connecting';
@@ -61,6 +63,12 @@ export function ConnectScreen() {
     await connect({ kind: 'serial', port, doubleSpeed });
   };
 
+  const reconnectTo = async (port: SerialPortHandle) => {
+    setPickerError(undefined);
+    log.record('event', `Reconnecting to ${port.description}`);
+    await connect({ kind: 'serial', port, doubleSpeed });
+  };
+
   return (
     <div className={styles['screen']}>
       <section className={styles['card']} aria-labelledby="connect-title">
@@ -94,9 +102,34 @@ export function ConnectScreen() {
                 Double-speed firmware (15625 baud)
               </Label.Root>
             </div>
+            {grantedPorts.length > 0 ? (
+              <div className={styles['reconnect']}>
+                <p>
+                  {grantedPorts.length === 1
+                    ? 'This browser already has permission for a serial port:'
+                    : 'This browser already has permission for these serial ports:'}
+                </p>
+                {grantedPorts.map((port, index) => (
+                  <button
+                    // Ports are listed in the order the browser gave them.
+                    // eslint-disable-next-line @eslint-react/no-array-index-key -- ports have no id of their own
+                    key={index}
+                    type="button"
+                    className="primary"
+                    disabled={busy}
+                    onClick={() => void reconnectTo(port)}
+                  >
+                    Reconnect to {port.description}
+                    {grantedPorts.length > 1
+                      ? ` (port ${String(index + 1)})`
+                      : ''}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <button
               type="button"
-              className="primary"
+              className={grantedPorts.length > 0 ? undefined : 'primary'}
               disabled={busy}
               onClick={() => void connectSerial()}
             >

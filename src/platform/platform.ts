@@ -19,6 +19,7 @@ export interface Platform {
   storage: StoragePlatform;
   settings: SettingsBackend;
   app: AppPlatform;
+  screen: ScreenPlatform;
 }
 
 /**
@@ -49,6 +50,11 @@ export interface SerialPlatform {
    * `DOMException` if they dismiss the picker (see `isPortPickerCancelled`).
    */
   requestPort(): Promise<SerialPortHandle>;
+  /**
+   * The ports the user has already allowed this app to use, which can be
+   * opened without the picker. Empty where the platform cannot tell.
+   */
+  grantedPorts(): Promise<SerialPortHandle[]>;
   /** A link to `port` at `baudRate`, 8N1, without flow control. */
   open(port: SerialPortHandle, options: { baudRate: number }): SerialLink;
 }
@@ -114,4 +120,57 @@ export interface SettingsBackend {
    * `key`. Returns an unsubscribe function.
    */
   watch(key: string, listener: () => void): () => void;
+}
+
+/** A screen wake lock that has been granted. */
+export interface WakeLockHold {
+  /** Lets the screen sleep again. Does nothing if it has been released. */
+  release(): Promise<void>;
+  /**
+   * Calls `listener` when the lock ends without `release` being called (the
+   * page was hidden, or the system took it back). Returns an unsubscribe
+   * function.
+   */
+  onReleased(listener: () => void): () => void;
+}
+
+export interface WakeLockPlatform {
+  /** Whether the screen can be kept on here at all. */
+  available(): boolean;
+  /**
+   * Asks to keep the screen on. Rejects if the system refuses (low battery,
+   * a hidden page).
+   */
+  request(): Promise<WakeLockHold>;
+  /**
+   * Calls `listener` when the page becomes visible again, which is when a
+   * lock the system took back can be asked for again. Returns an
+   * unsubscribe function.
+   */
+  onVisible(listener: () => void): () => void;
+}
+
+export interface FullscreenPlatform {
+  /** Whether the app can be shown full screen here at all. */
+  available(): boolean;
+  /** Whether the app is full screen now. */
+  active(): boolean;
+  /**
+   * Goes full screen. Must be called from a user's action; rejects if the
+   * browser refuses.
+   */
+  enter(): Promise<void>;
+  exit(): Promise<void>;
+  /**
+   * Calls `listener` when `active()` may have changed, including when the
+   * user leaves full screen with the Escape key. Returns an unsubscribe
+   * function.
+   */
+  watch(listener: () => void): () => void;
+}
+
+/** What the app asks of the screen it is shown on. */
+export interface ScreenPlatform {
+  wakeLock: WakeLockPlatform;
+  fullscreen: FullscreenPlatform;
 }

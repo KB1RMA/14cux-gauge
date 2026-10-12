@@ -14,6 +14,7 @@ describe('preferences', () => {
       theme: 'system',
       palette: 'coniston',
       usageCounts: 'on',
+      keepScreenOn: false,
     });
   });
 
@@ -25,6 +26,7 @@ describe('preferences', () => {
         theme: 'dark',
         palette: 'racing-green',
         usageCounts: 'off',
+        keepScreenOn: true,
       }),
     ).toEqual({
       temperatureUnit: 'C',
@@ -32,7 +34,13 @@ describe('preferences', () => {
       theme: 'dark',
       palette: 'racing-green',
       usageCounts: 'off',
+      keepScreenOn: true,
     });
+  });
+
+  it('keeps the screen on only when stored as true', () => {
+    expect(parse({ keepScreenOn: 'yes' }).keepScreenOn).toBe(false);
+    expect(parse({ keepScreenOn: 1 }).keepScreenOn).toBe(false);
   });
 
   it('keeps the default for values it does not recognise', () => {
@@ -42,6 +50,7 @@ describe('preferences', () => {
       theme: 'system',
       palette: 'coniston',
       usageCounts: 'on',
+      keepScreenOn: false,
     };
 
     expect(parse({ temperatureUnit: 'K', theme: 'sepia', palette: 3 })).toEqual(
