@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.11.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.10.0...v0.11.0) (2026-10-12)
+
+
+### Features
+
+* keep the ECU's identity and starting fault codes with each recording ([#102](https://github.com/KB1RMA/14cux-gauge/issues/102)) ([#117](https://github.com/KB1RMA/14cux-gauge/issues/117)) ([ce06b6c](https://github.com/KB1RMA/14cux-gauge/commit/ce06b6c8737203e8056fb5430644785c5301597f))
+* keep the screen on, go full screen and reconnect to an allowed port ([#118](https://github.com/KB1RMA/14cux-gauge/issues/118)) ([ac6b81b](https://github.com/KB1RMA/14cux-gauge/commit/ac6b81be9edaecbfd4928c56c010c23e82d140a3))
+* show the factory fault code number beside each stored fault ([#101](https://github.com/KB1RMA/14cux-gauge/issues/101)) ([20b90e3](https://github.com/KB1RMA/14cux-gauge/commit/20b90e3ac4a095682b6e15c89523c41355f792c5))
+
+
+### Bug Fixes
+
+* show fault code 25 (misfire), which ECUs with firmware before R3360 store and the app did not show ([#101](https://github.com/KB1RMA/14cux-gauge/issues/101)) ([20b90e3](https://github.com/KB1RMA/14cux-gauge/commit/20b90e3ac4a095682b6e15c89523c41355f792c5))
+
 ## [0.10.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.9.1...v0.10.0) (2026-10-10)
 
 
