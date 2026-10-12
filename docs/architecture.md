@@ -32,7 +32,7 @@ but never the ones above it. From top to bottom:
    status bar keep working, so you can still disconnect.
 2. **Hooks and providers** are the go-betweens. A view asks a hook for what it
    needs, and the hook gets it from a service.
-3. **Services** do the real work. There are six:
+3. **Services** do the real work. There are seven:
    - **EcuSession** connects to the ECU, asks it for readings again and again,
      and keeps the recent ones.
    - **EcuWrites** sends commands that change something in the ECU, such as
@@ -41,11 +41,17 @@ but never the ones above it. From top to bottom:
    - **Recorder** saves readings into a session while you record.
    - **RomReader** copies the ECU's program, called the ROM image, so you can
      keep it.
+   - **ScreenWake** keeps the screen from going to sleep while an ECU is
+     connected, if you chose that in Preferences. It lets go as soon as you
+     disconnect, and the status bar says when the screen is kept on or when
+     the browser would not do it.
    - **StorageService** opens the place where sessions and ROM images are kept.
    - **AppStatusStore** knows whether you are offline and whether a newer
      version of the app is out.
 4. **Platform** is the only part that talks to the browser directly: the
-   serial port, saving files, storage, settings and reloading the page. A
+   serial port (including the ports you already allowed, which the connect
+   screen offers to reconnect to), saving files, storage, settings, the screen
+   (keeping it on, and full screen) and reloading the page. A
    desktop version could swap in its own platform without changing the rest.
 5. **Storage and settings** keep things between visits.
 6. **Model** is the bottom layer. It sets the rules for what each kind of data
@@ -148,6 +154,7 @@ flowchart TB
     HReplay["useReplay<br/>useRecordedSeries"]
     HRoute["routing/<br/>React Router"]
     HAppStatus[useAppStatus]
+    HScreen["useScreenWake<br/>useFullscreen"]
     HPlat[usePlatform]
   end
 
@@ -157,6 +164,7 @@ flowchart TB
     Writes["EcuWrites<br/>ecuWrite/"]
     Recorder["Recorder<br/>recording/"]
     Roms["RomReader<br/>roms/"]
+    Wake["ScreenWake<br/>screen/"]
     StorageSvc["StorageService<br/>storage/"]
     AppStatus["AppStatusStore<br/>pwa/"]
   end
@@ -174,6 +182,7 @@ flowchart TB
     StorePlat["storage<br/>open"]
     SettingsBE["settings<br/>localStorage"]
     AppPlat["app<br/>reload"]
+    ScreenPlat["screen<br/>wakeLock · fullscreen"]
   end
 
   subgraph persist["storage/ · settings/"]
@@ -199,6 +208,7 @@ flowchart TB
   views --> HSet
   views --> HRoute
   Chrome --> HAppStatus
+  Dash & Chrome --> HScreen
   Connect & Sessions & Chrome --> HPlat
   Dash & Sessions --> ChartSeries
 
@@ -215,6 +225,9 @@ flowchart TB
   HPlat --> Serial
   HPlat --> Files
   HPlat --> AppPlat
+  HScreen --> Wake
+  HScreen --> ScreenPlat
+  HSet -. keep the screen on .-> Wake
 
   Writes --> Session
   Recorder --> Session
@@ -224,6 +237,8 @@ flowchart TB
   Roms --> StorageSvc
   Roms --> Recorder
   Roms --> Files
+  Wake --> Session
+  Wake --> ScreenPlat
 
   Session --> SampleHistory
   SampleHistory --> ChartSeries
@@ -256,8 +271,8 @@ the boundaries. As above, arrows point from a layer to the layers it may use.
 flowchart TB
   model["model/<br/>stored shapes, zod schemas"]
   storage["storage/ · settings/<br/>IndexedDB stores, settingStore"]
-  platform["platform/<br/>serial, files, storage, settings, app"]
-  svc["services<br/>ecu/ · ecuWrite/ · roms/ · recording/ · readings/"]
+  platform["platform/<br/>serial, files, storage, settings, app, screen"]
+  svc["services<br/>ecu/ · ecuWrite/ · roms/ · recording/ · screen/ · readings/"]
   series["history/ · replay/<br/>series model"]
   hooks["hooks and providers<br/>use*.ts · *Provider.tsx"]
   components["components/<br/>views"]

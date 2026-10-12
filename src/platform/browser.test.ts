@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
+import type { SerialPortHandle } from './platform';
 import { blockStorage } from '../test-support/storage';
 import {
   affectsSetting,
@@ -164,6 +165,41 @@ describe('browserPlatform', () => {
     expect(lost).toHaveBeenCalledOnce();
   });
 
+  it('lists the ports the user has already allowed, described by their USB IDs', async () => {
+    const granted = Object.assign(new EventTarget(), {
+      getInfo: () => ({ usbVendorId: 0x403, usbProductId: 0x6001 }),
+    });
+
+    Object.defineProperty(navigator, 'serial', {
+      value: { getPorts: () => Promise.resolve([granted, new EventTarget()]) },
+      configurable: true,
+    });
+
+    const ports = await browserPlatform().serial.grantedPorts();
+
+    expect(ports.map((port) => port.description)).toEqual([
+      'USB vendor 0x0403, product 0x6001',
+      'USB vendor unknown, product unknown',
+    ]);
+  });
+
+  it('opens a port it listed without asking the user', async () => {
+    const port = new EventTarget();
+
+    Object.defineProperty(navigator, 'serial', {
+      value: { getPorts: () => Promise.resolve([port]) },
+      configurable: true,
+    });
+
+    const { serial } = browserPlatform();
+    const [granted] = await serial.grantedPorts();
+
+    expect(granted).toBeDefined();
+    expect(() =>
+      serial.open(granted as SerialPortHandle, { baudRate: 7812 }),
+    ).not.toThrow();
+  });
+
   it('refuses to open a port another platform gave out', () => {
     expect(() =>
       browserPlatform().serial.open(
@@ -202,6 +238,182 @@ describe('browserPlatform', () => {
 
     expect(platform.storage).toBe(storage);
     expect(platform.settings).toBe(browserPlatform().settings);
+  });
+});
+
+describe('browser screen', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Reflect.deleteProperty(navigator, 'wakeLock');
+    Reflect.deleteProperty(document, 'fullscreenEnabled');
+    Reflect.deleteProperty(document, 'fullscreenElement');
+    Reflect.deleteProperty(document.documentElement, 'requestFullscreen');
+  });
+
+  /** A stand-in for the browser's lock, which ends on `release` events. */
+  function sentinel() {
+    const lock = Object.assign(new EventTarget(), {
+      release: vi.fn(() => Promise.resolve()),
+    });
+
+    Object.defineProperty(navigator, 'wakeLock', {
+      value: { request: vi.fn(() => Promise.resolve(lock)) },
+      configurable: true,
+    });
+
+    return lock;
+  }
+
+  it('can keep the screen on only where the browser has a wake lock', () => {
+    const { wakeLock } = browserPlatform().screen;
+
+    expect(wakeLock.available()).toBe(false);
+
+    sentinel();
+
+    expect(wakeLock.available()).toBe(true);
+  });
+
+  it('asks for a screen lock, and releases it when told to', async () => {
+    const lock = sentinel();
+    const hold = await browserPlatform().screen.wakeLock.request();
+
+    expect(
+      (navigator.wakeLock.request as ReturnType<typeof vi.fn>).mock.calls,
+    ).toEqual([['screen']]);
+
+    await hold.release();
+
+    expect(lock.release).toHaveBeenCalledOnce();
+  });
+
+  it('reports a lock the browser ended, until told to stop', async () => {
+    const lock = sentinel();
+    const hold = await browserPlatform().screen.wakeLock.request();
+    const ended = vi.fn();
+    const stop = hold.onReleased(ended);
+
+    lock.dispatchEvent(new Event('release'));
+    expect(ended).toHaveBeenCalledOnce();
+
+    stop();
+    lock.dispatchEvent(new Event('release'));
+    expect(ended).toHaveBeenCalledOnce();
+  });
+
+  it('passes on a refused lock as it was reported', async () => {
+    const refused = new DOMException('Low battery', 'NotAllowedError');
+
+    Object.defineProperty(navigator, 'wakeLock', {
+      value: { request: () => Promise.reject(refused) },
+      configurable: true,
+    });
+
+    await expect(browserPlatform().screen.wakeLock.request()).rejects.toBe(
+      refused,
+    );
+  });
+
+  it('tells when the page is shown again, not when it is hidden', () => {
+    const visible = vi.fn();
+    const stop = browserPlatform().screen.wakeLock.onVisible(visible);
+    let state: DocumentVisibilityState = 'hidden';
+
+    vi.spyOn(document, 'visibilityState', 'get').mockImplementation(
+      () => state,
+    );
+
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(visible).not.toHaveBeenCalled();
+
+    state = 'visible';
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(visible).toHaveBeenCalledOnce();
+
+    stop();
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(visible).toHaveBeenCalledOnce();
+  });
+
+  it('offers full screen only where the browser allows it', () => {
+    const { fullscreen } = browserPlatform().screen;
+
+    expect(fullscreen.available()).toBe(false);
+
+    Object.defineProperty(document, 'fullscreenEnabled', {
+      value: true,
+      configurable: true,
+    });
+
+    // Enabled, but nothing to request it with.
+    expect(fullscreen.available()).toBe(false);
+
+    Object.defineProperty(document.documentElement, 'requestFullscreen', {
+      value: () => Promise.resolve(),
+      configurable: true,
+    });
+
+    expect(fullscreen.available()).toBe(true);
+  });
+
+  it('shows the whole page full screen, and tells when that changes', async () => {
+    const request = vi.fn(() => Promise.resolve());
+    const leave = vi.fn(() => Promise.resolve());
+    const { fullscreen } = browserPlatform().screen;
+    const changed = vi.fn();
+    const stop = fullscreen.watch(changed);
+
+    Object.defineProperty(document.documentElement, 'requestFullscreen', {
+      value: request,
+      configurable: true,
+    });
+    Object.defineProperty(document, 'exitFullscreen', {
+      value: leave,
+      configurable: true,
+    });
+    Object.defineProperty(document, 'fullscreenElement', {
+      value: null,
+      configurable: true,
+    });
+
+    expect(fullscreen.active()).toBe(false);
+
+    await fullscreen.enter();
+    expect(request).toHaveBeenCalledOnce();
+
+    Object.defineProperty(document, 'fullscreenElement', {
+      value: document.documentElement,
+      configurable: true,
+    });
+    document.dispatchEvent(new Event('fullscreenchange'));
+
+    expect(changed).toHaveBeenCalledOnce();
+    expect(fullscreen.active()).toBe(true);
+
+    await fullscreen.exit();
+    expect(leave).toHaveBeenCalledOnce();
+
+    stop();
+    document.dispatchEvent(new Event('fullscreenchange'));
+    expect(changed).toHaveBeenCalledOnce();
+  });
+
+  it('has nothing to leave when it is not full screen', async () => {
+    const leave = vi.fn(() => Promise.resolve());
+
+    Object.defineProperty(document, 'exitFullscreen', {
+      value: leave,
+      configurable: true,
+    });
+    Object.defineProperty(document, 'fullscreenElement', {
+      value: null,
+      configurable: true,
+    });
+
+    await browserPlatform().screen.fullscreen.exit();
+
+    expect(leave).not.toHaveBeenCalled();
+    Reflect.deleteProperty(document, 'exitFullscreen');
   });
 });
 

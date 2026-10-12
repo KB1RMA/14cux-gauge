@@ -15,6 +15,7 @@ export interface PreferencesContextValue extends Preferences {
   setTheme(theme: ThemePreference): void;
   setPalette(palette: PalettePreference): void;
   setUsageCounts(usageCounts: UsageCountsPreference): void;
+  setKeepScreenOn(keepScreenOn: boolean): void;
 }
 
 export const PreferencesContext = createContext<

@@ -6,6 +6,7 @@ import { Gear } from '@kb1rma/libcomm14cux-ts';
 import type { LiveSnapshot } from '../model/snapshot';
 import { browserPlatform } from '../platform/browser';
 import { TestPlatform } from '../test-support/TestApp';
+import { testPlatform } from '../test-support/platform';
 import { PreferencesProvider } from '../preferences/PreferencesProvider';
 import { expectNoAxeViolations, readingFor } from '../test-support/a11y';
 import { SnapshotTiles } from './LiveTiles';
@@ -189,6 +190,7 @@ describe('PreferencesMenu', () => {
       theme: 'dark',
       palette: 'arles',
       usageCounts: 'on',
+      keepScreenOn: false,
     });
 
     first.unmount();
@@ -329,5 +331,62 @@ describe('PreferencesMenu', () => {
     await expectNoAxeViolations(document.body);
     await user.click(trigger());
     await expectNoAxeViolations(screen.getByRole('menu'));
+  });
+
+  it('offers to keep the screen on, off by default, and remembers the choice', async () => {
+    const user = userEvent.setup();
+    const awake = {
+      available: () => true,
+      request: () => Promise.reject(new Error('Not used in this test')),
+      onVisible: () => () => undefined,
+    };
+    const { screen: base } = browserPlatform();
+
+    render(
+      <TestPlatform
+        platform={browserPlatform({
+          screen: { ...base, wakeLock: awake },
+        })}
+      >
+        <PreferencesProvider>
+          <PreferencesMenu />
+        </PreferencesProvider>
+      </TestPlatform>,
+    );
+    await user.click(trigger());
+
+    const item = screen.getByRole('menuitemcheckbox', {
+      name: 'Keep the screen on while connected',
+    });
+
+    expect(item).not.toBeChecked();
+    expect(item).toBeEnabled();
+
+    await user.click(item);
+
+    expect(item).toBeChecked();
+    expect(
+      JSON.parse(localStorage.getItem('cuxGauge.preferences') ?? 'null'),
+    ).toMatchObject({ keepScreenOn: true });
+  });
+
+  it('says keeping the screen on is not supported, and cannot be chosen, without a wake lock', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TestPlatform platform={testPlatform()}>
+        <PreferencesProvider>
+          <PreferencesMenu />
+        </PreferencesProvider>
+      </TestPlatform>,
+    );
+    await user.click(trigger());
+
+    const item = screen.getByRole('menuitemcheckbox', {
+      name: /Keep the screen on while connected/,
+    });
+
+    expect(item).toHaveTextContent('Not supported');
+    expect(item).toHaveAttribute('aria-disabled', 'true');
   });
 });

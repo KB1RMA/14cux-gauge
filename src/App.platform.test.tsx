@@ -3,12 +3,13 @@
 import { SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { vi } from 'vitest';
 import { App } from './App';
 import { TestApp } from './test-support/TestApp';
 import { createAppServices } from './appServices';
 import { buildSyntheticRom } from './demo/syntheticRom';
 import type { FilePlatform, Platform } from './platform/platform';
-import { memorySettings } from './test-support/platform';
+import { memorySettings, testPlatform } from './test-support/platform';
 import { storageWith } from './test-support/storage';
 import { fakeUsageCounter } from './test-support/usageCounter';
 
@@ -24,6 +25,7 @@ function desktopPlatform() {
     serial: {
       available: () => true,
       requestPort: () => Promise.resolve({ description: 'Test adapter' }),
+      grantedPorts: () => Promise.resolve([]),
       open: (_port, { baudRate }) => {
         const transport = new SimulatedTransport();
 
@@ -52,6 +54,7 @@ function desktopPlatform() {
     storage: { open: storageWith() },
     settings: memorySettings(),
     app: { userAgent: 'TestBrowser/1.0', reload: () => undefined },
+    screen: testPlatform().screen,
   };
 
   return {
@@ -193,5 +196,197 @@ describe('App on another platform', () => {
       footer.getByRole('button', { name: 'Download diagnostic log' }),
     );
     expect(footer.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('App on a screen it can control', () => {
+  /** A screen whose lock and full-screen state the test can see. */
+  function controllableScreen() {
+    const locks: { released: boolean }[] = [];
+    const fullscreenListeners = new Set<() => void>();
+    let fullscreen = false;
+    let refuse = false;
+    const platform: Platform['screen'] = {
+      wakeLock: {
+        available: () => true,
+        request: () => {
+          if (refuse) {
+            return Promise.reject(new Error('Refused'));
+          }
+
+          const lock = { released: false };
+
+          locks.push(lock);
+
+          return Promise.resolve({
+            release: () => {
+              lock.released = true;
+
+              return Promise.resolve();
+            },
+            onReleased: () => () => undefined,
+          });
+        },
+        onVisible: () => () => undefined,
+      },
+      fullscreen: {
+        available: () => true,
+        active: () => fullscreen,
+        enter: () => {
+          fullscreen = true;
+          fullscreenListeners.forEach((listener) => {
+            listener();
+          });
+
+          return Promise.resolve();
+        },
+        exit: () => {
+          fullscreen = false;
+          fullscreenListeners.forEach((listener) => {
+            listener();
+          });
+
+          return Promise.resolve();
+        },
+        watch: (listener) => {
+          fullscreenListeners.add(listener);
+
+          return () => {
+            fullscreenListeners.delete(listener);
+          };
+        },
+      },
+    };
+
+    return {
+      platform,
+      locks,
+      refuse: () => {
+        refuse = true;
+      },
+    };
+  }
+
+  async function chooseKeepScreenOn(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: 'Preferences' }));
+    await user.click(
+      screen.getByRole('menuitemcheckbox', {
+        name: 'Keep the screen on while connected',
+      }),
+    );
+    await user.keyboard('{Escape}');
+  }
+
+  it('keeps the screen on while connected, says so, and lets go on disconnect', async () => {
+    const user = userEvent.setup();
+    const { platform: screenPlatform, locks } = controllableScreen();
+
+    render(
+      <TestApp
+        platform={testPlatform({ screen: screenPlatform })}
+        pollIntervalMs={{ demo: 10 }}
+        usageCounter={undefined}
+      />,
+    );
+
+    await chooseKeepScreenOn(user);
+    expect(locks).toHaveLength(0);
+
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Demo ECU · Polling · Screen kept on',
+    );
+    expect(locks.map((lock) => lock.released)).toEqual([false]);
+
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+
+    await vi.waitFor(() => {
+      expect(locks.map((lock) => lock.released)).toEqual([true]);
+    });
+  });
+
+  it('says when the browser would not keep the screen on', async () => {
+    const user = userEvent.setup();
+    const { platform: screenPlatform, refuse } = controllableScreen();
+
+    refuse();
+    render(
+      <TestApp
+        platform={testPlatform({ screen: screenPlatform })}
+        pollIntervalMs={{ demo: 10 }}
+        usageCounter={undefined}
+      />,
+    );
+
+    await chooseKeepScreenOn(user);
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Demo ECU · Polling · Screen may sleep: the browser refused to keep it on',
+    );
+  });
+
+  it('shows the preference as unavailable, and the status as such, without a wake lock', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TestApp
+        platform={testPlatform()}
+        pollIntervalMs={{ demo: 10 }}
+        usageCounter={undefined}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Preferences' }));
+
+    const item = screen.getByRole('menuitemcheckbox', {
+      name: /Keep the screen on while connected/,
+    });
+
+    expect(item).toHaveTextContent('Not supported');
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('goes full screen from the dashboard and back', async () => {
+    const user = userEvent.setup();
+    const { platform: screenPlatform } = controllableScreen();
+
+    render(
+      <TestApp
+        platform={testPlatform({ screen: screenPlatform })}
+        pollIntervalMs={{ demo: 10 }}
+        usageCounter={undefined}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+
+    const button = await screen.findByRole('button', { name: 'Full screen' });
+
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(button);
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(button);
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('says full screen is not supported where the browser cannot', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TestApp
+        platform={testPlatform()}
+        pollIntervalMs={{ demo: 10 }}
+        usageCounter={undefined}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+
+    expect(
+      await screen.findByRole('button', { name: 'Full screen' }),
+    ).toBeDisabled();
+    expect(screen.getByText('Not supported in this browser')).toBeVisible();
   });
 });

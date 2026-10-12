@@ -56,3 +56,9 @@
 .error {
   color: var(--danger);
 }
+
+.reconnect {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}

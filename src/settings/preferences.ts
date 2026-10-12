@@ -29,4 +29,6 @@ export interface Preferences {
   theme: ThemePreference;
   palette: PalettePreference;
   usageCounts: UsageCountsPreference;
+  /** Keep the screen on while an ECU is connected; off unless chosen. */
+  keepScreenOn: boolean;
 }

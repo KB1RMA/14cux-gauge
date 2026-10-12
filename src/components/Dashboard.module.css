@@ -8,10 +8,31 @@
   gap: 1.25rem;
 }
 
+.tabBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  border-bottom: 1px solid var(--control-border);
+}
+
 .tabs {
   display: flex;
   gap: 0.25rem;
-  border-bottom: 1px solid var(--control-border);
+}
+
+.fullscreen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.25rem;
+}
+
+.note {
+  color: var(--text-muted);
+  font-size: 0.85rem;
 }
 
 .tab {

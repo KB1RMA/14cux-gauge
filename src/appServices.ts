@@ -7,6 +7,7 @@ import { EcuWrites } from './ecuWrite/ecuWrites';
 import type { Platform } from './platform/platform';
 import { Recorder } from './recording/recorder';
 import { RomReader } from './roms/romReader';
+import { ScreenWake } from './screen/screenWake';
 import { StorageService } from './storage/storageService';
 import {
   AppStatusStore,
@@ -34,6 +35,8 @@ export interface AppServices {
   readonly recorder: Recorder;
   /** Reading the ROM image, and the images kept. */
   readonly roms: RomReader;
+  /** Keeping the screen on while connected, if the user chose that. */
+  readonly screenWake: ScreenWake;
   /**
    * Whether `appStatus` checks the network and the published build; off
    * outside a production build, where it reports online and up to date.
@@ -63,6 +66,7 @@ export function servicesOn(
   const writes = new EcuWrites(session);
   const recorder = new Recorder(session, writes, storage);
   const roms = new RomReader(session, storage, recorder, platform.files);
+  const screenWake = new ScreenWake(platform.screen.wakeLock, session);
 
   return {
     platform,
@@ -71,6 +75,7 @@ export function servicesOn(
     writes,
     recorder,
     roms,
+    screenWake,
     appStatus: new AppStatusStore(
       appStatus ?? { build: BUILD_INFO, versionUrl: '' },
     ),
@@ -81,6 +86,7 @@ export function servicesOn(
       const recorded = recorder.dispose();
 
       roms.dispose();
+      screenWake.dispose();
       session.dispose();
       void recorded.finally(() => {
         storage.dispose();

@@ -3,6 +3,7 @@
 import { Tabs } from 'radix-ui';
 import { useEffect, useRef } from 'react';
 import { useReadings } from '../readings/useReadings';
+import { useFullscreen } from '../screen/useFullscreen';
 import { LIVE_TAB_PATHS, type LiveTab } from '../routing/paths';
 import { useNavigateOnce } from '../routing/useNavigateOnce';
 import { EcuInfo } from './EcuInfo';
@@ -21,6 +22,7 @@ export function Dashboard({ tab }: { tab: LiveTab }) {
   const navigate = useNavigateOnce();
   const { chosen } = useReadings();
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const fullscreen = useFullscreen();
 
   // The control that started the connection is gone once the dashboard
   // replaces the connect screen; move focus to the start of the new view.
@@ -42,17 +44,44 @@ export function Dashboard({ tab }: { tab: LiveTab }) {
       }}
       className={styles['views']}
     >
-      <Tabs.List aria-label="Dashboard views" className={styles['tabs']}>
-        <Tabs.Trigger value="overview" className={styles['tab']}>
-          Overview
-        </Tabs.Trigger>
-        <Tabs.Trigger value="graphs" className={styles['tab']}>
-          Graphs
-        </Tabs.Trigger>
-        <Tabs.Trigger value="fuelMap" className={styles['tab']}>
-          Fuel map
-        </Tabs.Trigger>
-      </Tabs.List>
+      <div className={styles['tabBar']}>
+        <Tabs.List aria-label="Dashboard views" className={styles['tabs']}>
+          <Tabs.Trigger value="overview" className={styles['tab']}>
+            Overview
+          </Tabs.Trigger>
+          <Tabs.Trigger value="graphs" className={styles['tab']}>
+            Graphs
+          </Tabs.Trigger>
+          <Tabs.Trigger value="fuelMap" className={styles['tab']}>
+            Fuel map
+          </Tabs.Trigger>
+        </Tabs.List>
+        <div className={styles['fullscreen']}>
+          {fullscreen.available ? (
+            <button
+              type="button"
+              aria-pressed={fullscreen.active}
+              onClick={() => void fullscreen.toggle()}
+            >
+              Full screen
+            </button>
+          ) : (
+            <button type="button" disabled>
+              Full screen
+            </button>
+          )}
+          {fullscreen.available ? null : (
+            <span className={styles['note']}>
+              Not supported in this browser
+            </span>
+          )}
+          {fullscreen.error ? (
+            <span role="alert" className={styles['note']}>
+              {fullscreen.error}
+            </span>
+          ) : null}
+        </div>
+      </div>
 
       <Tabs.Content value="overview" className={styles['dashboard']}>
         <section className={styles['live']} aria-labelledby="live-title">

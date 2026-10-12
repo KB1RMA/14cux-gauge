@@ -32,7 +32,7 @@ import {
  */
 
 export const SETTINGS = {
-  /** Units, theme, palette and usage counts, chosen in Preferences. */
+  /** Units, theme, palette, usage counts and keeping the screen on, chosen in Preferences. */
   preferences: (defaults: SettingDefaults) =>
     settingObject({
       temperatureUnit: choice(TEMPERATURE_UNITS, 'F'),
@@ -41,6 +41,7 @@ export const SETTINGS = {
       palette: choice(PALETTE_PREFERENCES, 'coniston'),
       // The platform's default applies until a choice is made in Preferences.
       usageCounts: choice(USAGE_COUNTS_PREFERENCES, defaults.usageCounts),
+      keepScreenOn: z.catch(z.boolean(), false),
     }),
   /** Which readings are polled and recorded; every reading by default. */
   readings: () =>

@@ -3,6 +3,7 @@
 import { CheckIcon, GearIcon } from '@radix-ui/react-icons';
 import { DropdownMenu } from 'radix-ui';
 import { useId } from 'react';
+import { useCanKeepScreenOn } from '../screen/useScreenWake';
 import type {
   PalettePreference,
   ThemePreference,
@@ -139,7 +140,10 @@ export function PreferencesMenu({
     setPalette,
     usageCounts,
     setUsageCounts,
+    keepScreenOn,
+    setKeepScreenOn,
   } = usePreferences();
+  const canKeepScreenOn = useCanKeepScreenOn();
 
   return (
     <DropdownMenu.Root>
@@ -183,6 +187,28 @@ export function PreferencesMenu({
             value={palette}
             onChange={setPalette}
           />
+          <DropdownMenu.Separator className={styles['separator']} />
+          <DropdownMenu.Label className={styles['label']}>
+            Screen
+          </DropdownMenu.Label>
+          <DropdownMenu.CheckboxItem
+            className={styles['item']}
+            checked={keepScreenOn}
+            disabled={!canKeepScreenOn}
+            onCheckedChange={setKeepScreenOn}
+            // Stay open, like the choices above.
+            onSelect={(event) => {
+              event.preventDefault();
+            }}
+          >
+            <DropdownMenu.ItemIndicator className={styles['indicator']}>
+              <CheckIcon aria-hidden="true" />
+            </DropdownMenu.ItemIndicator>
+            Keep the screen on while connected
+            {canKeepScreenOn ? null : (
+              <span className={styles['hint']}>Not supported</span>
+            )}
+          </DropdownMenu.CheckboxItem>
           {offerUsageCounts && (
             <>
               <DropdownMenu.Separator className={styles['separator']} />
