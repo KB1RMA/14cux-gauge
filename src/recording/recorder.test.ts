@@ -209,7 +209,7 @@ describe('Recorder', () => {
     ]);
   });
 
-  it('says once why nothing was read while a ROM read has the link', async () => {
+  it('says the identity was not read when a ROM read has the link', async () => {
     const { recorder, session, sessions } = await recorderOn();
     const lease = session.acquire(ROM_READ_HOLDER);
 
@@ -224,6 +224,7 @@ describe('Recorder', () => {
       status: 'failed',
       message: 'The ECU was busy or no longer connected.',
     });
+    expect(identity?.faultCodes.status).toBe('failed');
   });
 
   it('is interrupted without offering a name', async () => {

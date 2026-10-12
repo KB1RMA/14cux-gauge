@@ -263,6 +263,15 @@ describe('Recording and browsing sessions', () => {
       startedAt: START,
       identity: {
         ...IDENTITY,
+        faultCodes: {
+          status: 'read',
+          readAt: START,
+          value: {
+            romChecksumFailure: true,
+            coolantTempSensor: true,
+            futureFault: true,
+          },
+        },
         fuelMap: { status: 'invalid', readAt: START },
         rpmLimit: {
           status: 'failed',
@@ -303,6 +312,7 @@ describe('Recording and browsing sessions', () => {
     ).toEqual([
       '29 · ROM checksum failure romChecksumFailure',
       '14 · Coolant temperature sensor coolantTempSensor',
+      'Unknown fault code futureFault',
     ]);
     expect(within(identity).queryByText(/Simulated/)).not.toBeInTheDocument();
     await expectNoAxeViolations(container);
@@ -341,6 +351,45 @@ describe('Recording and browsing sessions', () => {
       'Simulated: recorded from the demo ECU, not a real one.',
     );
     expect(identity).toHaveTextContent('No fault codes stored.');
+  });
+
+  it('says when the fault codes at the start could not be read', async () => {
+    const user = userEvent.setup();
+    const store = new MemorySessionStore();
+    const { id } = await store.create({
+      name: 'Lost link',
+      source: 'serial',
+      startedAt: START,
+      identity: {
+        ...IDENTITY,
+        faultCodes: {
+          status: 'failed',
+          readAt: START,
+          message: 'The connection to the ECU was closed.',
+        },
+      },
+    });
+
+    await store.finish(id, START + 1000);
+    render(
+      <TestApp
+        platform={browserPlatform({
+          storage: { open: storageWith({ sessions: store }) },
+        })}
+      />,
+    );
+
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: 'Lost link' }));
+
+    const identity = await screen.findByRole('region', {
+      name: 'ECU at the start',
+    });
+
+    expect(identity).toHaveTextContent(
+      'Not read: The connection to the ECU was closed.',
+    );
+    expect(within(identity).queryByRole('list')).not.toBeInTheDocument();
   });
 
   it('opens a session recorded before identities were kept, and says so', async () => {

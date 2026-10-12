@@ -84,6 +84,23 @@ describe('sessionCsv', () => {
     ).toBe('Fault codes,None stored,2026-10-05T14:00:00.000Z');
   });
 
+  it('keeps a fault code a newer version recorded, by its name', () => {
+    const identity: EcuIdentity = {
+      ...IDENTITY,
+      faultCodes: {
+        status: 'read',
+        readAt: Date.UTC(2026, 9, 5, 14, 0, 0),
+        value: { futureFault: true },
+      },
+    };
+
+    expect(
+      sessionCsv({ source: 'serial', identity }, [], IMPERIAL).split('\r\n')[7],
+    ).toBe(
+      'Fault code,Unknown fault code (futureFault),2026-10-05T14:00:00.000Z',
+    );
+  });
+
   it('marks a demo recording as simulated', () => {
     expect(
       sessionCsv({ source: 'demo', identity: IDENTITY }, [], IMPERIAL).split(
