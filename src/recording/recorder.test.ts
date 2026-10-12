@@ -2,6 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { buildSyntheticRom } from '../demo/syntheticRom';
+import { ROM_READ_HOLDER } from '../roms/romImage';
 import { MemoryRomStore } from '../storage/romStore';
 import { MemorySessionStore } from '../storage/sessionStore';
 import { connectedSession } from '../test-support/ecuSession';
@@ -131,6 +132,24 @@ describe('Recorder', () => {
     expect(identity?.rpmLimit.status).toBe('invalid');
     expect(identity?.fuelMap.status).toBe('invalid');
     expect(identity?.tune.status).toBe('read');
+  });
+
+  it('says the identity was not read when a ROM read has the link', async () => {
+    const { recorder, session, sessions } = await recorderOn();
+    const lease = session.acquire(ROM_READ_HOLDER);
+
+    await lease?.ready;
+    await recorder.start();
+    lease?.release();
+    await recorder.stop();
+
+    const identity = (await sessions.list())[0]?.identity;
+
+    expect(identity?.tune).toMatchObject({
+      status: 'failed',
+      message: 'Not read: the ECU was busy or no longer connected.',
+    });
+    expect(identity?.faultCodes.status).toBe('failed');
   });
 
   it('is interrupted without offering a name', async () => {

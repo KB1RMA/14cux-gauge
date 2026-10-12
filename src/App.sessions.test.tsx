@@ -263,6 +263,15 @@ describe('Recording and browsing sessions', () => {
       startedAt: START,
       identity: {
         ...IDENTITY,
+        faultCodes: {
+          status: 'read',
+          readAt: START,
+          value: {
+            romChecksumFailure: true,
+            coolantTempSensor: true,
+            futureFault: true,
+          },
+        },
         fuelMap: { status: 'invalid', readAt: START },
         rpmLimit: {
           status: 'failed',
@@ -303,6 +312,7 @@ describe('Recording and browsing sessions', () => {
     ).toEqual([
       '29 · ROM checksum failure romChecksumFailure',
       '14 · Coolant temperature sensor coolantTempSensor',
+      'Unknown fault code futureFault',
     ]);
     expect(within(identity).queryByText(/Simulated/)).not.toBeInTheDocument();
     await expectNoAxeViolations(container);
