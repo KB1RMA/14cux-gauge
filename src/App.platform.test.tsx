@@ -203,9 +203,11 @@ describe('App on a screen it can control', () => {
   /** A screen whose lock and full-screen state the test can see. */
   function controllableScreen() {
     const locks: { released: boolean }[] = [];
+    const lockEnded = new Set<() => void>();
     const fullscreenListeners = new Set<() => void>();
     let fullscreen = false;
     let refuse = false;
+    let failFullscreen = false;
     const platform: Platform['screen'] = {
       wakeLock: {
         available: () => true,
@@ -224,7 +226,13 @@ describe('App on a screen it can control', () => {
 
               return Promise.resolve();
             },
-            onReleased: () => () => undefined,
+            onReleased: (listener) => {
+              lockEnded.add(listener);
+
+              return () => {
+                lockEnded.delete(listener);
+              };
+            },
           });
         },
         onVisible: () => () => undefined,
@@ -233,6 +241,10 @@ describe('App on a screen it can control', () => {
         available: () => true,
         active: () => fullscreen,
         enter: () => {
+          if (failFullscreen) {
+            return Promise.reject(new Error('Refused'));
+          }
+
           fullscreen = true;
           fullscreenListeners.forEach((listener) => {
             listener();
@@ -263,6 +275,15 @@ describe('App on a screen it can control', () => {
       locks,
       refuse: () => {
         refuse = true;
+      },
+      refuseFullscreen: () => {
+        failFullscreen = true;
+      },
+      /** The browser ends every lock, as when the page is hidden. */
+      endLocks: () => {
+        for (const listener of [...lockEnded]) {
+          listener();
+        }
       },
     };
   }
@@ -388,5 +409,71 @@ describe('App on a screen it can control', () => {
       await screen.findByRole('button', { name: 'Full screen' }),
     ).toBeDisabled();
     expect(screen.getByText('Not supported in this browser')).toBeVisible();
+  });
+
+  it('says when the browser ended keeping the screen on', async () => {
+    const user = userEvent.setup();
+    const { platform: screenPlatform, endLocks } = controllableScreen();
+
+    render(
+      <TestApp
+        platform={testPlatform({ screen: screenPlatform })}
+        pollIntervalMs={{ demo: 10 }}
+        usageCounter={undefined}
+      />,
+    );
+
+    await chooseKeepScreenOn(user);
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+    await screen.findByText(/Screen kept on/);
+
+    act(() => {
+      endLocks();
+    });
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Demo ECU · Polling · Screen may sleep: the browser ended keeping it on',
+    );
+  });
+
+  it('says when a saved choice to keep the screen on cannot be met', async () => {
+    const user = userEvent.setup();
+    const base = testPlatform();
+
+    base.settings.write('preferences', { keepScreenOn: true });
+    render(
+      <TestApp
+        platform={base}
+        pollIntervalMs={{ demo: 10 }}
+        usageCounter={undefined}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Demo ECU · Polling · Screen may sleep: this browser cannot keep it on',
+    );
+  });
+
+  it('says when the browser would not go full screen', async () => {
+    const user = userEvent.setup();
+    const { platform: screenPlatform, refuseFullscreen } = controllableScreen();
+
+    refuseFullscreen();
+    render(
+      <TestApp
+        platform={testPlatform({ screen: screenPlatform })}
+        pollIntervalMs={{ demo: 10 }}
+        usageCounter={undefined}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Full screen' }),
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The browser would not go full screen.',
+    );
   });
 });

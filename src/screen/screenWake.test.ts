@@ -16,6 +16,7 @@ function fakeWakeLock(available = true) {
   let refuse = false;
   let pending: ((hold: WakeLockHold) => void) | undefined;
   let hold = false;
+  let failingRelease = false;
 
   const platform: WakeLockPlatform = {
     available: () => available,
@@ -39,7 +40,9 @@ function fakeWakeLock(available = true) {
         release: () => {
           record.released = true;
 
-          return Promise.resolve();
+          return failingRelease
+            ? Promise.reject(new Error('Already released'))
+            : Promise.resolve();
         },
         onReleased: (listener) => {
           ended.add(listener);
@@ -80,7 +83,18 @@ function fakeWakeLock(available = true) {
       hold = true;
     },
     grant: () => {
-      pending?.({} as WakeLockHold);
+      pending?.({
+        release: () => {
+          holds.at(-1)?.end();
+
+          return Promise.resolve();
+        },
+        onReleased: () => () => undefined,
+      });
+    },
+    /** Makes the next lock fail when it is let go of. */
+    failRelease: () => {
+      failingRelease = true;
     },
     show: () => {
       for (const listener of visibleListeners) {
@@ -225,5 +239,38 @@ describe('ScreenWake', () => {
     service.dispose();
 
     expect(wake.holds.map((hold) => hold.released)).toEqual([true]);
+  });
+
+  it('lets go of a lock the browser cannot release, without failing', async () => {
+    const { session, wake, service } = setup();
+
+    wake.failRelease();
+    service.setEnabled(true);
+    await session.connect({ kind: 'demo' });
+    await vi.waitFor(() => {
+      expect(status(service)).toBe('on');
+    });
+
+    await session.disconnect();
+
+    expect(status(service)).toBe('inactive');
+    expect(wake.holds.map((hold) => hold.released)).toEqual([true]);
+  });
+
+  it('keeps the one lock while something else holds the ECU link', async () => {
+    const { session, wake, service } = setup();
+
+    service.setEnabled(true);
+    await session.connect({ kind: 'demo' });
+    await vi.waitFor(() => {
+      expect(status(service)).toBe('on');
+    });
+
+    const lease = session.acquire({ kind: 'write', pausesPolling: false });
+
+    lease?.release();
+
+    expect(status(service)).toBe('on');
+    expect(wake.holds).toHaveLength(1);
   });
 });
