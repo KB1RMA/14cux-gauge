@@ -353,6 +353,45 @@ describe('Recording and browsing sessions', () => {
     expect(identity).toHaveTextContent('No fault codes stored.');
   });
 
+  it('says when the fault codes at the start could not be read', async () => {
+    const user = userEvent.setup();
+    const store = new MemorySessionStore();
+    const { id } = await store.create({
+      name: 'Lost link',
+      source: 'serial',
+      startedAt: START,
+      identity: {
+        ...IDENTITY,
+        faultCodes: {
+          status: 'failed',
+          readAt: START,
+          message: 'The connection to the ECU was closed.',
+        },
+      },
+    });
+
+    await store.finish(id, START + 1000);
+    render(
+      <TestApp
+        platform={browserPlatform({
+          storage: { open: storageWith({ sessions: store }) },
+        })}
+      />,
+    );
+
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: 'Lost link' }));
+
+    const identity = await screen.findByRole('region', {
+      name: 'ECU at the start',
+    });
+
+    expect(identity).toHaveTextContent(
+      'Not read: The connection to the ECU was closed.',
+    );
+    expect(within(identity).queryByRole('list')).not.toBeInTheDocument();
+  });
+
   it('opens a session recorded before identities were kept, and says so', async () => {
     const user = userEvent.setup();
     const factory = new IDBFactory();
