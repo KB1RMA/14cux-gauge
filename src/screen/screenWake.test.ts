@@ -210,6 +210,33 @@ describe('ScreenWake', () => {
     expect(wake.holds).toHaveLength(2);
   });
 
+  it('asks again once the page is shown, after a request made while it was hidden was refused', async () => {
+    const { session, wake, service } = setup();
+
+    service.setEnabled(true);
+    await session.connect({ kind: 'demo' });
+    await vi.waitFor(() => {
+      expect(status(service)).toBe('on');
+    });
+
+    wake.holds[0]?.end();
+    expect(status(service)).toBe('released');
+
+    // Something changes while hidden, and the browser refuses the request.
+    wake.refuseNext();
+    session.acquire({ kind: 'write', pausesPolling: false })?.release();
+    await vi.waitFor(() => {
+      expect(status(service)).toBe('refused');
+    });
+
+    wake.refuseNext(false);
+    wake.show();
+
+    await vi.waitFor(() => {
+      expect(status(service)).toBe('on');
+    });
+  });
+
   it('releases a lock that was granted after the connection ended', async () => {
     const { session, wake, service } = setup();
 

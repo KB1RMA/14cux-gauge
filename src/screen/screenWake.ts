@@ -47,10 +47,11 @@ export class ScreenWake {
         this.sync();
       }),
       wakeLock.onVisible(() => {
-        // The system takes the lock back while the page is hidden.
-        if (this.state.status === 'released') {
-          this.sync();
-        }
+        // The system takes the lock back while the page is hidden, and
+        // refuses a request made then, so a lock that was ended or refused
+        // is asked for again once the page is shown. Does nothing while a
+        // lock is held or being requested.
+        this.sync();
       }),
     ];
   }
@@ -140,6 +141,7 @@ export class ScreenWake {
         this.setStatus('on');
       },
       () => {
+        // Not tried again until the connection changes or the page is shown.
         if (generation === this.generation) {
           this.requesting = false;
           this.setStatus('refused');

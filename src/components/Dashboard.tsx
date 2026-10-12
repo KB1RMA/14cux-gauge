@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { Tabs } from 'radix-ui';
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { useReadings } from '../readings/useReadings';
 import { useFullscreen } from '../screen/useFullscreen';
 import { LIVE_TAB_PATHS, type LiveTab } from '../routing/paths';
@@ -23,6 +23,7 @@ export function Dashboard({ tab }: { tab: LiveTab }) {
   const { chosen } = useReadings();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const fullscreen = useFullscreen();
+  const fullscreenNoteId = useId();
 
   // The control that started the connection is gone once the dashboard
   // replaces the connect screen; move focus to the start of the new view.
@@ -66,12 +67,12 @@ export function Dashboard({ tab }: { tab: LiveTab }) {
               Full screen
             </button>
           ) : (
-            <button type="button" disabled>
+            <button type="button" disabled aria-describedby={fullscreenNoteId}>
               Full screen
             </button>
           )}
           {fullscreen.available ? null : (
-            <span className={styles['note']}>
+            <span id={fullscreenNoteId} className={styles['note']}>
               Not supported in this browser
             </span>
           )}
