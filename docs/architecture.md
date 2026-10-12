@@ -38,7 +38,9 @@ but never the ones above it. From top to bottom:
    - **EcuWrites** sends commands that change something in the ECU, such as
      clearing fault codes or running the fuel pump. The app always asks you to
      confirm first.
-   - **Recorder** saves readings into a session while you record.
+   - **Recorder** saves readings into a session while you record. When a
+     recording starts, it first asks EcuSession to read which ECU it is:
+     the tune, rev limit, fuel map and stored fault codes.
    - **RomReader** copies the ECU's program, called the ROM image, so you can
      keep it.
    - **StorageService** opens the place where sessions and ROM images are kept.
@@ -94,8 +96,12 @@ a drop to zero.
 These are kept in the browser's database:
 
 - **Sessions.** Each one has a name, notes, start and end times, the number of
-  samples, and whether it came from a real ECU or the demo. Its snapshots are
-  saved beside it in batches.
+  samples, and whether it came from a real ECU or the demo. It also keeps
+  which ECU it came from, read once when recording starts: the tune number,
+  ident, checksum fixer, rev limit, fuel map and the fault codes that were
+  set, each with the time it was read. A value that could not be read says
+  why. Sessions saved before this was kept say "Not recorded". Its snapshots
+  are saved beside it in batches.
 - **Writes.** Each command sent to the ECU during a recording, with when it
   started and ended and how it went: done, failed, or only partly done.
 - **ROM images.** The copied program, with its tune number, size, a
@@ -293,6 +299,11 @@ sequenceDiagram
   Session-->>Recorder: snapshot event, while recording
   Recorder->>Store: append full-precision samples<br/>(buffered, saved about once a second)
 ```
+
+As a recording starts, the `Recorder` asks `EcuSession.readNow` to run
+`readIdentity` (in `ecu/reads.ts`) beside polling, and stores the result in
+the session's summary (format 4). `readNow` reads nothing while a ROM read
+has the link to itself, and the identity then says it was not read.
 
 ECU writes (clearing faults, actuator tests) go the other way: a view behind
 `ConfirmDialog` calls `useEcuWrite`, which asks `EcuWrites`; `EcuWrites` takes

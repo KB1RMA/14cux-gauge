@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { recordedSource } from '../ecu/connect';
+import { identityNotRead, readIdentity } from '../ecu/reads';
 import type { EcuSession } from '../ecu/session';
 import type { EcuWrites } from '../ecuWrite/ecuWrites';
 import type { SessionSummary } from '../model/session';
@@ -118,9 +119,22 @@ export class Recorder {
 
     try {
       const startedAt = Date.now();
+      // Read once per recording, as it starts, so every recording says what
+      // it was taken from.
+      const identity =
+        (await this.session.readNow(readIdentity)) ??
+        identityNotRead(
+          'Not read: the ECU was busy or no longer connected.',
+          Date.now(),
+        );
       const recorder = await SessionRecorder.start(
         store,
-        { name: defaultSessionName(source, startedAt), source, startedAt },
+        {
+          name: defaultSessionName(source, startedAt),
+          source,
+          startedAt,
+          identity,
+        },
         {
           onError: (cause) => {
             this.set({ error: describeStorageError(cause) });

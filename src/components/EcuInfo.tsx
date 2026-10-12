@@ -2,7 +2,12 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { libraryVersion, readTuneInfo } from '../ecu/reads';
 import { useEcuRead } from '../ecu/useEcuRead';
-import { hex } from '../hex';
+import {
+  formatChecksumFixer,
+  formatTuneIdent,
+  formatTuneNumber,
+  NOT_VALID,
+} from '../sessions/identity';
 import { InfoPopover } from './InfoPopover';
 import styles from './Panel.module.css';
 
@@ -23,14 +28,14 @@ export function EcuInfo() {
             </p>
           </InfoPopover>
         </dt>
-        <dd>{tune ? tune.tuneNumber.toString().padStart(4, '0') : '…'}</dd>
+        <dd>{tune ? formatTuneNumber(tune.tuneNumber) : '…'}</dd>
         <dt>
           Tune ident
           <InfoPopover label="Tune ident">
             <p>Tells apart different builds of the same tune number.</p>
           </InfoPopover>
         </dt>
-        <dd>{tune ? hex(tune.tuneIdent, 4) : '…'}</dd>
+        <dd>{tune ? formatTuneIdent(tune.tuneIdent) : '…'}</dd>
         <dt>
           Checksum fixer
           <InfoPopover label="Checksum fixer">
@@ -40,7 +45,7 @@ export function EcuInfo() {
             </p>
           </InfoPopover>
         </dt>
-        <dd>{tune ? hex(tune.checksumFixer, 2) : '…'}</dd>
+        <dd>{tune ? formatChecksumFixer(tune.checksumFixer) : '…'}</dd>
         <dt>
           Rev limit
           <InfoPopover label="Rev limit">
@@ -51,7 +56,7 @@ export function EcuInfo() {
           {info === undefined
             ? '…'
             : info.rpmLimit === null
-              ? 'Not valid'
+              ? NOT_VALID
               : info.rpmLimit === undefined
                 ? 'Unavailable'
                 : `${info.rpmLimit} rpm`}

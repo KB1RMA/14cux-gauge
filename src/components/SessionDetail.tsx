@@ -16,6 +16,7 @@ import { useSessions } from '../sessions/useSessions';
 import { keepsWrites, type SessionSummary } from '../model/session';
 import { DeleteSessionDialog } from './DeleteSessionDialog';
 import { SessionFields } from './SessionFields';
+import { SessionIdentity } from './SessionIdentity';
 import { SessionMeta } from './SessionMeta';
 import { SessionReplay } from './SessionReplay';
 import styles from './Sessions.module.css';
@@ -182,6 +183,7 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
         </section>
 
         <aside className={styles['side']}>
+          <SessionIdentity session={session} />
           <section aria-labelledby="details-title">
             <h3 id="details-title" className={styles['subtitle']}>
               Name and notes
@@ -193,8 +195,9 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
               Export
             </h3>
             <p className={styles['hint']}>
-              One row per sample, in your chosen units, with the unit in each
-              column heading. Invalid readings are left empty.
+              The ECU’s identity and fault codes from the start of the
+              recording, then one row per sample, in your chosen units, with the
+              unit in each column heading. Invalid readings are left empty.
             </p>
             {exportFailed?.id === id ? (
               <p role="alert" className={styles['error']}>
@@ -212,7 +215,10 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
                   void saveFile(
                     files,
                     sessionCsvFileName(session.name, session.startedAt),
-                    sessionCsv(samples.samples, { temperatureUnit, speedUnit }),
+                    sessionCsv(session, samples.samples, {
+                      temperatureUnit,
+                      speedUnit,
+                    }),
                     'text/csv',
                   ).then((feedback) => {
                     if (feedback?.kind === 'failed') {

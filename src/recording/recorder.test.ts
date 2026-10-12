@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
+import { buildSyntheticRom } from '../demo/syntheticRom';
 import { MemoryRomStore } from '../storage/romStore';
 import { MemorySessionStore } from '../storage/sessionStore';
 import { connectedSession } from '../test-support/ecuSession';
@@ -66,6 +67,70 @@ describe('Recorder', () => {
       write: 'clearFaultCodes',
       outcome: { status: 'done', message: 'Fault codes cleared.' },
     });
+  });
+
+  it('keeps the ECU’s identity and fault codes from when it started', async () => {
+    const transport = new SimulatedTransport();
+    const startAt = Date.UTC(2026, 9, 5, 14, 0, 0);
+
+    transport.loadRom(buildSyntheticRom()); // tune 1234, ident 0xDE70, fixer 0xA5
+    transport.memory[MemoryOffset.RPMLimit] = 1500 >> 8; // 7,500,000 / 1500 = 5000 rpm
+    transport.memory[MemoryOffset.RPMLimit + 1] = 1500 & 0xff;
+    transport.memory[MemoryOffset.CurrentFuelMapId] = 3;
+    transport.memory[MemoryOffset.FaultCodes] = 0x02; // lambda sensor, odd bank
+
+    const { recorder, sessions } = await recorderOn(transport);
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(startAt);
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+
+    await recorder.start();
+    await recorder.stop();
+
+    const [saved] = await sessions.list();
+    const identity = saved?.identity;
+
+    expect(saved?.formatVersion).toBe(4);
+    expect(identity).toMatchObject({
+      tune: {
+        status: 'read',
+        readAt: startAt,
+        value: { tuneNumber: 1234, tuneIdent: 0xde70, checksumFixer: 0xa5 },
+      },
+      rpmLimit: { status: 'read', readAt: startAt, value: 5000 },
+      fuelMap: { status: 'read', readAt: startAt, value: 3 },
+      faultCodes: { status: 'read', readAt: startAt },
+    });
+
+    const flags =
+      identity?.faultCodes.status === 'read' ? identity.faultCodes.value : {};
+
+    expect(Object.keys(flags).filter((name) => flags[name] === true)).toEqual([
+      'lambdaSensorOdd',
+    ]);
+    expect(Object.keys(flags)).toContain('romChecksumFailure');
+  });
+
+  it('keeps values the ECU gave as invalid apart from those it read', async () => {
+    const transport = new SimulatedTransport();
+
+    transport.memory[MemoryOffset.RPMLimit] = 0; // a zero period
+    transport.memory[MemoryOffset.RPMLimit + 1] = 0;
+    transport.memory[MemoryOffset.CurrentFuelMapId] = 9; // only 0 to 5 exist
+
+    const { recorder, sessions } = await recorderOn(transport);
+
+    await recorder.start();
+    await recorder.stop();
+
+    const identity = (await sessions.list())[0]?.identity;
+
+    expect(identity?.rpmLimit.status).toBe('invalid');
+    expect(identity?.fuelMap.status).toBe('invalid');
+    expect(identity?.tune.status).toBe('read');
   });
 
   it('is interrupted without offering a name', async () => {

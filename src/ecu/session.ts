@@ -13,6 +13,7 @@ import type { LiveSnapshot, ReadingKey } from '../model/snapshot';
 import type { EcuConnection, EcuSource } from './connect';
 import { connectionReducer, type ConnectionState } from './connectionState';
 import { describeError, errorReason } from './errors';
+import type { EcuRead } from './reads';
 import {
   ALL_READINGS,
   pickReadings,
@@ -226,6 +227,26 @@ export class EcuSession {
     this.state.link === link && this.active?.link === link
       ? this.active.connection.ecu
       : undefined;
+
+  /**
+   * Runs an on-demand read on the connected ECU, beside polling, as a
+   * service needs one (a recording reads the ECU's identity as it starts).
+   * Resolves `undefined` without reading when not connected, or while a
+   * holder has the link to itself.
+   */
+  readonly readNow = async <T>(read: EcuRead<T>): Promise<T | undefined> => {
+    const active = this.active;
+
+    if (
+      !active ||
+      this.state.link !== active.link ||
+      this.state.holder?.pausesPolling
+    ) {
+      return undefined;
+    }
+
+    return read(active.connection.ecu);
+  };
 
   readonly connect = async (source: EcuSource): Promise<void> => {
     const myGeneration = ++this.generation;

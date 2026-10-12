@@ -11,6 +11,8 @@ import {
   type FuelMap,
   type TuneRevision,
 } from '@kb1rma/libcomm14cux-ts';
+import type { EcuIdentity, IdentityRead } from '../model/identity';
+import { describeError } from './errors';
 
 export { FAULT_CODE_NUMBERS, FUEL_MAP_COLUMNS, FUEL_MAP_ROWS };
 export type {
@@ -76,3 +78,69 @@ export const readFuelMapInUse: EcuRead<LoadedMap> = async (ecu) => {
     rpm: await ecu.getRpmTable(),
   };
 };
+
+/**
+ * Runs `read` and keeps what came of it, with the time it finished: the
+ * value, `invalid` if `allowInvalid` and the ECU gave a value its firmware
+ * cannot produce, or why it failed.
+ */
+async function attempt<T>(
+  read: () => Promise<T>,
+  allowInvalid: true,
+): Promise<IdentityRead<T>>;
+async function attempt<T>(
+  read: () => Promise<T>,
+  allowInvalid: false,
+): Promise<Exclude<IdentityRead<T>, { status: 'invalid' }>>;
+async function attempt<T>(
+  read: () => Promise<T>,
+  allowInvalid: boolean,
+): Promise<IdentityRead<T>> {
+  try {
+    const value = await read();
+
+    return { status: 'read', readAt: Date.now(), value };
+  } catch (e) {
+    if (allowInvalid && e instanceof InvalidReadingError) {
+      return { status: 'invalid', readAt: Date.now() };
+    }
+
+    return { status: 'failed', readAt: Date.now(), message: describeError(e) };
+  }
+}
+
+/**
+ * What a recording keeps of the ECU as it starts: its tune, rev limit, fuel
+ * map in use and stored fault codes, each as the library returned it. Never
+ * throws; a value that could not be read is kept as failed, with why.
+ */
+export const readIdentity: EcuRead<EcuIdentity> = async (ecu) => {
+  const tune = await attempt(async () => {
+    const { tuneNumber, tuneIdent, checksumFixer } =
+      await ecu.getTuneRevision();
+
+    return { tuneNumber, tuneIdent, checksumFixer };
+  }, false);
+  const rpmLimit = await attempt(() => ecu.getRPMLimit(), true);
+  const fuelMap = await attempt(() => ecu.getCurrentFuelMap(), true);
+  const faultCodes = await attempt(
+    async (): Promise<Record<string, boolean>> => ({
+      ...(await ecu.getFaultCodes()),
+    }),
+    false,
+  );
+
+  return { tune, rpmLimit, fuelMap, faultCodes };
+};
+
+/** An identity none of which was read, each value failed for `message`. */
+export function identityNotRead(message: string, at: number): EcuIdentity {
+  const failed = { status: 'failed', readAt: at, message } as const;
+
+  return {
+    tune: failed,
+    rpmLimit: failed,
+    fuelMap: failed,
+    faultCodes: failed,
+  };
+}

@@ -321,7 +321,14 @@ test.describe('Recorded sessions', () => {
 
     const path = await file.path();
     const { readFile } = await import('node:fs/promises');
-    const [header, first] = (await readFile(path, 'utf8')).split('\r\n');
+    const [identity = '', samples = ''] = (await readFile(path, 'utf8')).split(
+      '\r\n\r\n',
+    );
+    const [header, first] = samples.split('\r\n');
+
+    expect(identity).toMatch(
+      /^ECU at start of recording,Value,Read at \(UTC\)\r\nSource,Demo ECU \(simulated\),\r\nTune number,1234,/,
+    );
 
     expect(header).toMatch(
       /^Time since start \(s\),Time \(UTC\),Engine speed \(rpm\),/,

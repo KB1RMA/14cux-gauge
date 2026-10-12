@@ -15,6 +15,7 @@ import { openStorage } from './storage/openStorage';
 import { MemorySessionStore } from './storage/sessionStore';
 import { expectNoAxeViolations, readingFor } from './test-support/a11y';
 import { notification } from './test-support/notifications';
+import { IDENTITY } from './test-support/identity';
 import { fakeUsageCounter } from './test-support/usageCounter';
 import { snapshotAt } from './test-support/snapshots';
 import { storageWith } from './test-support/storage';
@@ -158,6 +159,7 @@ describe('Recording and browsing sessions', () => {
       name: 'Idle wobble',
       source: 'demo',
       startedAt: START,
+      identity: null,
     });
 
     await store.append(id, [
@@ -252,6 +254,138 @@ describe('Recording and browsing sessions', () => {
     expect(await store.list()).toEqual([]);
   });
 
+  it('shows the ECU’s identity and fault codes from the start of a session', async () => {
+    const user = userEvent.setup();
+    const store = new MemorySessionStore();
+    const { id } = await store.create({
+      name: 'Misfire hunt',
+      source: 'serial',
+      startedAt: START,
+      identity: {
+        ...IDENTITY,
+        fuelMap: { status: 'invalid', readAt: START },
+        rpmLimit: {
+          status: 'failed',
+          readAt: START,
+          message: 'The ECU stopped responding.',
+        },
+      },
+    });
+
+    await store.finish(id, START + 1000);
+
+    const { container } = render(
+      <TestApp
+        platform={browserPlatform({
+          storage: { open: storageWith({ sessions: store }) },
+        })}
+      />,
+    );
+
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: 'Misfire hunt' }));
+
+    const identity = await screen.findByRole('region', {
+      name: 'ECU at the start',
+    });
+
+    expect(readingFor('Tune number')).toHaveTextContent(/^3360 read /);
+    expect(readingFor('Tune ident')).toHaveTextContent(/^0x0021 read /);
+    expect(readingFor('Checksum fixer')).toHaveTextContent(/^0x5C read /);
+    expect(readingFor('Rev limit')).toHaveTextContent(
+      /^Not read: The ECU stopped responding\. read /,
+    );
+    expect(readingFor('Fuel map')).toHaveTextContent(/^Not valid read /);
+    expect(
+      within(identity)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      '29 · ROM checksum failure romChecksumFailure',
+      '14 · Coolant temperature sensor coolantTempSensor',
+    ]);
+    expect(within(identity).queryByText(/Simulated/)).not.toBeInTheDocument();
+    await expectNoAxeViolations(container);
+  });
+
+  it('marks a demo session’s identity as simulated', async () => {
+    const user = userEvent.setup();
+    const store = new MemorySessionStore();
+    const { id } = await store.create({
+      name: 'Demo drive',
+      source: 'demo',
+      startedAt: START,
+      identity: {
+        ...IDENTITY,
+        faultCodes: { status: 'read', readAt: START, value: {} },
+      },
+    });
+
+    await store.finish(id, START + 1000);
+    render(
+      <TestApp
+        platform={browserPlatform({
+          storage: { open: storageWith({ sessions: store }) },
+        })}
+      />,
+    );
+
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: 'Demo drive' }));
+
+    const identity = await screen.findByRole('region', {
+      name: 'ECU at the start',
+    });
+
+    expect(identity).toHaveTextContent(
+      'Simulated: recorded from the demo ECU, not a real one.',
+    );
+    expect(identity).toHaveTextContent('No fault codes stored.');
+  });
+
+  it('opens a session recorded before identities were kept, and says so', async () => {
+    const user = userEvent.setup();
+    const factory = new IDBFactory();
+
+    await plantRecords(factory, {
+      sessions: [
+        {
+          id: 'old',
+          name: 'Old drive',
+          source: 'serial',
+          startedAt: START,
+          endedAt: START + 60_000,
+          sampleCount: 1,
+          notes: '',
+          formatVersion: 3,
+        },
+      ],
+      chunks: [{ sessionId: 'old', samples: [snapshotAt(START)] }],
+    });
+
+    const { container } = render(
+      <TestApp
+        platform={browserPlatform({
+          storage: { open: () => openStorage(factory) },
+        })}
+      />,
+    );
+
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: 'Old drive' }));
+
+    const identity = await screen.findByRole('region', {
+      name: 'ECU at the start',
+    });
+
+    expect(identity).toHaveTextContent(
+      'Not recorded. This session was recorded before the app kept the ECU’s identity and fault codes.',
+    );
+    expect(() => readingFor('Tune number')).toThrow();
+    expect(await screen.findByRole('button', { name: 'Play' })).toBeVisible();
+    await expectNoAxeViolations(container);
+  });
+
   it('lists and marks the writes to the ECU made while recording', async () => {
     const user = userEvent.setup();
     const store = new MemorySessionStore();
@@ -259,6 +393,7 @@ describe('Recording and browsing sessions', () => {
       name: 'Pump check',
       source: 'serial',
       startedAt: START,
+      identity: null,
     });
 
     await store.append(id, [
@@ -476,7 +611,22 @@ describe('Recording and browsing sessions', () => {
 
     const text = await blobs[0]?.text();
 
-    expect(text?.split('\r\n')[0]).toMatch(
+    const [identity, rows] = text?.split('\r\n\r\n') ?? [];
+
+    // The demo ECU's synthetic tune, rev limit, fuel map and stored fault.
+    expect(
+      identity?.split('\r\n').map((line) => line.replace(/,[^,]*$/, '')),
+    ).toEqual([
+      'ECU at start of recording,Value',
+      'Source,Demo ECU (simulated)',
+      'Tune number,1234',
+      'Tune ident,0xDE70',
+      'Checksum fixer,0xA5',
+      'Rev limit (rpm),5000',
+      'Fuel map,5',
+      'Fault code,88 Purge valve leak (purgeValveLeak)',
+    ]);
+    expect(rows?.split('\r\n')[0]).toMatch(
       /^Time since start \(s\),Time \(UTC\),Engine speed \(rpm\),/,
     );
     vi.restoreAllMocks();
@@ -628,6 +778,7 @@ describe('Recording and browsing sessions', () => {
       name: 'Empty',
       source: 'serial',
       startedAt: Date.UTC(2026, 9, 5),
+      identity: null,
     });
 
     render(
@@ -740,6 +891,7 @@ describe('Recording and browsing sessions', () => {
       name: 'Slow to go',
       source: 'demo',
       startedAt: START,
+      identity: null,
     });
     render(
       <TestApp
@@ -862,7 +1014,7 @@ describe('Recording and browsing sessions', () => {
     };
 
     await plantRecords(factory, {
-      sessions: [good, { ...good, id: 'newer', formatVersion: 4 }],
+      sessions: [good, { ...good, id: 'newer', formatVersion: 5 }],
     });
 
     const { container } = render(
@@ -880,7 +1032,7 @@ describe('Recording and browsing sessions', () => {
     ).closest('li');
 
     expect(row).toHaveTextContent(
-      'format 4 is from a newer version of the app. Its ID is newer.',
+      'format 5 is from a newer version of the app. Its ID is newer.',
     );
     expect(screen.getByRole('link', { name: 'Cold start' })).toBeVisible();
     await expectNoAxeViolations(container);
@@ -933,6 +1085,7 @@ describe('Recording and browsing sessions', () => {
       name: 'From elsewhere',
       source: 'serial',
       startedAt: Date.UTC(2026, 9, 5),
+      identity: null,
     });
 
     expect(
