@@ -44,8 +44,56 @@ export interface TuneInfo {
   rpmLimit: number | null | undefined;
 }
 
+/** What came of a read, with the time it finished. */
+type Outcome<T> = { readAt: number } & (
+  { ok: true; value: T } | { ok: false; error: unknown }
+);
+
+async function settle<T>(read: () => Promise<T>): Promise<Outcome<T>> {
+  try {
+    const value = await read();
+
+    return { ok: true, readAt: Date.now(), value };
+  } catch (error) {
+    return { ok: false, readAt: Date.now(), error };
+  }
+}
+
+/**
+ * The tune revision read on each connection, which has its own `Ecu`. It is
+ * in the ROM, so it cannot change while connected: the ECU info and every
+ * recording on the connection share one read, and keep when it was made. A
+ * failed read is not kept, so the next asks the ECU again.
+ */
+const tuneRevisions = new WeakMap<Ecu, Promise<Outcome<TuneRevision>>>();
+
+function readTuneRevision(ecu: Ecu): Promise<Outcome<TuneRevision>> {
+  const kept = tuneRevisions.get(ecu);
+
+  if (kept) {
+    return kept;
+  }
+
+  const reading = settle(() => ecu.getTuneRevision());
+
+  tuneRevisions.set(ecu, reading);
+  void reading.then((outcome) => {
+    if (!outcome.ok && tuneRevisions.get(ecu) === reading) {
+      tuneRevisions.delete(ecu);
+    }
+  });
+
+  return reading;
+}
+
 export const readTuneInfo: EcuRead<TuneInfo> = async (ecu) => {
-  const revision = await ecu.getTuneRevision();
+  const tune = await readTuneRevision(ecu);
+
+  if (!tune.ok) {
+    throw tune.error;
+  }
+
+  const revision = tune.value;
   const rpmLimit = await ecu.getRPMLimit().catch((e: unknown) => {
     if (e instanceof InvalidReadingError) {
       return null;
@@ -80,53 +128,65 @@ export const readFuelMapInUse: EcuRead<LoadedMap> = async (ecu) => {
 };
 
 /**
- * Runs `read` and keeps what came of it, with the time it finished: the
- * value, `invalid` if `allowInvalid` and the ECU gave a value its firmware
- * cannot produce, or why it failed.
+ * What came of a read, as an identity keeps it: the value, `invalid` if
+ * `allowInvalid` and the ECU gave a value its firmware cannot produce, or why
+ * it failed.
  */
-async function attempt<T>(
-  read: () => Promise<T>,
+function identityRead<T>(
+  outcome: Outcome<T>,
   allowInvalid: true,
-): Promise<IdentityRead<T>>;
-async function attempt<T>(
-  read: () => Promise<T>,
+): IdentityRead<T>;
+function identityRead<T>(
+  outcome: Outcome<T>,
   allowInvalid: false,
-): Promise<Exclude<IdentityRead<T>, { status: 'invalid' }>>;
-async function attempt<T>(
-  read: () => Promise<T>,
+): Exclude<IdentityRead<T>, { status: 'invalid' }>;
+function identityRead<T>(
+  outcome: Outcome<T>,
   allowInvalid: boolean,
-): Promise<IdentityRead<T>> {
-  try {
-    const value = await read();
+): IdentityRead<T> {
+  const { readAt } = outcome;
 
-    return { status: 'read', readAt: Date.now(), value };
-  } catch (e) {
-    if (allowInvalid && e instanceof InvalidReadingError) {
-      return { status: 'invalid', readAt: Date.now() };
-    }
-
-    return { status: 'failed', readAt: Date.now(), message: describeError(e) };
+  if (outcome.ok) {
+    return { status: 'read', readAt, value: outcome.value };
   }
+
+  if (allowInvalid && outcome.error instanceof InvalidReadingError) {
+    return { status: 'invalid', readAt };
+  }
+
+  return { status: 'failed', readAt, message: describeError(outcome.error) };
 }
 
 /**
  * What a recording keeps of the ECU as it starts: its tune, rev limit, fuel
- * map in use and stored fault codes, each as the library returned it. Never
- * throws; a value that could not be read is kept as failed, with why.
+ * map in use and stored fault codes, each as the library returned it. The
+ * tune is the one read on this connection (see {@link tuneRevisions}), with
+ * when it was read; the rest are read now, as they are kept in the ECU's
+ * RAM. Never throws; a value that could not be read is kept as failed, with
+ * why.
  */
 export const readIdentity: EcuRead<EcuIdentity> = async (ecu) => {
-  const tune = await attempt(async () => {
-    const { tuneNumber, tuneIdent, checksumFixer } =
-      await ecu.getTuneRevision();
-
-    return { tuneNumber, tuneIdent, checksumFixer };
-  }, false);
-  const rpmLimit = await attempt(() => ecu.getRPMLimit(), true);
-  const fuelMap = await attempt(() => ecu.getCurrentFuelMap(), true);
-  const faultCodes = await attempt(
-    async (): Promise<Record<string, boolean>> => ({
+  const revision = identityRead(await readTuneRevision(ecu), false);
+  const tune =
+    revision.status === 'read'
+      ? {
+          ...revision,
+          value: {
+            tuneNumber: revision.value.tuneNumber,
+            tuneIdent: revision.value.tuneIdent,
+            checksumFixer: revision.value.checksumFixer,
+          },
+        }
+      : revision;
+  const rpmLimit = identityRead(await settle(() => ecu.getRPMLimit()), true);
+  const fuelMap = identityRead(
+    await settle(() => ecu.getCurrentFuelMap()),
+    true,
+  );
+  const faultCodes = identityRead(
+    await settle(async (): Promise<Record<string, boolean>> => ({
       ...(await ecu.getFaultCodes()),
-    }),
+    })),
     false,
   );
 

@@ -119,14 +119,13 @@ export class Recorder {
 
     try {
       const startedAt = Date.now();
-      // Read once per recording, as it starts, so every recording says what
-      // it was taken from.
+      // Read as each recording starts, so every recording says what it was
+      // taken from. The tune is read once per connection (see
+      // `readIdentity`), so most recordings start after only the reads of
+      // the ECU's RAM.
       const identity =
         (await this.session.readNow(readIdentity)) ??
-        identityNotRead(
-          'Not read: the ECU was busy or no longer connected.',
-          Date.now(),
-        );
+        identityNotRead('The ECU was busy or no longer connected.', Date.now());
       const recorder = await SessionRecorder.start(
         store,
         {

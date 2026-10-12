@@ -40,7 +40,8 @@ but never the ones above it. From top to bottom:
      confirm first.
    - **Recorder** saves readings into a session while you record. When a
      recording starts, it first asks EcuSession to read which ECU it is:
-     the tune, rev limit, fuel map and stored fault codes.
+     the tune, rev limit, fuel map and stored fault codes. The tune is in
+     the ROM and cannot change, so it is read only once per connection.
    - **RomReader** copies the ECU's program, called the ROM image, so you can
      keep it.
    - **StorageService** opens the place where sessions and ROM images are kept.
@@ -97,9 +98,10 @@ These are kept in the browser's database:
 
 - **Sessions.** Each one has a name, notes, start and end times, the number of
   samples, and whether it came from a real ECU or the demo. It also keeps
-  which ECU it came from, read once when recording starts: the tune number,
-  ident, checksum fixer, rev limit, fuel map and the fault codes that were
-  set, each with the time it was read. A value that could not be read says
+  which ECU it came from: the tune number, ident, checksum fixer, rev limit,
+  fuel map and the fault codes that were set, each with the time it was
+  read. The tune is read once per connection; the rest are read when
+  recording starts. A value that could not be read says
   why. Sessions saved before this was kept say "Not recorded". Its snapshots
   are saved beside it in batches.
 - **Writes.** Each command sent to the ECU during a recording, with when it
@@ -303,7 +305,12 @@ sequenceDiagram
 As a recording starts, the `Recorder` asks `EcuSession.readNow` to run
 `readIdentity` (in `ecu/reads.ts`) beside polling, and stores the result in
 the session's summary (format 4). `readNow` reads nothing while a ROM read
-has the link to itself, and the identity then says it was not read.
+has the link to itself, and the identity then says it was not read. The tune
+revision is in the ROM, so `reads.ts` keeps one read of it for each
+connection's `Ecu`, shared by the ECU info and every recording on that
+connection, with the time it was read; a failed read is not kept. The rev
+limit, fuel map and fault codes are in the ECU's RAM and are read as each
+recording starts.
 
 ECU writes (clearing faults, actuator tests) go the other way: a view behind
 `ConfirmDialog` calls `useEcuWrite`, which asks `EcuWrites`; `EcuWrites` takes

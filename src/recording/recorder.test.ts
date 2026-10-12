@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
+import {
+  MemoryOffset,
+  type Ecu,
+  SimulatedTransport,
+  TimeoutError,
+} from '@kb1rma/libcomm14cux-ts';
 import { buildSyntheticRom } from '../demo/syntheticRom';
+import { readTuneInfo } from '../ecu/reads';
+import type { EcuSession } from '../ecu/session';
+import { ROM_READ_HOLDER } from '../roms/romImage';
 import { MemoryRomStore } from '../storage/romStore';
 import { MemorySessionStore } from '../storage/sessionStore';
 import { connectedSession } from '../test-support/ecuSession';
@@ -18,6 +26,18 @@ async function recorderOn(transport = new SimulatedTransport()) {
   );
 
   return { ...services, sessions, transport };
+}
+
+/** The ECU `session` is connected to. */
+function connectedEcu(session: EcuSession): Ecu {
+  const { link } = session.getSnapshot();
+  const ecu = link && session.ecuFor(link);
+
+  if (!ecu) {
+    throw new Error('Not connected');
+  }
+
+  return ecu;
 }
 
 describe('Recorder', () => {
@@ -131,6 +151,79 @@ describe('Recorder', () => {
     expect(identity?.rpmLimit.status).toBe('invalid');
     expect(identity?.fuelMap.status).toBe('invalid');
     expect(identity?.tune.status).toBe('read');
+  });
+
+  it('keeps the tune read on the connection, and reads the rest as it starts', async () => {
+    const transport = new SimulatedTransport();
+    const connectedAt = Date.UTC(2026, 9, 5, 14, 0, 0);
+    const startAt = connectedAt + 60_000;
+
+    transport.loadRom(buildSyntheticRom());
+
+    const { recorder, session, sessions } = await recorderOn(transport);
+    const getTuneRevision = vi.spyOn(connectedEcu(session), 'getTuneRevision');
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(connectedAt);
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+
+    // As the ECU info does when the ECU connects.
+    await session.readNow(readTuneInfo);
+    vi.setSystemTime(startAt);
+    await recorder.start();
+    await recorder.stop();
+    await recorder.start();
+    await recorder.stop();
+
+    expect(getTuneRevision).toHaveBeenCalledTimes(1);
+
+    for (const { identity } of await sessions.list()) {
+      expect(identity).toMatchObject({
+        tune: { status: 'read', readAt: connectedAt },
+        rpmLimit: { readAt: startAt },
+        fuelMap: { readAt: startAt },
+        faultCodes: { readAt: startAt },
+      });
+    }
+  });
+
+  it('reads the tune again when it could not be read before', async () => {
+    const { recorder, session, sessions } = await recorderOn();
+
+    vi.spyOn(connectedEcu(session), 'getTuneRevision').mockRejectedValueOnce(
+      new TimeoutError('The ECU stopped responding.'),
+    );
+
+    await recorder.start();
+    await recorder.stop();
+    await recorder.start();
+    await recorder.stop();
+
+    const tunes = (await sessions.list()).map(({ identity }) => identity?.tune);
+
+    expect(tunes.map((tune) => tune?.status).sort()).toEqual([
+      'failed',
+      'read',
+    ]);
+  });
+
+  it('says once why nothing was read while a ROM read has the link', async () => {
+    const { recorder, session, sessions } = await recorderOn();
+    const lease = session.acquire(ROM_READ_HOLDER);
+
+    await lease?.ready;
+    await recorder.start();
+    lease?.release();
+    await recorder.stop();
+
+    const identity = (await sessions.list())[0]?.identity;
+
+    expect(identity?.tune).toMatchObject({
+      status: 'failed',
+      message: 'The ECU was busy or no longer connected.',
+    });
   });
 
   it('is interrupted without offering a name', async () => {
