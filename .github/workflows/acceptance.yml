@@ -67,18 +67,20 @@ jobs:
         env:
           # Firefox will not start as root with another user's home.
           HOME: /root
-          PLAYWRIGHT_BLOB_OUTPUT_DIR: test-reports/blob
+          PLAYWRIGHT_BLOB_OUTPUT_DIR: test-reports/e2e/blob
         run: >
           npm run test:e2e --
           --project=${{ matrix.browser }}
           --shard=${{ matrix.shard }}/3
           --reporter=blob
+      # With test-reports/e2e/results, which holds each failure's screenshot,
+      # trace and error-context.md.
       - name: Upload the blob report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: e2e-blob-${{ matrix.browser }}-${{ matrix.shard }}
-          path: ${{ env.APP_DIR }}/test-reports/blob
+          path: ${{ env.APP_DIR }}/test-reports/e2e
           if-no-files-found: error
           retention-days: 1
 
@@ -111,15 +113,17 @@ jobs:
         with:
           pattern: e2e-blob-${{ matrix.browser }}-*
           merge-multiple: true
-          path: ${{ env.APP_DIR }}/test-reports/blob
+          path: ${{ env.APP_DIR }}/test-reports/e2e
       # Writes the reporters playwright.config.ts lists, as one run would.
       - name: Merge the reports
-        run: npx playwright merge-reports --config playwright.config.ts test-reports/blob
+        run: npx playwright merge-reports --config playwright.config.ts test-reports/e2e/blob
       - name: Upload the report
         uses: actions/upload-artifact@v7
         with:
           name: e2e-report-${{ matrix.browser }}
-          path: ${{ env.APP_DIR }}/test-reports/e2e
+          path: |
+            ${{ env.APP_DIR }}/test-reports/e2e
+            !${{ env.APP_DIR }}/test-reports/e2e/blob
           if-no-files-found: error
           retention-days: 14
       # Alongside the unit test results validate.yml uploads, flagged by
