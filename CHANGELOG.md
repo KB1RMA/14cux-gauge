@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.11.0...v0.12.0) (2026-10-25)
+
+
+### Features
+
+* help search engines find and describe the app ([#119](https://github.com/KB1RMA/14cux-gauge/issues/119)) ([00c98c3](https://github.com/KB1RMA/14cux-gauge/commit/00c98c396c5f77f167366319361efbfbbbe2f461))
+
 ## [0.11.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.10.0...v0.11.0) (2026-10-12)
 
 
