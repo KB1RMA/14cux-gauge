@@ -17,7 +17,9 @@ test.describe('Release build', () => {
 
     await page.goto('./');
 
-    await expect(page).toHaveTitle('14CUX Gauge');
+    await expect(page).toHaveTitle(
+      '14CUX Gauge: 14CUX ECU diagnostics in the browser',
+    );
     await expect(
       page.getByRole('heading', { level: 1, name: '14CUX Gauge' }),
     ).toBeVisible();

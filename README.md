@@ -2,6 +2,8 @@
 
 A browser dashboard for the Lucas 14CUX engine ECU: live engine data, stored fault codes and ECU information over a USB serial cable, using the Web Serial API. It is built on the [comm14cux-ts](https://github.com/KB1RMA/comm14cux-ts) library.
 
+**Open the app: [kb1rma.github.io/14cux-gauge](https://kb1rma.github.io/14cux-gauge/)** — it runs in Chrome, Edge or Opera on a desktop, with nothing to install. Demo mode works without a car.
+
 > **Status:** pre-release MVP.
 
 ## Purpose
