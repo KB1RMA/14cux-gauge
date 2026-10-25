@@ -4,6 +4,11 @@ run-name: Acceptance
 # Runs the Playwright acceptance suite against an already-built `dist/`,
 # uploaded by the calling workflow as the artifact named in `dist-artifact`.
 # It never rebuilds the app, so what passes here is byte-for-byte what ships.
+#
+# Each browser's run is split into shards that run side by side. Every shard
+# uploads a blob report, and a report job per browser merges them into the
+# same html, JUnit and JSON reports a single run writes, in the
+# e2e-report-<browser> artifact that release.yml reads for its attestation.
 
 on:
   workflow_call:
@@ -24,13 +29,22 @@ env:
 
 jobs:
   e2e:
-    name: E2E (${{ matrix.browser }})
+    name: E2E (${{ matrix.browser }}, ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
+    # Playwright's own image comes with every browser and the system packages
+    # they need. Installing them on the runner fetches up to 117 MB from the
+    # Ubuntu mirror, which can stall for minutes.
+    # Keep its version the same as @playwright/test's in package-lock.json;
+    # Playwright stops with "please update docker image" if they differ.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
+        # Keep the total in the job name and the --shard flag below in step.
+        shard: [1, 2, 3]
     defaults:
       run:
         working-directory: ${{ env.APP_DIR }}
@@ -49,21 +63,72 @@ jobs:
         with:
           name: ${{ inputs.dist-artifact }}
           path: ${{ env.APP_DIR }}/dist
-      - name: Install ${{ matrix.browser }}
-        run: npx playwright install --with-deps ${{ matrix.browser }}
       - name: Run the acceptance suite
-        run: npm run test:e2e -- --project=${{ matrix.browser }}
-      - name: Upload the report
+        env:
+          # Firefox will not start as root with another user's home.
+          HOME: /root
+          PLAYWRIGHT_BLOB_OUTPUT_DIR: test-reports/e2e/blob
+        run: >
+          npm run test:e2e --
+          --project=${{ matrix.browser }}
+          --shard=${{ matrix.shard }}/3
+          --reporter=blob
+      # With test-reports/e2e/results, which holds each failure's screenshot,
+      # trace and error-context.md.
+      - name: Upload the blob report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-report-${{ matrix.browser }}
+          name: e2e-blob-${{ matrix.browser }}-${{ matrix.shard }}
           path: ${{ env.APP_DIR }}/test-reports/e2e
+          if-no-files-found: error
+          retention-days: 1
+
+  report:
+    name: E2E report (${{ matrix.browser }})
+    needs: e2e
+    # Merges the reports of failed runs too, so their traces can be read.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    defaults:
+      run:
+        working-directory: ${{ env.APP_DIR }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: ${{ env.APP_DIR }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ env.APP_DIR }}/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: ${{ env.APP_DIR }}/package-lock.json
+      - run: npm ci
+      - name: Download the blob reports
+        uses: actions/download-artifact@v8
+        with:
+          pattern: e2e-blob-${{ matrix.browser }}-*
+          merge-multiple: true
+          path: ${{ env.APP_DIR }}/test-reports/e2e
+      # Writes the reporters playwright.config.ts lists, as one run would.
+      - name: Merge the reports
+        run: npx playwright merge-reports --config playwright.config.ts test-reports/e2e/blob
+      - name: Upload the report
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report-${{ matrix.browser }}
+          path: |
+            ${{ env.APP_DIR }}/test-reports/e2e
+            !${{ env.APP_DIR }}/test-reports/e2e/blob
+          if-no-files-found: error
           retention-days: 14
       # Alongside the unit test results validate.yml uploads, flagged by
       # browser so Codecov can tell the runs apart.
       - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
