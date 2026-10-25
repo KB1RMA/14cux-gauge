@@ -29,7 +29,7 @@ env:
 
 jobs:
   e2e:
-    name: E2E (${{ matrix.browser }}, ${{ matrix.shard }}/2)
+    name: E2E (${{ matrix.browser }}, ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -37,7 +37,7 @@ jobs:
       matrix:
         browser: [chromium, firefox, webkit]
         # Keep the total in the job name and the --shard flag below in step.
-        shard: [1, 2]
+        shard: [1, 2, 3]
     defaults:
       run:
         working-directory: ${{ env.APP_DIR }}
@@ -56,32 +56,15 @@ jobs:
         with:
           name: ${{ inputs.dist-artifact }}
           path: ${{ env.APP_DIR }}/dist
-      # The browsers are cached for each Playwright release and runner image;
-      # the system packages they need are installed every time.
-      - name: Find the Playwright release
-        id: playwright
-        run: |
-          echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-          echo "image=${ImageOS}" >> "$GITHUB_OUTPUT"
-      - name: Restore ${{ matrix.browser }}
-        id: browsers
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ steps.playwright.outputs.image }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}-${{ matrix.browser }}
       - name: Install ${{ matrix.browser }}
-        if: ${{ steps.browsers.outputs.cache-hit != 'true' }}
         run: npx playwright install --with-deps ${{ matrix.browser }}
-      - name: Install ${{ matrix.browser }}'s system packages
-        if: ${{ steps.browsers.outputs.cache-hit == 'true' }}
-        run: npx playwright install-deps ${{ matrix.browser }}
       - name: Run the acceptance suite
         env:
           PLAYWRIGHT_BLOB_OUTPUT_DIR: test-reports/blob
         run: >
           npm run test:e2e --
           --project=${{ matrix.browser }}
-          --shard=${{ matrix.shard }}/2
+          --shard=${{ matrix.shard }}/3
           --reporter=blob
       - name: Upload the blob report
         if: ${{ !cancelled() }}
