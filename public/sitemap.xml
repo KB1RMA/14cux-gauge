@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only
+     Copyright (C) 2026 14cux-gauge contributors
+     The app is one page; its views are #hash routes, which crawlers ignore.
+     Submit this in Google Search Console and Bing Webmaster Tools. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://kb1rma.github.io/14cux-gauge/</loc>
+  </url>
+</urlset>

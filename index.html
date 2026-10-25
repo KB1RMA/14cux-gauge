@@ -9,9 +9,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Live data and fault codes for the Lucas 14CUX engine ECU, in the browser."
+      content="Free diagnostic software for the Lucas 14CUX engine ECU (Land Rover V8, 1990–1995), in the browser: live engine data, graphs, recordings, fault codes, fuel map and ROM dumps over a USB serial cable. Nothing to install."
     />
-    <title>14CUX Gauge</title>
+    <title>14CUX Gauge: 14CUX ECU diagnostics in the browser</title>
+    <!-- Search engines and link previews. Absolute URLs, as they require. -->
+    <link rel="canonical" href="https://kb1rma.github.io/14cux-gauge/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="14CUX Gauge" />
+    <meta
+      property="og:title"
+      content="14CUX Gauge: 14CUX ECU diagnostics in the browser"
+    />
+    <meta
+      property="og:description"
+      content="Live engine data, graphs, recordings, fault codes and ROM dumps for the Lucas 14CUX engine ECU, over a USB serial cable. Nothing to install."
+    />
+    <meta property="og:url" content="https://kb1rma.github.io/14cux-gauge/" />
+    <meta
+      property="og:image"
+      content="https://kb1rma.github.io/14cux-gauge/icon-512.png"
+    />
+    <meta name="twitter:card" content="summary" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "14CUX Gauge",
+        "url": "https://kb1rma.github.io/14cux-gauge/",
+        "description": "Browser-based diagnostic software for the Lucas 14CUX engine ECU fitted to V8 Land Rover vehicles from 1990 to 1995: live engine data, graphs, recorded sessions, fault codes, the fuel map and ROM image dumps, over a USB serial cable using Web Serial.",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Any (Chrome, Edge or Opera with Web Serial)",
+        "browserRequirements": "Requires JavaScript and the Web Serial API",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+        "codeRepository": "https://github.com/KB1RMA/14cux-gauge",
+        "image": "https://kb1rma.github.io/14cux-gauge/icon-512.png"
+      }
+    </script>
     <style>
       /* SPDX-License-Identifier: GPL-3.0-only
          Copyright (C) 2026 14cux-gauge contributors
@@ -42,6 +77,29 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- What the app is, for browsers and crawlers that do not run scripts.
+         Outside #root, which must stay empty for the startup check below. -->
+    <noscript>
+      <main>
+        <h1>14CUX Gauge</h1>
+        <p>
+          14CUX Gauge is free diagnostic software for the Lucas 14CUX engine
+          ECU, fitted to V8-engined Land Rover vehicles from 1990 to 1995. It
+          runs in the browser and connects over a USB serial cable using Web
+          Serial: live engine data, graphs, recorded sessions, stored fault
+          codes, the fuel map, the fuel pump test and ROM image dumps. A demo
+          mode simulates an ECU so you can try it without a car.
+        </p>
+        <p>14CUX Gauge needs JavaScript. Turn it on and reload the page.</p>
+        <p>
+          <a href="https://github.com/KB1RMA/14cux-gauge"
+            >Source code and documentation</a
+          >
+          (GNU GPL v3). Not affiliated with or endorsed by the author of
+          libcomm14cux or RoverGauge.
+        </p>
+      </main>
+    </noscript>
     <main id="startup-error" aria-labelledby="startup-error-heading" hidden>
       <h1 id="startup-error-heading" tabindex="-1">
         14CUX Gauge could not start
