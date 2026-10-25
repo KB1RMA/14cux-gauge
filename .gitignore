@@ -10,3 +10,4 @@ npm-debug.log*
 !.env.example
 # Claude Code worktrees
 /.claude/worktrees/
+/.vitest

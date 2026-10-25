@@ -56,8 +56,55 @@ jobs:
       - run: npm ci
       - run: npm run type:check
 
+  # The unit tests run in shards on parallel runners, as one runner's few
+  # cores are what limits them. Each shard leaves a blob report with its
+  # results and coverage, and the Test job merges them.
+  test-shard:
+    name: Test shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    defaults:
+      run:
+        working-directory: ${{ env.APP_DIR }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: ${{ env.APP_DIR }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ env.APP_DIR }}/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: ${{ env.APP_DIR }}/package-lock.json
+      - run: npm ci
+      # A shard covers only part of the code, so VITEST_SHARD leaves the
+      # coverage thresholds to the Test job.
+      - run: >
+          npx vitest --run --coverage --coverage.reporter=text-summary
+          --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+          --reporter=default --reporter=github-actions --reporter=blob
+        env:
+          VITEST_SHARD: ${{ matrix.shard }}
+      - name: Upload the blob report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: vitest-blob-${{ matrix.shard }}
+          path: ${{ env.APP_DIR }}/.vitest/blob
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  # Branch protection requires this job by name. It reports the merged
+  # results, checks the coverage thresholds over the whole run and fails if
+  # any shard did.
   test:
     name: Test
+    needs: test-shard
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -73,7 +120,14 @@ jobs:
           cache: 'npm'
           cache-dependency-path: ${{ env.APP_DIR }}/package-lock.json
       - run: npm ci
-      - run: npm run test:coverage
+      - name: Download the blob reports
+        uses: actions/download-artifact@v8
+        with:
+          pattern: vitest-blob-*
+          path: ${{ env.APP_DIR }}/.vitest/blob
+          merge-multiple: true
+      # The reporters, including junit, come from vite.config.ts.
+      - run: npx vitest --merge-reports --coverage
       # The app is checked out into a subdirectory, so the uploader runs there
       # to find the reports and map their paths onto the repository.
       - name: Upload coverage reports to Codecov
@@ -89,6 +143,12 @@ jobs:
           working-directory: ${{ env.APP_DIR }}
           report_type: test_results
           files: ./test-reports/junit.xml
+      # A shard that crashed or timed out may have left no report to merge.
+      - name: Check every shard passed
+        if: ${{ !cancelled() && needs.test-shard.result != 'success' }}
+        run: |
+          echo "::error::A test shard ${{ needs.test-shard.result }}."
+          exit 1
 
   build:
     name: Build
