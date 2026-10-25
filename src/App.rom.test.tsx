@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { IDBFactory } from 'fake-indexeddb';
 import { TestApp } from './test-support/TestApp';
@@ -11,9 +11,10 @@ import { openStorage } from './storage/openStorage';
 import type { UnreadableRecord } from './model/record';
 import type { RomSummary } from './model/rom';
 import type { FilePlatform } from './platform/platform';
-import { MemoryRomStore, type RomStore } from './storage/romStore';
+import { MemoryRomStore } from './storage/romStore';
 import { expectNoAxeViolations } from './test-support/a11y';
-import { storageWith } from './test-support/storage';
+import { connectDemo } from './test-support/demo';
+import { captureDownloads, renderApp } from './test-support/romApp';
 import { plantRecords } from './test-support/storedRecords';
 import { fakeUsageCounter } from './test-support/usageCounter';
 
@@ -35,27 +36,6 @@ vi.mock('./demo/demoEngine', async (importOriginal) => {
 
 const DEMO_FILE = '14cux-demo-synthetic-tune-R1234-ident-0xDE70.bin';
 
-/** Records what the page offers for download. */
-function captureDownloads() {
-  const blobs: Blob[] = [];
-  const names: string[] = [];
-
-  URL.createObjectURL = (blob: Blob | MediaSource) => {
-    blobs.push(blob as Blob);
-
-    return 'blob:rom';
-  };
-
-  URL.revokeObjectURL = () => undefined;
-  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
-    this: HTMLAnchorElement,
-  ) {
-    names.push(this.download);
-  });
-
-  return { blobs, names };
-}
-
 function firstBlob({ blobs }: { blobs: Blob[] }): Blob {
   const [blob] = blobs;
 
@@ -64,27 +44,6 @@ function firstBlob({ blobs }: { blobs: Blob[] }): Blob {
   }
 
   return blob;
-}
-
-async function connectDemo(user: UserEvent) {
-  await user.click(screen.getByRole('button', { name: 'Demo mode' }));
-  await screen.findByRole('heading', { name: 'Live data' });
-}
-
-function renderApp(
-  store: RomStore = new MemoryRomStore(),
-  files?: FilePlatform,
-) {
-  return render(
-    <TestApp
-      pollIntervalMs={{ demo: 10 }}
-      usageCounter={fakeUsageCounter()}
-      platform={browserPlatform({
-        storage: { open: storageWith({ roms: store }) },
-        ...(files ? { files } : {}),
-      })}
-    />,
-  );
 }
 
 /** Reads the demo ECU's ROM image, and waits for the read to end. */
@@ -284,123 +243,6 @@ describe('Saving the ROM image', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       `${DEMO_FILE} could not be saved: Error: Disk full. Nothing was saved.`,
     );
-  });
-
-  it('does not read anything if the user backs out of the confirmation', async () => {
-    const user = userEvent.setup();
-    const downloads = captureDownloads();
-    const store = new MemoryRomStore();
-
-    renderApp(store);
-    await connectDemo(user);
-    await user.click(screen.getByRole('button', { name: 'Save ROM image' }));
-    await user.click(await screen.findByRole('button', { name: 'Cancel' }));
-
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    expect(downloads.names).toEqual([]);
-    expect(await store.list()).toEqual([]);
-    expect(screen.getByRole('status')).toHaveTextContent('Demo ECU · Polling');
-  });
-
-  it('cannot be read while a write to the ECU runs, and says why', async () => {
-    const user = userEvent.setup();
-    const downloads = captureDownloads();
-
-    renderApp();
-    await connectDemo(user);
-
-    const pump = within(screen.getByRole('region', { name: 'Fuel pump test' }));
-
-    await user.click(
-      pump.getByRole('button', { name: 'Run pump (continuous)' }),
-    );
-    await user.click(
-      within(screen.getByRole('alertdialog')).getByRole('button', {
-        name: 'Run fuel pump',
-      }),
-    );
-
-    const save = within(
-      screen.getByRole('region', { name: 'ROM image' }),
-    ).getByRole('button', { name: 'Save ROM image' });
-
-    expect(save).toBeDisabled();
-    expect(save).toHaveAccessibleDescription(
-      'Disabled while a write to the ECU runs: Fuel pump test.',
-    );
-
-    await user.click(pump.getByRole('button', { name: 'Stop fuel pump' }));
-    // The pump runs on for up to two seconds, and holds the link until then.
-    await waitFor(
-      () => {
-        expect(save).toBeEnabled();
-      },
-      { timeout: 5_000 },
-    );
-    expect(save).not.toHaveAccessibleDescription();
-    expect(downloads.names).toEqual([]);
-  });
-
-  it('stops when cancelled, saves nothing and resumes polling', async () => {
-    const user = userEvent.setup();
-    const downloads = captureDownloads();
-    const store = new MemoryRomStore();
-
-    renderApp(store);
-    await connectDemo(user);
-    await user.click(screen.getByRole('button', { name: 'Save ROM image' }));
-    await user.click(
-      await screen.findByRole('button', { name: 'Read ROM image' }),
-    );
-
-    const progress = await screen.findByRole('alertdialog', {
-      name: 'Reading the ROM image',
-    });
-
-    await user.click(within(progress).getByRole('button', { name: 'Cancel' }));
-    await waitFor(() => {
-      expect(progress).not.toBeInTheDocument();
-    });
-
-    expect(
-      await screen.findByText('The read was cancelled. Nothing was saved.'),
-    ).toBeInTheDocument();
-    expect(downloads.names).toEqual([]);
-    expect(await store.list()).toEqual([]);
-    await waitFor(() => {});
-    await act(() => new Promise((resolve) => setTimeout(resolve, 300)));
-    expect(screen.getByText(/^Demo ECU · Polling$/)).toBeInTheDocument();
-  });
-
-  it('stops a recording in progress, and says it will first', async () => {
-    const user = userEvent.setup();
-
-    captureDownloads();
-    renderApp();
-    await connectDemo(user);
-    await user.click(screen.getByRole('button', { name: 'Record' }));
-    // Recording starts once its session is created in storage.
-    await screen.findByRole('button', { name: 'Stop recording' });
-    await user.click(screen.getByRole('button', { name: 'Save ROM image' }));
-
-    const confirm = await screen.findByRole('alertdialog', {
-      name: 'Read the ROM image?',
-    });
-
-    expect(confirm).toHaveTextContent('The recording in progress stops');
-    await user.click(
-      within(confirm).getByRole('button', { name: 'Read ROM image' }),
-    );
-    await screen.findByRole('alertdialog', { name: 'Reading the ROM image' });
-    await waitFor(
-      () => {
-        expect(
-          screen.queryByRole('alertdialog', { name: 'Reading the ROM image' }),
-        ).not.toBeInTheDocument();
-      },
-      { timeout: 10_000 },
-    );
-    expect(screen.getByRole('button', { name: 'Record' })).toBeInTheDocument();
   });
 
   it('shows no images, rather than failing, when the saved ones cannot be listed', async () => {

@@ -63,13 +63,17 @@ export default defineConfig({
         'src/main.tsx',
       ],
       // Floors, not targets: raise them as coverage improves; never lower
-      // them to land a change.
-      thresholds: {
-        statements: 90,
-        lines: 90,
-        functions: 95,
-        branches: 80,
-      },
+      // them to land a change. A CI shard covers only part of the code, so
+      // it leaves them to the job that merges the shards, which checks them
+      // over the whole run.
+      ...(process.env['VITEST_SHARD'] === undefined && {
+        thresholds: {
+          statements: 90,
+          lines: 90,
+          functions: 95,
+          branches: 80,
+        },
+      }),
     },
   },
 });
