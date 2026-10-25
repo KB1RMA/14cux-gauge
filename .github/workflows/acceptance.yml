@@ -31,12 +31,6 @@ jobs:
   e2e:
     name: E2E (${{ matrix.browser }}, ${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
-    # Playwright's own image comes with every browser and the system packages
-    # they need, which installing on the runner takes up to a minute to fetch.
-    # Keep its version the same as @playwright/test's in package-lock.json;
-    # Playwright stops with "please update docker image" if they differ.
-    container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -62,10 +56,27 @@ jobs:
         with:
           name: ${{ inputs.dist-artifact }}
           path: ${{ env.APP_DIR }}/dist
+      # The browsers are cached for each Playwright release and runner image;
+      # the system packages they need are installed every time.
+      - name: Find the Playwright release
+        id: playwright
+        run: |
+          echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "image=${ImageOS}" >> "$GITHUB_OUTPUT"
+      - name: Restore ${{ matrix.browser }}
+        id: browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ steps.playwright.outputs.image }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}-${{ matrix.browser }}
+      - name: Install ${{ matrix.browser }}
+        if: ${{ steps.browsers.outputs.cache-hit != 'true' }}
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Install ${{ matrix.browser }}'s system packages
+        if: ${{ steps.browsers.outputs.cache-hit == 'true' }}
+        run: npx playwright install-deps ${{ matrix.browser }}
       - name: Run the acceptance suite
         env:
-          # Firefox will not start as root with another user's home.
-          HOME: /root
           PLAYWRIGHT_BLOB_OUTPUT_DIR: test-reports/blob
         run: >
           npm run test:e2e --
