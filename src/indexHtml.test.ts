@@ -14,7 +14,15 @@ describe('index.html', () => {
   });
 
   it('has a descriptive title', () => {
-    expect(page.title).toBe('14CUX Gauge');
+    expect(page.title).toBe(
+      '14CUX Gauge: 14CUX ECU diagnostics in the browser',
+    );
+  });
+
+  it('names the published address for search engines', () => {
+    expect(
+      page.querySelector('link[rel="canonical"]')?.getAttribute('href'),
+    ).toBe('https://kb1rma.github.io/14cux-gauge/');
   });
 
   it('lets the page zoom', () => {
