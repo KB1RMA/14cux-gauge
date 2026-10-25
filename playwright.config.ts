@@ -16,10 +16,6 @@ export default defineConfig({
   outputDir: './test-reports/e2e/results',
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: true,
-  // Most tests wait on the emulated ECU or the demo in real time rather than
-  // on the CPU, so CI runs one worker per core instead of Playwright's
-  // default of half the cores (which it keeps locally).
-  workers: CI ? '100%' : '50%',
   forbidOnly: CI,
   // A retry captures a trace of the failure; failOnFlakyTests still fails
   // the run, so a flaky test cannot let a release through.
