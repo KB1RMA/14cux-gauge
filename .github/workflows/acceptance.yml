@@ -31,6 +31,13 @@ jobs:
   e2e:
     name: E2E (${{ matrix.browser }}, ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
+    # Playwright's own image comes with every browser and the system packages
+    # they need. Installing them on the runner fetches up to 117 MB from the
+    # Ubuntu mirror, which can stall for minutes.
+    # Keep its version the same as @playwright/test's in package-lock.json;
+    # Playwright stops with "please update docker image" if they differ.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -56,10 +63,10 @@ jobs:
         with:
           name: ${{ inputs.dist-artifact }}
           path: ${{ env.APP_DIR }}/dist
-      - name: Install ${{ matrix.browser }}
-        run: npx playwright install --with-deps ${{ matrix.browser }}
       - name: Run the acceptance suite
         env:
+          # Firefox will not start as root with another user's home.
+          HOME: /root
           PLAYWRIGHT_BLOB_OUTPUT_DIR: test-reports/blob
         run: >
           npm run test:e2e --
