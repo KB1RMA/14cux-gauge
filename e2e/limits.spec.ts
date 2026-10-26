@@ -100,6 +100,31 @@ test.describe('Reading limits', () => {
     await expect(reading(live, 'Coolant')).toHaveText('41 °C hot');
   });
 
+  test('stay open to show an invalid limit typed before Escape', async ({
+    page,
+  }) => {
+    const live = page.getByRole('region', { name: 'Live data' });
+    const dialog = await openPreferences(page, 'Limits');
+    const high = dialog
+      .getByRole('group', { name: /^Coolant/ })
+      .getByRole('textbox', { name: 'High', exact: true });
+
+    // °F shows whole degrees, so 104.5 cannot be a limit.
+    await high.fill('104.5');
+    await high.press('Escape');
+
+    await expect(high).toBeFocused();
+    await expect(high).toHaveAccessibleDescription(
+      'High: enter it as the reading shows it, such as 105. Close again to discard the change.',
+    );
+
+    // Fixed, it applies as Preferences closes.
+    await high.fill('105');
+    await high.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(reading(live, 'Coolant')).toHaveText('105 °F hot');
+  });
+
   test('list the limits beside the live graph', async ({ page }) => {
     await page.getByRole('tab', { name: 'Graphs' }).click();
 

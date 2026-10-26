@@ -8,7 +8,12 @@ import {
   type MetricLimits,
 } from '../metrics';
 import { fieldsOf } from '../model/record';
-import { LIMIT_LEVELS, sameLimits, type Limits } from '../model/limits';
+import {
+  LIMIT_LEVELS,
+  limitsSchema,
+  sameLimits,
+  type Limits,
+} from '../model/limits';
 
 /** A reading a user can set limits on. */
 export type LimitMetric = Metric & { limits: MetricLimits };
@@ -43,8 +48,9 @@ function storedLimits(stored: unknown): Limits {
 
 /**
  * The limits stored for each reading that takes them. A reading with
- * nothing usable stored, or that does not take limits, is left out, so it
- * uses its suggestion.
+ * nothing usable stored, levels out of order (which the Limits section
+ * never stores), or that does not take limits, is left out, so it uses its
+ * suggestion.
  */
 export const ownLimits = z.pipe(
   z.catch(z.unknown(), undefined),
@@ -55,8 +61,14 @@ export const ownLimits = z.pipe(
     for (const { key } of LIMIT_METRICS) {
       const entry = fields[key];
 
-      if (typeof entry === 'object' && entry !== null) {
-        own[key] = storedLimits(entry);
+      if (typeof entry !== 'object' || entry === null) {
+        continue;
+      }
+
+      const parsed = limitsSchema.safeParse(storedLimits(entry));
+
+      if (parsed.success) {
+        own[key] = parsed.data;
       }
     }
 

@@ -155,6 +155,18 @@ describe('limits', () => {
       }),
     ).toEqual({ own: { coolantTempF: { lowWarn: 32 } } });
   });
+
+  it('leaves out a reading whose levels are out of order, so it uses its suggestion', () => {
+    expect(
+      parse({
+        own: {
+          coolantTempF: { highWarn: 239, highAlert: 221 },
+          mainVoltage: { lowWarn: 13, highWarn: 13 },
+          fuelTempF: { highWarn: 150, highAlert: 150 },
+        },
+      }),
+    ).toEqual({ own: { fuelTempF: { highWarn: 150, highAlert: 150 } } });
+  });
 });
 
 describe('graphs', () => {

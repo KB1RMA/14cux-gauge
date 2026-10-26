@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { CheckIcon, Cross2Icon, GearIcon } from '@radix-ui/react-icons';
 import { Checkbox, Dialog, RadioGroup, Tabs } from 'radix-ui';
-import { useId, useRef, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { usePreferences } from '../preferences/usePreferences';
 import {
   PREFERENCES_SECTIONS,
@@ -18,6 +18,7 @@ import type {
 } from '../settings/preferences';
 import type { SpeedUnit, TemperatureUnit } from '../units';
 import { LimitsPreferences } from './LimitsPreferences';
+import { createPendingEdits } from './pendingEdits';
 import styles from './Preferences.module.css';
 
 interface Option<T extends string> {
@@ -273,6 +274,15 @@ export function Preferences({
 }) {
   const { section, open, select, close } = usePreferencesRoute();
   const triggerRef = useRef<HTMLButtonElement>(null);
+  // Limits typed but not yet applied, applied before closing or changing
+  // section, or holding Preferences open to show why they cannot be.
+  const [pending] = useState(createPendingEdits);
+
+  const holdOpen = (event: { preventDefault(): void }) => {
+    if (!pending.applyAll()) {
+      event.preventDefault();
+    }
+  };
 
   return (
     <>
@@ -302,6 +312,8 @@ export function Preferences({
           <Dialog.Content
             className={styles['dialog']}
             aria-describedby={undefined}
+            onEscapeKeyDown={holdOpen}
+            onInteractOutside={holdOpen}
             onCloseAutoFocus={(event) => {
               // Back to the gear, also when the dialog was opened by a link.
               event.preventDefault();
@@ -315,6 +327,7 @@ export function Preferences({
               <Dialog.Close
                 className={styles['close']}
                 aria-label="Close preferences"
+                onClick={holdOpen}
               >
                 <Cross2Icon aria-hidden="true" width={18} height={18} />
               </Dialog.Close>
@@ -325,7 +338,7 @@ export function Preferences({
               onValueChange={(next) => {
                 const known = PREFERENCES_SECTIONS.find((s) => s === next);
 
-                if (known) {
+                if (known && pending.applyAll()) {
                   select(known);
                 }
               }}
@@ -335,7 +348,15 @@ export function Preferences({
                 aria-label="Preference sections"
               >
                 {PREFERENCES_SECTIONS.map((id) => (
-                  <Tabs.Trigger key={id} value={id} className={styles['tab']}>
+                  <Tabs.Trigger
+                    key={id}
+                    value={id}
+                    className={styles['tab']}
+                    // A tab chooses on mouse down and again on the focus
+                    // that follows; holding it here keeps both from
+                    // leaving an invalid limit unseen.
+                    onMouseDown={holdOpen}
+                  >
                     {SECTION_TITLES[id]}
                   </Tabs.Trigger>
                 ))}
@@ -347,7 +368,7 @@ export function Preferences({
                 <AppearancePreferences />
               </Tabs.Content>
               <Tabs.Content value="limits" className={styles['panel']}>
-                <LimitsPreferences />
+                <LimitsPreferences pending={pending} />
               </Tabs.Content>
             </Tabs.Root>
           </Dialog.Content>

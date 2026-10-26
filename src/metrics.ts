@@ -201,21 +201,22 @@ const temperatureRange = (
   highF: number,
   units: DisplayUnits,
 ): string => {
-  const show = (f: number) => Math.round(temperature(f, units)).toString();
+  const show = (f: number) => fixed(0)(temperature(f, units));
 
   return `${show(lowF)}–${show(highF)} ${temperatureUnit(units)}`;
 };
 
 /** A Fahrenheit temperature in the user's unit, such as "105 °C". */
 const temperatureText = (f: number, units: DisplayUnits): string =>
-  `${Math.round(temperature(f, units)).toString()} ${temperatureUnit(units)}`;
+  `${fixed(0)(temperature(f, units))} ${temperatureUnit(units)}`;
 
 const trim = (label: string): Omit<Metric, 'key' | 'description'> => ({
   label,
   group: 'fuelling',
   unit: () => 'counts',
   toDisplay: same,
-  format: formatSigned,
+  // Whole counts, as the ECU reports them.
+  format: (display) => formatSigned(Math.round(display)),
   // No suggestion: owners report no general range for a healthy engine.
   limits: limitsFrom(same),
   chart: {},

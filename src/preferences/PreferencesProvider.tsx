@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { useLayoutEffect, useMemo, type ReactNode } from 'react';
-import type { OwnLimits } from '../settings/limitSettings';
+import type { Limits } from '../model/limits';
+import { withLimits, type LimitMetric } from '../settings/limitSettings';
 import type {
   GaugeStylePreference,
   PalettePreference,
@@ -72,8 +73,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         setPreferences((p) => ({ ...p, keepScreenOn }));
       },
       ownLimits,
-      setOwnLimits: (own: OwnLimits) => {
-        setLimits({ own });
+      setReadingLimits: (metric: LimitMetric, limits: Limits) => {
+        // From the stored value, not this render's, so a change made since
+        // (in another window, or to another reading) is kept.
+        setLimits(({ own }) => ({ own: withLimits(own, metric, limits) }));
       },
     }),
     [preferences, setPreferences, ownLimits, setLimits],

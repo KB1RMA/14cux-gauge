@@ -356,9 +356,107 @@ describe('LimitsPreferences', () => {
     );
     await expectNoAxeViolations(dialog);
 
+    // The first close stays open on the field, to say the change is not
+    // applied; closing again drops it.
     await close(user, dialog);
 
+    expect(dialog).toBeInTheDocument();
+    expect(field(coolant, 'High')).toHaveFocus();
+    expect(field(coolant, 'High')).toHaveAccessibleDescription(
+      'High: enter a number. Close again to discard the change.',
+    );
+
+    await close(user, dialog);
+
+    expect(dialog).not.toBeInTheDocument();
     expect(readingFor('Coolant')).toHaveTextContent(/^230 °F hot$/);
+  });
+
+  it('stays open to show an invalid limit typed just before Escape, and applies it once fixed', async () => {
+    const user = userEvent.setup();
+
+    renderApp({ ...SNAPSHOT, coolantTempF: 212 });
+
+    const dialog = await openLimits(user);
+    const coolant = reading(dialog, /^Coolant/);
+
+    // °F shows whole degrees, so 211.5 cannot be a limit.
+    await type(user, coolant, 'High', '211.5');
+    await user.keyboard('{Escape}');
+
+    expect(dialog).toBeInTheDocument();
+    expect(field(coolant, 'High')).toHaveFocus();
+    expect(field(coolant, 'High')).toHaveAccessibleDescription(
+      'High: enter it as the reading shows it, such as 212. Close again to discard the change.',
+    );
+
+    // Fixing it is a new edit, so the next close applies it.
+    await type(user, coolant, 'High', '212');
+    await user.keyboard('{Escape}');
+
+    expect(dialog).not.toBeInTheDocument();
+    expect(readingFor('Coolant')).toHaveTextContent(/^212 °F hot$/);
+  });
+
+  it('stays on Limits to show an invalid limit when another section is chosen', async () => {
+    const user = userEvent.setup();
+
+    renderApp();
+
+    const dialog = await openLimits(user);
+    const coolant = reading(dialog, /^Coolant/);
+
+    await type(user, coolant, 'High', 'hot');
+    await user.click(within(dialog).getByRole('tab', { name: 'General' }));
+
+    expect(
+      within(dialog).getByRole('tab', { name: 'Limits', selected: true }),
+    ).toBeInTheDocument();
+    expect(field(coolant, 'High')).toHaveAccessibleDescription(
+      'High: enter a number. Close again to discard the change.',
+    );
+  });
+
+  it('takes only plain decimal numbers', async () => {
+    const user = userEvent.setup();
+
+    renderApp();
+
+    const dialog = await openLimits(user);
+    const rpm = reading(dialog, /^Engine speed/);
+
+    for (const text of ['1e2', '0x69', 'Infinity', '5,000']) {
+      await setField(user, rpm, 'Low', text);
+
+      expect(field(rpm, 'Low')).toHaveAccessibleDescription(
+        'Low: enter a number.',
+      );
+    }
+
+    await setField(user, rpm, 'Low', '+500');
+
+    expect(field(rpm, 'Low')).toBeValid();
+    expect(field(rpm, 'Low')).toHaveValue('500');
+  });
+
+  it('refuses a fraction of a count on a fuel trim', async () => {
+    const user = userEvent.setup();
+
+    renderApp();
+
+    const dialog = await openLimits(user);
+    const trim = reading(dialog, /^Short trim, odd/);
+
+    await setField(user, trim, 'High', '5.5');
+
+    expect(field(trim, 'High')).toHaveAccessibleDescription(
+      'High: enter it as the reading shows it, such as +6.',
+    );
+
+    await setField(user, trim, 'High', '+6');
+
+    expect(field(trim, 'High')).toBeValid();
+    expect(field(trim, 'High')).toHaveValue('+6');
   });
 
   it('refuses more decimals than the reading shows', async () => {
@@ -393,7 +491,12 @@ describe('LimitsPreferences', () => {
 
     await setField(user, voltage, 'Very low', '12.5');
 
+    // Both levels of the pair are marked, the one typed in as well.
+    expect(field(voltage, 'Very low')).toBeInvalid();
+    expect(field(voltage, 'Very low')).toHaveAccessibleDescription(order);
+    expect(field(voltage, 'Low')).toBeInvalid();
     expect(field(voltage, 'Low')).toHaveAccessibleDescription(order);
+    expect(field(voltage, 'High')).toBeValid();
 
     await setField(user, voltage, 'Very low', '');
     await setField(user, voltage, 'High', '12.0');

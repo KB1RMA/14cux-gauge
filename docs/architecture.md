@@ -91,7 +91,9 @@ reading is checked against them at full precision, never after rounding.
 When it reaches one, its tile says so in words ("hot", "low") and in colour,
 a dial shows the levels as coloured bands, and a live graph draws them as
 dashed lines and lists them. Recordings do not keep limits, so replay shows
-none.
+none. If you type a level the app cannot use, it says why beside the box.
+If you then try to close Preferences, it stays open once to show you, so a
+mistake is never thrown away without you seeing it.
 
 Some readings change slowly, such as coolant temperature and battery voltage.
 The app reads those less often, usually on every tenth pass. In the passes
@@ -367,7 +369,17 @@ Limits live in the `limits` setting (`settings/limitSettings.ts`), which
 stores only the readings whose limits differ from their suggestion
 (`Metric.limits.suggested` in `metrics.ts`), in library units.
 `PreferencesProvider` exposes them as `ownLimits`, and `limitsFor` picks the
-user's or the suggestion. `readingState` turns a sample and its limits into a
+user's or the suggestion; `setReadingLimits` changes one reading's from the
+stored value, so a change made in another window is kept. One zod schema,
+`limitsSchema` in `model/limits.ts`, checks a reading's levels are finite and
+in order, both when the setting is read (a reading out of order falls back to
+its suggestion) and when the user types them: `limitFormSchema`
+(`settings/limitForm.ts`) turns the typed text into library units and pipes
+it into `limitsSchema`, and each reading in `LimitsPreferences` is a
+react-hook-form form checked by that schema through `zodResolver`.
+`Preferences` holds a `PendingEdits` (`components/pendingEdits.ts`) so that
+closing it or changing section applies what was typed first, or stays open
+once to show why it cannot. `readingState` turns a sample and its limits into a
 tone and a note for `LiveTiles` and `DashView`; `dialBands` and
 `limitLinesPlugin` draw the same levels on dials and live graphs. Replay passes
 no limits.

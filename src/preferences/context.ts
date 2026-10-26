@@ -8,7 +8,8 @@ import type {
   ThemePreference,
   UsageCountsPreference,
 } from '../settings/preferences';
-import type { OwnLimits } from '../settings/limitSettings';
+import type { Limits } from '../model/limits';
+import type { LimitMetric, OwnLimits } from '../settings/limitSettings';
 import type { SpeedUnit, TemperatureUnit } from '../units';
 
 export interface PreferencesContextValue extends Preferences {
@@ -24,7 +25,11 @@ export interface PreferencesContextValue extends Preferences {
    * listed use their suggestions (see `limitsFor`).
    */
   ownLimits: OwnLimits;
-  setOwnLimits(ownLimits: OwnLimits): void;
+  /**
+   * Sets `metric`'s limits, in library units; limits the same as its
+   * suggestion put it back on the suggestion.
+   */
+  setReadingLimits(metric: LimitMetric, limits: Limits): void;
 }
 
 export const PreferencesContext = createContext<

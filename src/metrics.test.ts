@@ -191,6 +191,11 @@ describe('metrics', () => {
     expect(formatSample(metric('airflow'), 0.1, IMPERIAL)).toBe('10.0');
     expect(metric('throttle').toDisplay(0.25, IMPERIAL)).toBe(25);
     expect(formatSample(metric('lambdaShortOdd'), 10, IMPERIAL)).toBe('+10');
+    // Trims are whole counts: a fraction rounds, and never shows as "-0".
+    expect(formatSample(metric('lambdaShortOdd'), 5.5, IMPERIAL)).toBe('+6');
+    expect(formatSample(metric('lambdaLongEven'), -12, IMPERIAL)).toBe('-12');
+    expect(formatSample(metric('lambdaLongEven'), -0.4, IMPERIAL)).toBe('0');
+    expect(formatSample(metric('lambdaShortOdd'), 0, IMPERIAL)).toBe('0');
     expect(formatSample(metric('mainVoltage'), 14.06, IMPERIAL)).toBe('14.1');
     expect(formatSample(metric('gear'), Gear.DriveOrReverse, IMPERIAL)).toBe(
       'D / R',
@@ -507,5 +512,48 @@ describe('metrics', () => {
     expect(meterSpan(plain, 100)).toEqual([0, 1]);
     expect(meterSpan(plain, 120)).toEqual([0, 1]);
     expect(meterSpan(plain, -5)).toEqual([0, 0]);
+  });
+});
+
+describe('limits typed in display units', () => {
+  const typed = (key: MetricKey, display: number, units: DisplayUnits) => {
+    const { limits } = metric(key);
+
+    if (!limits) {
+      throw new Error(`${key} takes no limits`);
+    }
+
+    return limits.fromDisplay(display, units);
+  };
+
+  it('converts each back to the library’s units', () => {
+    expect(typed('coolantTempF', 105, METRIC)).toBe(221);
+    expect(typed('coolantTempF', 221, IMPERIAL)).toBe(221);
+    expect(typed('fuelTempF', -40, METRIC)).toBe(-40);
+    expect(typed('roadSpeedMph', 100, METRIC)).toBeCloseTo(62.1371, 4);
+    expect(typed('roadSpeedMph', 62, IMPERIAL)).toBe(62);
+    expect(typed('throttle', 85, IMPERIAL)).toBe(0.85);
+    expect(typed('injectorDuty', 100, IMPERIAL)).toBe(1);
+    expect(typed('injectorPulseUs', 2.5, IMPERIAL)).toBe(2500);
+    expect(typed('mainVoltage', 14.8, METRIC)).toBe(14.8);
+    expect(typed('lambdaShortOdd', -12, IMPERIAL)).toBe(-12);
+  });
+
+  it('reads back as typed for every reading that takes limits, in both unit systems', () => {
+    const withLimits = METRICS.filter((m) => m.limits !== undefined);
+
+    // Every continuous reading.
+    expect(withLimits).toHaveLength(16);
+
+    for (const m of withLimits) {
+      for (const units of [IMPERIAL, METRIC]) {
+        for (const display of [-40, 0, 0.5, 12.3, 105, 5000]) {
+          expect(m.toDisplay(typed(m.key, display, units), units)).toBeCloseTo(
+            display,
+            9,
+          );
+        }
+      }
+    }
   });
 });

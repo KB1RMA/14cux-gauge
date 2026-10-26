@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { limitReached, sameLimits } from './limits';
+import {
+  levelsOutOfOrder,
+  limitReached,
+  limitsSchema,
+  sameLimits,
+} from './limits';
 
 describe('limitReached', () => {
   const limits = { lowAlert: 11, lowWarn: 12, highWarn: 14.8, highAlert: 15.5 };
@@ -39,5 +44,81 @@ describe('sameLimits', () => {
     expect(sameLimits({ highWarn: 221 }, { highWarn: 220 })).toBe(false);
     expect(sameLimits({ highWarn: 221 }, {})).toBe(false);
     expect(sameLimits({ highWarn: 221 }, { highAlert: 221 })).toBe(false);
+  });
+});
+
+describe('levelsOutOfOrder', () => {
+  it('accepts levels in order, and levels on one side that meet', () => {
+    expect(
+      levelsOutOfOrder({
+        lowAlert: 11,
+        lowWarn: 12,
+        highWarn: 14.8,
+        highAlert: 15.5,
+      }),
+    ).toEqual([]);
+    expect(levelsOutOfOrder({ lowAlert: 12, lowWarn: 12 })).toEqual([]);
+    expect(levelsOutOfOrder({ highWarn: 221, highAlert: 221 })).toEqual([]);
+    expect(levelsOutOfOrder({})).toEqual([]);
+  });
+
+  it('names both levels of each pair out of order, in level order', () => {
+    expect(levelsOutOfOrder({ lowAlert: 12.5, lowWarn: 12 })).toEqual([
+      'lowAlert',
+      'lowWarn',
+    ]);
+    expect(levelsOutOfOrder({ highWarn: 239, highAlert: 221 })).toEqual([
+      'highWarn',
+      'highAlert',
+    ]);
+    // Skips levels that are not set.
+    expect(levelsOutOfOrder({ lowAlert: 15, highAlert: 14 })).toEqual([
+      'lowAlert',
+      'highAlert',
+    ]);
+  });
+
+  it('refuses a high level at a low one, so no value is both', () => {
+    expect(levelsOutOfOrder({ lowWarn: 12, highWarn: 12 })).toEqual([
+      'lowWarn',
+      'highWarn',
+    ]);
+  });
+});
+
+describe('limitsSchema', () => {
+  it('reads finite levels in order', () => {
+    expect(limitsSchema.parse({ highWarn: 221, highAlert: 239 })).toEqual({
+      highWarn: 221,
+      highAlert: 239,
+    });
+  });
+
+  it('puts an issue on each level of a pair out of order', () => {
+    const result = limitsSchema.safeParse({ highWarn: 239, highAlert: 221 });
+
+    expect(result.success).toBe(false);
+    expect(
+      result.error?.issues.map(({ path, message }) => ({ path, message })),
+    ).toEqual([
+      {
+        path: ['highWarn'],
+        message:
+          'Each level must be above the one before it: very low, low, high, very high.',
+      },
+      {
+        path: ['highAlert'],
+        message:
+          'Each level must be above the one before it: very low, low, high, very high.',
+      },
+    ]);
+  });
+
+  it('refuses levels that are not finite numbers', () => {
+    expect(limitsSchema.safeParse({ highWarn: Infinity }).success).toBe(false);
+    expect(limitsSchema.safeParse({ highWarn: Number.NaN }).success).toBe(
+      false,
+    );
+    expect(limitsSchema.safeParse({ highWarn: '221' }).success).toBe(false);
   });
 });
