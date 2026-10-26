@@ -64,8 +64,16 @@
   stroke-linecap: round;
 }
 
-.needle circle {
+.needle circle,
+.beyond {
   fill: var(--text);
+}
+
+/* Stopped at an end because the reading is off the scale: dashed, beside
+   the arrowhead, so it does not read as the value at that end. */
+.needle[data-beyond] line {
+  stroke-dasharray: 5 3;
+  stroke-linecap: butt;
 }
 
 /* Drawn from data-text, so the scale stays out of the reading's text. */

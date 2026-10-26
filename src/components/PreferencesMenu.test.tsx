@@ -233,6 +233,39 @@ describe('PreferencesMenu', () => {
     expect(readingFor('Coolant')).toHaveTextContent('100 °C');
   });
 
+  it('moves along a row of choices with the left and right arrows', async () => {
+    const user = userEvent.setup();
+
+    renderWithTiles();
+    await user.click(trigger());
+    screen.getByRole('menuitemradio', { name: /^Fahrenheit / }).focus();
+
+    await user.keyboard('{ArrowRight}');
+
+    expect(
+      screen.getByRole('menuitemradio', { name: /^Celsius / }),
+    ).toHaveFocus();
+
+    // The row's end: Right goes no further, and stays in the row.
+    await user.keyboard('{ArrowRight}');
+
+    expect(
+      screen.getByRole('menuitemradio', { name: /^Celsius / }),
+    ).toHaveFocus();
+
+    await user.keyboard('{ArrowLeft}');
+
+    expect(
+      screen.getByRole('menuitemradio', { name: /^Fahrenheit / }),
+    ).toHaveFocus();
+
+    await user.keyboard('{ArrowRight}{Enter}');
+
+    expect(
+      screen.getByRole('menuitemradio', { name: /^Celsius / }),
+    ).toBeChecked();
+  });
+
   it('switches the colour theme, and follows the system again on System', async () => {
     const user = userEvent.setup();
     const root = document.documentElement;

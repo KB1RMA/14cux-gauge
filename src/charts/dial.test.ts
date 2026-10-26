@@ -5,6 +5,7 @@ import {
   arcPath,
   dialAngle,
   dialBands,
+  dialBeyond,
   dialCaption,
   dialFraction,
   dialLabel,
@@ -64,6 +65,14 @@ describe('dial geometry', () => {
     expect(dialFraction([0, 7000], 7001)).toBe(1);
     expect(dialFraction([0, 7000], 9000)).toBe(1);
     expect(dialFraction([-40, 140], -41)).toBe(0);
+  });
+
+  it('says which end a value off the scale lies beyond', () => {
+    expect(dialBeyond([0, 7000], 0)).toBeUndefined();
+    expect(dialBeyond([0, 7000], 7000)).toBeUndefined();
+    expect(dialBeyond([0, 7000], 7001)).toBe('high');
+    expect(dialBeyond([-40, 140], -40)).toBeUndefined();
+    expect(dialBeyond([-40, 140], -41)).toBe('low');
   });
 
   it('measures points clockwise from straight up', () => {

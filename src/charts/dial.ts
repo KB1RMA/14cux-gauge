@@ -27,6 +27,19 @@ export function dialFraction(
   return Math.min(Math.max((display - low) / (high - low), 0), 1);
 }
 
+/**
+ * Which end of the scale a display value lies beyond, if any, so a dial can
+ * show that its needle is stopped there rather than reading that value.
+ */
+export function dialBeyond(
+  range: DialScale['range'],
+  display: number,
+): 'low' | 'high' | undefined {
+  const [low, high] = range;
+
+  return display < low ? 'low' : display > high ? 'high' : undefined;
+}
+
 /** The angle for a fraction of the way round the scale. */
 export function dialAngle(fraction: number): number {
   return DIAL_START + fraction * DIAL_SWEEP;

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { CheckIcon, GearIcon } from '@radix-ui/react-icons';
 import { DropdownMenu } from 'radix-ui';
-import { useId } from 'react';
+import { useId, type KeyboardEvent } from 'react';
 import { useCanKeepScreenOn } from '../screen/useScreenWake';
 import type {
   GaugeStylePreference,
@@ -49,10 +49,36 @@ const stayOpen = (event: Event) => {
 };
 
 /**
+ * Moves focus to the segment beside the focused one on Left or Right, as the
+ * row's layout suggests. The menu itself moves only on Up and Down, and
+ * Radix marks whichever item has focus as highlighted.
+ */
+function moveAlongRow(event: KeyboardEvent<HTMLDivElement>): void {
+  const step =
+    event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+
+  if (step === 0) {
+    return;
+  }
+
+  event.preventDefault();
+
+  const segments = [
+    ...event.currentTarget.querySelectorAll<HTMLElement>(
+      '[role="menuitemradio"]',
+    ),
+  ];
+  const current = segments.findIndex((segment) => segment === event.target);
+
+  segments[current + step]?.focus();
+}
+
+/**
  * A few short choices side by side on one row, beside their label, like a
- * segmented toggle. Still `menuitemradio`s, so arrow keys move and Enter or
- * Space picks, as in `ChoiceGroup`. Each shows its `hint` if it has one,
- * named with the full text and the hint, so the name includes what is shown.
+ * segmented toggle. Still `menuitemradio`s, so Up and Down move through the
+ * menu and Enter or Space picks, as in `ChoiceGroup`; Left and Right also
+ * move along the row. Each shows its `hint` if it has one, named with the
+ * full text and the hint, so the name includes what is shown.
  */
 function ChoiceRow<T extends string>({
   label,
@@ -74,6 +100,7 @@ function ChoiceRow<T extends string>({
           choose(options, next, onChange);
         }}
         className={styles['segments']}
+        onKeyDown={moveAlongRow}
       >
         {options.map((option) => (
           <DropdownMenu.RadioItem

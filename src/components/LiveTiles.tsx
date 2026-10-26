@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { useId, type ReactNode } from 'react';
+import { useId, useMemo, type ReactNode } from 'react';
 import { useLiveSample } from '../ecu/useLiveData';
 import type { LiveSnapshot } from '../model/snapshot';
 import {
@@ -9,9 +9,11 @@ import {
   METRIC_KEYS,
   metricsInGroup,
   sampleOf,
+  type DialScale,
   type Metric,
   type MetricKey,
 } from '../metrics';
+import type { PreferencesContextValue } from '../preferences/context';
 import { usePreferences } from '../preferences/usePreferences';
 import { Dial } from './Dial';
 import { Meter } from './Meter';
@@ -44,6 +46,19 @@ function Group({
   );
 }
 
+/**
+ * The dial scale to draw `metric` on, or `undefined` to draw it as a tile.
+ * The one place that decides, so a dial never lands among the tiles.
+ */
+function dialScaleFor(
+  metric: Metric,
+  preferences: PreferencesContextValue,
+): DialScale | undefined {
+  return preferences.gaugeStyle === 'dials'
+    ? metric.dial?.(preferences)
+    : undefined;
+}
+
 function MetricTile({
   metric,
   sample,
@@ -54,7 +69,9 @@ function MetricTile({
 }) {
   const units = usePreferences();
   const display = sample == null ? sample : metric.toDisplay(sample, units);
-  const scale = units.gaugeStyle === 'dials' ? metric.dial?.(units) : undefined;
+  // The same scale object until the metric or a preference changes, so the
+  // dial's face is not redrawn with each reading.
+  const scale = useMemo(() => dialScaleFor(metric, units), [metric, units]);
 
   return (
     <Tile
@@ -94,9 +111,9 @@ function TileGroups({
   keys: readonly MetricKey[];
   tile(metric: Metric): ReactNode;
 }) {
-  const { gaugeStyle } = usePreferences();
+  const preferences = usePreferences();
   const asDial = (metric: Metric) =>
-    gaugeStyle === 'dials' && metric.dial !== undefined;
+    dialScaleFor(metric, preferences) !== undefined;
 
   return (
     <div className={styles['groups']}>
