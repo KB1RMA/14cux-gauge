@@ -19,13 +19,27 @@ import { MetricInfo } from './MetricInfo';
 import { Tile } from './Tile';
 import styles from './LiveTiles.module.css';
 
-function Group({ title, children }: { title: string; children: ReactNode }) {
+/**
+ * A group's readings under its heading. Dials, being larger, sit in a grid
+ * of their own above the tiles, so a short tile never stands beside a tall
+ * dial.
+ */
+function Group({
+  title,
+  dials,
+  tiles,
+}: {
+  title: string;
+  dials: ReactNode[];
+  tiles: ReactNode[];
+}) {
   const id = useId();
 
   return (
     <section aria-labelledby={id} className={styles['group']}>
       <h3 id={id}>{title}</h3>
-      <dl className={styles['grid']}>{children}</dl>
+      {dials.length > 0 ? <dl className={styles['dials']}>{dials}</dl> : null}
+      {tiles.length > 0 ? <dl className={styles['grid']}>{tiles}</dl> : null}
     </section>
   );
 }
@@ -80,6 +94,10 @@ function TileGroups({
   keys: readonly MetricKey[];
   tile(metric: Metric): ReactNode;
 }) {
+  const { gaugeStyle } = usePreferences();
+  const asDial = (metric: Metric) =>
+    gaugeStyle === 'dials' && metric.dial !== undefined;
+
   return (
     <div className={styles['groups']}>
       {METRIC_GROUPS.map((group) => {
@@ -88,9 +106,12 @@ function TileGroups({
         );
 
         return metrics.length === 0 ? null : (
-          <Group key={group.id} title={group.title}>
-            {metrics.map(tile)}
-          </Group>
+          <Group
+            key={group.id}
+            title={group.title}
+            dials={metrics.filter(asDial).map(tile)}
+            tiles={metrics.filter((m) => !asDial(m)).map(tile)}
+          />
         );
       })}
     </div>

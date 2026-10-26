@@ -120,8 +120,19 @@ describe('PreferencesMenu', () => {
       expect(picture(label)).not.toBeNull();
     }
 
-    // Readings without a dial stay as they were.
+    // Readings without a dial stay as they were, after the dials.
     expect(picture('Target idle')).toBeNull();
+    expect(
+      within(screen.getByRole('region', { name: 'Engine' }))
+        .getAllByRole('term')
+        .map((term) => term.textContent),
+    ).toEqual([
+      'Engine speed',
+      'Road speed',
+      'Coolant',
+      'Fuel temp',
+      'Target idle',
+    ]);
     // Exactly the reading, as a tile shows it: the scale adds no text.
     expect(readingFor('Engine speed')).toHaveTextContent(/^750 rpm$/);
     expect(readingFor('Road speed')).toHaveTextContent(/^62 mph$/);

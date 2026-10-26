@@ -12,9 +12,20 @@
   color: var(--text-muted);
 }
 
-.grid {
+.grid,
+.dials {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
   gap: 0.75rem;
   margin: 0;
+}
+
+/* Wide enough for a dial's scale labels to stay readable, and two to a
+   row on a phone. */
+.dials {
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+}
+
+.dials + .grid {
+  margin-top: 0.75rem;
 }

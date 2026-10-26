@@ -65,12 +65,7 @@
   font-weight: 600;
 }
 
-/* A dial needs room for its scale, so it takes two columns where there are
-   two, and its value sits centred under it. */
-.tile[data-dial] {
-  grid-column: span 2;
-}
-
+/* A dial's value sits centred under it. */
 .tile[data-dial] .value {
   text-align: center;
 }
