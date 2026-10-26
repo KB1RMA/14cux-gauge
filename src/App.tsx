@@ -21,6 +21,7 @@ import { PlatformContext } from './platform/context';
 import { PreferencesProvider } from './preferences/PreferencesProvider';
 import { AppStatusProvider } from './pwa/AppStatusProvider';
 import {
+  DASH_PATH,
   LIVE_PATH,
   LIVE_TAB_PATHS,
   SESSIONS_PATH,
@@ -36,6 +37,7 @@ import styles from './App.module.css';
 
 const VIEWS: readonly { label: string; to: string }[] = [
   { label: 'Live', to: LIVE_PATH },
+  { label: 'Dash', to: DASH_PATH },
   { label: 'Sessions', to: SESSIONS_PATH },
 ];
 
@@ -44,6 +46,9 @@ const DEFAULT_USAGE_COUNTER = goatCounter();
 // The views behind the connect screen are split out of the startup bundle.
 const { View: Dashboard, preload: loadDashboard } = lazyView(() =>
   import('./components/Dashboard').then((module) => module.Dashboard),
+);
+const { View: DashView, preload: loadDashView } = lazyView(() =>
+  import('./components/DashView').then((module) => module.DashView),
 );
 const { View: SessionsView, preload: loadSessionsView } = lazyView(() =>
   import('./components/SessionsView').then((module) => module.SessionsView),
@@ -62,6 +67,23 @@ function Live({ tab }: { tab: LiveTab }) {
   );
 }
 
+/**
+ * The dash, or the connect screen until there has been a connection. The
+ * dash stays up once there has, even when the link drops, to say its
+ * readings are stale.
+ */
+function Dash() {
+  const { state } = useEcu();
+
+  return state.status === 'idle' && !state.afterSession ? (
+    <ConnectScreen />
+  ) : (
+    <ViewBoundary>
+      <DashView />
+    </ViewBoundary>
+  );
+}
+
 function Main({ usageCounter }: { usageCounter: UsageCounter | undefined }) {
   useUsageCounts(usageCounter);
   useSyncKeepScreenOn();
@@ -70,7 +92,11 @@ function Main({ usageCounter }: { usageCounter: UsageCounter | undefined }) {
   // when opened, and while the build on the server still matches this page.
   // A failure shows in the view that needs the code, if it is opened.
   useEffect(() => {
-    void Promise.allSettled([loadDashboard(), loadSessionsView()]);
+    void Promise.allSettled([
+      loadDashboard(),
+      loadDashView(),
+      loadSessionsView(),
+    ]);
   }, []);
 
   return (
@@ -84,6 +110,7 @@ function Main({ usageCounter }: { usageCounter: UsageCounter | undefined }) {
         />
         <Route path={LIVE_TAB_PATHS.graphs} element={<Live tab="graphs" />} />
         <Route path={LIVE_TAB_PATHS.fuelMap} element={<Live tab="fuelMap" />} />
+        <Route path={DASH_PATH} element={<Dash />} />
         <Route
           path={`${SESSIONS_PATH}/*`}
           element={

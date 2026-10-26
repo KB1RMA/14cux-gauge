@@ -8,6 +8,7 @@ import {
   THEME_PREFERENCES,
   USAGE_COUNTS_PREFERENCES,
 } from './preferences';
+import { dashReadings } from './dashSettings';
 import { ALWAYS_READ } from './readingSettings';
 import { LAYOUT_OPTIONS, WINDOW_OPTIONS } from './graphSettings';
 import type { SettingDefaults } from './settingDefaults';
@@ -51,6 +52,8 @@ export const SETTINGS = {
       // Never turns the MIL off.
       off: pickedFrom(METRIC_KEYS, (key) => !ALWAYS_READ.includes(key)),
     }),
+  /** Which readings the Dash view shows. */
+  dash: () => settingObject({ readings: dashReadings }),
   /** The time window, layout and hidden graphs, live and in replay. */
   graphs: () =>
     settingObject(

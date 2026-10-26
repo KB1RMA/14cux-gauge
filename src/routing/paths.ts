@@ -10,6 +10,7 @@ export type LiveTab = 'overview' | 'graphs' | 'fuelMap';
 export type ReplayTab = 'readings' | 'graphs';
 
 export const LIVE_PATH = '/live';
+export const DASH_PATH = '/dash';
 export const SESSIONS_PATH = '/sessions';
 
 export const LIVE_TAB_PATHS: Record<LiveTab, string> = {

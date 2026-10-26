@@ -15,6 +15,14 @@ export interface ReadingsContextValue {
    * that withdraws the request.
    */
   request(keys: readonly MetricKey[]): () => void;
+  /**
+   * Narrows what is read to `keys` (and the always-read ones, and any that
+   * have been asked for) while a view needs the ECU's full attention, so
+   * each is read more often. The chosen readings are not read meanwhile, so
+   * a view must not focus while they are being recorded. Returns a function
+   * that lifts it.
+   */
+  focus(keys: readonly MetricKey[]): () => void;
 }
 
 export const ReadingsContext = createContext<ReadingsContextValue | undefined>(

@@ -91,6 +91,33 @@ describe('readings', () => {
   });
 });
 
+describe('dash', () => {
+  const parse = settingParser('dash', defaults);
+
+  it('shows engine speed, road speed, coolant, voltage and the MIL by default', () => {
+    expect(parse(undefined)).toEqual({
+      readings: [
+        'engineRpm',
+        'roadSpeedMph',
+        'coolantTempF',
+        'mainVoltage',
+        'milOn',
+      ],
+    });
+  });
+
+  it('keeps only known readings, in display order, and keeps an empty choice', () => {
+    expect(
+      parse({ readings: ['milOn', 'warpDrive', 3, 'throttle', 'engineRpm'] }),
+    ).toEqual({ readings: ['engineRpm', 'throttle', 'milOn'] });
+    expect(parse({ readings: [] })).toEqual({ readings: [] });
+  });
+
+  it('uses the default list when the stored one is not a list', () => {
+    expect(parse({ readings: 'engineRpm' }).readings).toHaveLength(5);
+  });
+});
+
 describe('graphs', () => {
   const parse = settingParser('graphs', defaults);
 

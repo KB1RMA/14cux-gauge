@@ -24,6 +24,10 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
   const [requested, setRequested] = useState<ReadonlyMap<MetricKey, number>>(
     () => new Map(),
   );
+  // The readings a view has narrowed to, if any (see `focus`).
+  const [focused, setFocused] = useState<readonly MetricKey[] | undefined>(
+    undefined,
+  );
   const chosen = useMemo(
     () => chosenReadings(readingSettings.off),
     [readingSettings.off],
@@ -31,14 +35,19 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
   // What the poller reads: the chosen readings and any a view has asked
   // for. Only the chosen ones are recorded, and only those the user picked
   // (not `ALWAYS_READ`) decide whether slow values can wait.
-  const selection = useMemo(
-    () => ({
-      polled: readingsFor([...chosen, ...requested.keys()]),
+  const selection = useMemo(() => {
+    const wanted = focused
+      ? [...focused, ...ALWAYS_READ, ...requested.keys()]
+      : [...chosen, ...requested.keys()];
+
+    return {
+      polled: readingsFor(wanted),
       chosen: readingsFor(chosen),
-      watched: readingsFor(chosen.filter((key) => !ALWAYS_READ.includes(key))),
-    }),
-    [chosen, requested],
-  );
+      watched: readingsFor(
+        (focused ?? chosen).filter((key) => !ALWAYS_READ.includes(key)),
+      ),
+    };
+  }, [chosen, requested, focused]);
 
   // The poller asks before every pass, so a change applies without
   // reconnecting.
@@ -79,9 +88,18 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const focus = useCallback((keys: readonly MetricKey[]) => {
+    setFocused(keys);
+
+    // Only lifts its own narrowing, not a later view's.
+    return () => {
+      setFocused((current) => (current === keys ? undefined : current));
+    };
+  }, []);
+
   const value = useMemo(
-    () => ({ chosen, off: readingSettings.off, setOff, request }),
-    [chosen, readingSettings.off, setOff, request],
+    () => ({ chosen, off: readingSettings.off, setOff, request, focus }),
+    [chosen, readingSettings.off, setOff, request, focus],
   );
 
   return <ReadingsContext value={value}>{children}</ReadingsContext>;

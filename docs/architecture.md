@@ -25,8 +25,8 @@ Think of the app as a stack of layers. Each layer may use the layers below it,
 but never the ones above it. From top to bottom:
 
 1. **Views** are the screens, tiles, graphs and buttons you see. They show
-   data, but they never fetch it themselves. The dashboard and the sessions
-   views are downloaded just after the app starts, so the first screen shows
+   data, but they never fetch it themselves. The dashboard, the dash and the
+   sessions views are downloaded just after the app starts, so the first screen shows
    sooner. If one of them breaks, only that view shows an error and a Reload
    button. Going to another page tries the view again. The app bar and
    status bar keep working, so you can still disconnect.
@@ -118,7 +118,8 @@ These are kept in the browser's database:
   fingerprint (SHA-256) to tell copies apart, and whether it came from a real
   ECU or the demo.
 
-**Settings**, such as units, theme and which readings to show, are small. They
+**Settings**, such as units, theme and which readings to show (one list for
+the overview, graphs and recordings, and another for the Dash view), are small. They
 are kept apart from the database, in the browser's local storage. Every
 setting has a default, and so does each part of one. A new version can add a
 setting without breaking an older one: the older version uses its default for
@@ -140,7 +141,7 @@ so a gap or a high point reads the same live and in replay.
 
 `main.tsx` builds the `Platform` and the `AppServices` once and hands them to
 `<App>`. React providers only expose the services; views reach them through
-hooks. `App.tsx` loads `Dashboard` and `SessionsView` with React's `lazy`,
+hooks. `App.tsx` loads `Dashboard`, `DashView` and `SessionsView` with React's `lazy`,
 each inside its own `ViewBoundary` (an error boundary and a `Suspense`
 boundary). Arrows point from the user of a module to the module it uses.
 
@@ -152,13 +153,14 @@ flowchart TB
     direction LR
     Connect[ConnectScreen]
     Dash["Dashboard (lazy)<br/>LiveTiles · GraphsView · FuelMapView<br/>FaultCodes · EcuInfo · tests"]
+    DashV["DashView (lazy)<br/>large readings, stale marking"]
     Sessions["SessionsView (lazy)<br/>SessionList · SessionDetail · SessionReplay"]
     Chrome["StatusBar · PreferencesMenu · Footer<br/>SaveSessionDialog · AppNotices"]
   end
 
   subgraph react["Hooks and providers — React"]
     direction LR
-    HEcu["useEcu · useEcuRead<br/>useLiveData · useHistory"]
+    HEcu["useEcu · useEcuRead<br/>useLiveData · useHistory<br/>useLiveStatus"]
     HWrite["useEcuWrite<br/>useFuelPumpRun"]
     HRec[useRecording]
     HRoms[useRoms]
@@ -212,16 +214,16 @@ flowchart TB
   main --> services
   main --> platform
 
-  Connect & Dash & Chrome --> HEcu
+  Connect & Dash & DashV & Chrome --> HEcu
   Dash --> HWrite
-  Dash & Sessions & Chrome --> HRec
+  Dash & DashV & Sessions & Chrome --> HRec
   Dash --> HRoms
   Sessions & Chrome --> HSess
   Sessions --> HReplay
   views --> HSet
   views --> HRoute
   Chrome --> HAppStatus
-  Dash & Chrome --> HScreen
+  Dash & DashV & Chrome --> HScreen
   Connect & Sessions & Chrome --> HPlat
   Dash & Sessions --> ChartSeries
 
@@ -231,7 +233,7 @@ flowchart TB
   HRoms --> Roms
   HSess --> StorageSvc
   HSet --> SettingStore
-  HSet -. chosen readings .-> Session
+  HSet -. chosen readings, or the dash's alone .-> Session
   HReplay --> SampleHistory
   HEcu --> SampleHistory
   HAppStatus --> AppStatus
