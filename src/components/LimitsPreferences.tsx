@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { useEffect, useId, useRef, useState } from 'react';
-import {
-  describeLimits,
-  formatSample,
-  type DisplayUnits,
-  type Metric,
-} from '../metrics';
+import { describeLimits, formatSample, type DisplayUnits } from '../metrics';
 import { LIMIT_LEVELS, type LimitLevel, type Limits } from '../model/limits';
 import { usePreferences } from '../preferences/usePreferences';
 import {
   LIMIT_METRICS,
+  type LimitMetric,
   limitsFor,
   withLimits,
   type OwnLimits,
@@ -28,7 +24,11 @@ const LEVEL_LABELS: Record<LimitLevel, string> = {
 type Texts = Record<LimitLevel, string>;
 
 /** A level as the field first shows it: formatted as the reading is. */
-function textsOf(metric: Metric, limits: Limits, units: DisplayUnits): Texts {
+function textsOf(
+  metric: LimitMetric,
+  limits: Limits,
+  units: DisplayUnits,
+): Texts {
   const text = (level: LimitLevel) => {
     const sample = limits[level];
 
@@ -53,7 +53,7 @@ type Checked =
  * no more decimals than the reading shows, so it reads back as typed.
  */
 function check(
-  metric: Metric,
+  metric: LimitMetric,
   texts: Texts,
   initial: Texts,
   stored: Limits,
@@ -89,7 +89,7 @@ function check(
       };
     }
 
-    limits[level] = metric.limits?.fromDisplay(display, units) ?? display;
+    limits[level] = metric.limits.fromDisplay(display, units);
   }
 
   const set = LIMIT_LEVELS.flatMap((level) => {
@@ -126,12 +126,11 @@ function Status({
   own,
   units,
 }: {
-  metric: Metric;
+  metric: LimitMetric;
   own: OwnLimits;
   units: DisplayUnits;
 }) {
-  const suggested = metric.limits?.suggested ?? {};
-  const suggestion = describeLimits(metric, suggested, units);
+  const suggestion = describeLimits(metric, metric.limits.suggested, units);
 
   if (own[metric.key] === undefined) {
     return (
@@ -162,12 +161,12 @@ function ReadingFields({
   metric,
   units,
 }: {
-  metric: Metric;
+  metric: LimitMetric;
   units: DisplayUnits;
 }) {
   const { ownLimits, setOwnLimits } = usePreferences();
   const id = useId();
-  const applied = limitsFor(metric, ownLimits) ?? {};
+  const applied = limitsFor(metric, ownLimits);
   const shown = textsOf(metric, applied, units);
   // What the user is typing, until it applies; `undefined` shows `applied`.
   const [draft, setDraft] = useState<Texts | undefined>(undefined);
@@ -176,7 +175,7 @@ function ReadingFields({
   >(undefined);
   const texts = draft ?? shown;
   const unit = metric.unit(units);
-  const suggested = metric.limits?.suggested ?? {};
+  const { suggested } = metric.limits;
 
   const commit = () => {
     if (draft === undefined) {
@@ -222,7 +221,7 @@ function ReadingFields({
         ) : null}
       </legend>
       <Status metric={metric} own={ownLimits} units={units} />
-      {metric.limits?.basis ? (
+      {metric.limits.basis ? (
         <p className={styles['basis']}>{metric.limits.basis(units)}</p>
       ) : null}
       <div className={styles['fields']}>
@@ -265,7 +264,9 @@ function ReadingFields({
             setOwnLimits(withLimits(ownLimits, metric, suggested));
           }}
         >
-          Use suggested limits
+          {Object.keys(suggested).length > 0
+            ? 'Use suggested limits'
+            : 'Clear my limits'}
         </button>
       )}
     </fieldset>

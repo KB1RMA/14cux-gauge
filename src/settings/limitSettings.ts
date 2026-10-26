@@ -1,13 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import * as z from 'zod/mini';
-import { METRICS, type Metric, type MetricKey } from '../metrics';
+import {
+  METRICS,
+  type Metric,
+  type MetricKey,
+  type MetricLimits,
+} from '../metrics';
 import { fieldsOf } from '../model/record';
 import { LIMIT_LEVELS, sameLimits, type Limits } from '../model/limits';
 
+/** A reading a user can set limits on. */
+export type LimitMetric = Metric & { limits: MetricLimits };
+
 /** The readings a user can set limits on, in display order. */
-export const LIMIT_METRICS: readonly Metric[] = METRICS.filter(
-  (metric) => metric.limits !== undefined,
+export const LIMIT_METRICS: readonly LimitMetric[] = METRICS.filter(
+  (metric): metric is LimitMetric => metric.limits !== undefined,
 );
 
 /**
@@ -57,6 +65,9 @@ export const ownLimits = z.pipe(
 );
 
 /** The limits that apply to `metric`: the user's own, or the suggestion. */
+export function limitsFor(metric: LimitMetric, own: OwnLimits): Limits;
+export function limitsFor(metric: Metric, own: OwnLimits): Limits | undefined;
+
 export function limitsFor(metric: Metric, own: OwnLimits): Limits | undefined {
   return own[metric.key] ?? metric.limits?.suggested;
 }
@@ -67,13 +78,12 @@ export function limitsFor(metric: Metric, own: OwnLimits): Limits | undefined {
  */
 export function withLimits(
   own: OwnLimits,
-  metric: Metric,
+  metric: LimitMetric,
   limits: Limits,
 ): OwnLimits {
   const { [metric.key]: _previous, ...others } = own;
-  const suggested = metric.limits?.suggested ?? {};
 
-  return sameLimits(limits, suggested)
+  return sameLimits(limits, metric.limits.suggested)
     ? others
     : { ...others, [metric.key]: limits };
 }

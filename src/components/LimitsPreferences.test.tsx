@@ -289,6 +289,28 @@ describe('LimitsPreferences', () => {
     expect(field(reopened, 'Very high')).toHaveValue('');
   });
 
+  it('says when the user’s limits are on a reading with no suggestion, and clears them on request', async () => {
+    const user = userEvent.setup();
+
+    renderApp();
+
+    const dialog = await openLimits(user);
+    const throttle = reading(dialog, /^Throttle/);
+
+    await setField(user, throttle, 'High', '90');
+
+    expect(
+      within(throttle).getByText('Your limits. No limits are suggested.'),
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(throttle).getByRole('button', { name: 'Clear my limits' }),
+    );
+
+    expect(field(throttle, 'High')).toHaveValue('');
+    expect(within(throttle).getByText('No limits set.')).toBeInTheDocument();
+  });
+
   it('goes back to the suggested limits on request', async () => {
     const user = userEvent.setup();
 
