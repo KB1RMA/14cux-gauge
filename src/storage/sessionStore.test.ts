@@ -109,7 +109,9 @@ describe.each(backends)('%s', (_name, open) => {
           },
         },
       },
-      formatVersion: 4,
+      writesKept: true,
+      imported: null,
+      formatVersion: 5,
     });
     expect(await store.get(session.id)).toEqual(session);
     expect(await store.readSamples(session.id)).toEqual([]);
@@ -286,6 +288,53 @@ describe.each(backends)('%s', (_name, open) => {
     );
     expect(await store.list()).toEqual([]);
   });
+
+  it('stores whole sessions opened from a file, each under a new id', async () => {
+    const imported = {
+      fileName: 'idle.json',
+      importedAt: 9000,
+      savedAt: 8000,
+      savedBy: '14CUX Gauge 0.13.0',
+    };
+    // More samples than one stored chunk holds.
+    const samples = Array.from({ length: 2500 }, (_, index) =>
+      snapshotAt(1000 + index * 100, { engineRpm: 700 + (index % 7) }),
+    );
+    const file = {
+      session: {
+        name: 'Idle',
+        notes: 'From a forum post',
+        source: 'serial' as const,
+        startedAt: 1000,
+        endedAt: 251_000,
+        identity: IDENTITY,
+        writesKept: true,
+        imported,
+      },
+      samples,
+      writes: [PUMP_STOPPED],
+    };
+
+    const [first, second] = await store.importSessions([file, file]);
+
+    expect(first).toEqual({
+      ...file.session,
+      id: expect.any(String) as string,
+      sampleCount: 2500,
+      formatVersion: 5,
+    });
+    expect(second?.id).not.toBe(first?.id);
+    expect(await store.list()).toHaveLength(2);
+    expect(await store.get(first?.id ?? '')).toEqual(first);
+    expect(await store.readSamples(first?.id ?? '')).toEqual(samples);
+
+    const writes = await store.readWrites(second?.id ?? '');
+
+    // A new id, so the copies' writes stay apart.
+    expect(writes).toEqual([{ ...PUMP_STOPPED, id: expect.any(String) }]);
+    expect(writes[0]?.id).not.toBe('pump-1');
+    expect(await store.readWrites(first?.id ?? '')).toHaveLength(1);
+  });
 });
 
 describe('IndexedDbSessionStore persistence', () => {
@@ -307,7 +356,7 @@ describe('IndexedDbSessionStore persistence', () => {
     expect(await second.get(id)).toMatchObject({
       sampleCount: 1,
       identity: IDENTITY,
-      formatVersion: 4,
+      formatVersion: 5,
     });
     expect(await second.readSamples(id)).toEqual([snapshotAt(10)]);
     second.close();
@@ -372,6 +421,8 @@ describe('IndexedDbSessionStore upgrades', () => {
         sampleCount: 1,
         notes: '',
         identity: null,
+        writesKept: false,
+        imported: null,
         formatVersion: 2,
       },
     ]);
@@ -436,6 +487,42 @@ describe('IndexedDbSessionStore failures', () => {
       expect.objectContaining({ name: 'ConstraintError' }) as Error,
     );
     uuid.mockRestore();
+    store.close();
+  });
+
+  it('stores none of the sessions from a file when one cannot be stored', async () => {
+    const store = await openIndexedDb(new IDBFactory());
+    const session = {
+      name: 'Idle',
+      notes: '',
+      source: 'serial',
+      startedAt: 1000,
+      endedAt: 2000,
+      identity: null,
+      writesKept: true,
+      imported: {
+        fileName: 'idle.json',
+        importedAt: 9000,
+        savedAt: 8000,
+        savedBy: '14CUX Gauge 0.13.0',
+      },
+    } as const;
+    // A value IndexedDB cannot store, so adding it throws as it is made,
+    // after the first session's records have been added.
+    const unstorable = {
+      ...PUMP_STOPPED,
+      outcome: { status: 'done', message: (() => 'x') as unknown as string },
+    } satisfies WriteLogEntry;
+
+    await expect(
+      store.importSessions([
+        { session, samples: [snapshotAt(1000)], writes: [PUMP_STOPPED] },
+        { session, samples: [snapshotAt(1000)], writes: [unstorable] },
+      ]),
+    ).rejects.toThrow(
+      expect.objectContaining({ name: 'DataCloneError' }) as Error,
+    );
+    expect(await store.list()).toEqual([]);
     store.close();
   });
 });
@@ -627,7 +714,7 @@ describe('IndexedDbSessionStore stored records', () => {
     const factory = new IDBFactory();
 
     await plantRecords(factory, {
-      sessions: [GOOD, { ...GOOD, id: 'newer', formatVersion: 5 }],
+      sessions: [GOOD, { ...GOOD, id: 'newer', formatVersion: 6 }],
     });
 
     const store = await openIndexedDb(factory);
@@ -636,11 +723,11 @@ describe('IndexedDbSessionStore stored records', () => {
     expect(await store.listUnreadable()).toEqual([
       {
         id: 'newer',
-        detail: 'format 5 is from a newer version of the app',
+        detail: 'format 6 is from a newer version of the app',
       },
     ]);
     await expect(store.update('newer', { name: 'Renamed' })).rejects.toThrow(
-      'The stored session could not be read: format 5 is from a newer version of the app',
+      'The stored session could not be read: format 6 is from a newer version of the app',
     );
     store.close();
   });

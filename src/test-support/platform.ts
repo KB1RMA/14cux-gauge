@@ -4,6 +4,11 @@ import { SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import type { Platform, SettingsBackend } from '../platform/platform';
 import { storageWith } from './storage';
 
+/** A file dialog the user always dismisses. */
+export function noFileChosen(): Promise<'cancelled'> {
+  return Promise.resolve('cancelled');
+}
+
 /** Settings kept in memory, as a desktop build might keep them in a file. */
 export function memorySettings(): SettingsBackend {
   const stored = new Map<string, string>();
@@ -39,7 +44,7 @@ export function testPlatform(overrides: Partial<Platform> = {}): Platform {
         onLost: () => () => undefined,
       }),
     },
-    files: { save: () => Promise.resolve('saved') },
+    files: { save: () => Promise.resolve('saved'), open: noFileChosen },
     storage: { open: storageWith() },
     settings: memorySettings(),
     app: { userAgent: 'TestBrowser/1.0', reload: () => undefined },

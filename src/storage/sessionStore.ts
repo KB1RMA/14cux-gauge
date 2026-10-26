@@ -2,6 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import {
   SESSION_FORMAT_VERSION,
+  type ImportedSession,
   type NewSession,
   type SessionChanges,
   type SessionSummary,
@@ -51,6 +52,13 @@ export interface SessionStore {
    * know.
    */
   readWrites(id: string): Promise<RecordedWrite[]>;
+  /**
+   * Stores whole sessions opened from a file, each under a new id, all or
+   * none. Returns their summaries in the order given.
+   */
+  importSessions(
+    sessions: readonly ImportedSession[],
+  ): Promise<SessionSummary[]>;
   /** Deletes a session, its samples and its writes. Unknown ids are ignored. */
   remove(id: string): Promise<void>;
   /**
@@ -82,7 +90,32 @@ export function emptySummary(session: NewSession): SessionSummary {
     endedAt: null,
     sampleCount: 0,
     notes: '',
+    writesKept: true,
+    imported: null,
     formatVersion: SESSION_FORMAT_VERSION,
+  };
+}
+
+/**
+ * The summary, samples and writes to store for a session opened from a file.
+ * It gets a new id, as do its writes, so opening a file twice keeps two
+ * copies rather than mixing them.
+ */
+export function importedRecords({ session, samples, writes }: ImportedSession) {
+  const summary: SessionSummary = {
+    ...session,
+    id: newSessionId(),
+    sampleCount: samples.length,
+    formatVersion: SESSION_FORMAT_VERSION,
+  };
+
+  return {
+    summary,
+    samples: samples.map((sample) => ({ ...sample })),
+    writes: writes.map((write) => ({
+      ...copyWrite(write),
+      id: crypto.randomUUID(),
+    })),
   };
 }
 
@@ -121,7 +154,7 @@ export class MemorySessionStore implements SessionStore {
     {
       summary: SessionSummary;
       samples: LiveSnapshot[];
-      writes: Map<string, WriteLogEntry>;
+      writes: Map<string, RecordedWrite>;
     }
   >();
   private readonly listeners = new Listeners();
@@ -191,6 +224,24 @@ export class MemorySessionStore implements SessionStore {
 
   async readWrites(id: string): Promise<RecordedWrite[]> {
     return [...this.entry(id).writes.values()].map(copyWrite).sort(byStart);
+  }
+
+  async importSessions(
+    sessions: readonly ImportedSession[],
+  ): Promise<SessionSummary[]> {
+    const records = sessions.map(importedRecords);
+
+    for (const { summary, samples, writes } of records) {
+      this.sessions.set(summary.id, {
+        summary,
+        samples,
+        writes: new Map(writes.map((write) => [write.id, write])),
+      });
+    }
+
+    this.listeners.notify();
+
+    return records.map(({ summary }) => ({ ...summary }));
   }
 
   async remove(id: string): Promise<void> {

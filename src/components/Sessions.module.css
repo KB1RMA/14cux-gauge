@@ -111,6 +111,150 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Saving chosen sessions to a file, and opening one. */
+.tableFrame {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* Actions on the sessions, along the top of the table. */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.9rem;
+}
+
+/* Actions that are not on the chosen sessions sit at the far end. */
+.toolbar .toolbarEnd {
+  margin-inline-start: auto;
+}
+
+.selected {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* What became of a file just opened or saved, under the toolbar. */
+.banner,
+.opened {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.opened {
+  display: block;
+}
+
+.opened:empty {
+  display: none;
+}
+
+/* Loading, empty or failed, in place of the table. */
+.frameMessage {
+  margin: 0;
+  padding: 1rem 0.75rem;
+}
+
+/* The sessions, one row each. */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* The frame draws the bottom edge. */
+.table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.table th,
+.table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+
+.table thead th {
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.table [data-column='samples'] {
+  text-align: right;
+}
+
+.cell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.table .select {
+  width: 1px;
+  padding-right: 0;
+}
+
+.table .name {
+  min-width: 12rem;
+}
+
+/* A column heading that sorts by that column; its arrow shows the order. */
+.sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.25rem;
+  margin: 0 -0.25rem;
+  color: inherit;
+  font-weight: inherit;
+  background: none;
+  border: 1px solid transparent;
+}
+
+.table [data-column='samples'] .sort {
+  flex-direction: row-reverse;
+}
+
+.table td .delete {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.checkbox {
+  display: inline-grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+}
+
+/* Checked boxes show a tick as well as the fill. */
+.checkbox[data-state='checked'],
+.checkbox[data-state='indeterminate'] {
+  color: var(--accent-contrast);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 /* Why a stored session cannot be read; its ID is long and unbroken. */
 .unreadable {
   margin: 0;
@@ -119,7 +263,11 @@
 }
 
 .notes {
+  display: block;
   margin: 0;
+  font-weight: normal;
+  color: var(--text-muted);
+  font-size: 0.9rem;
   white-space: pre-line;
   display: -webkit-box;
   -webkit-box-orient: vertical;

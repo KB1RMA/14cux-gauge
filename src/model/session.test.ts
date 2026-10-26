@@ -36,15 +36,24 @@ describe('readSession', () => {
       sampleCount: 1,
       notes: '',
       identity: null,
+      writesKept: false,
+      imported: null,
       formatVersion: 2,
     });
   });
 
   it('reads formats 2 and 3 as not having recorded the identity', () => {
-    expect(readSession(FORMAT_2)).toEqual({ ...FORMAT_2, identity: null });
+    expect(readSession(FORMAT_2)).toEqual({
+      ...FORMAT_2,
+      identity: null,
+      writesKept: false,
+      imported: null,
+    });
     expect(readSession({ ...FORMAT_2, formatVersion: 3 })).toEqual({
       ...FORMAT_2,
       identity: null,
+      writesKept: true,
+      imported: null,
       formatVersion: 3,
     });
   });
@@ -52,7 +61,35 @@ describe('readSession', () => {
   it('reads the identity kept in format 4', () => {
     const format4 = { ...FORMAT_2, identity: IDENTITY, formatVersion: 4 };
 
-    expect(readSession(format4)).toEqual(format4);
+    expect(readSession(format4)).toEqual({
+      ...format4,
+      writesKept: true,
+      imported: null,
+    });
+  });
+
+  it('reads where a format 5 session came from, and whether it kept writes', () => {
+    const format5 = {
+      ...FORMAT_2,
+      identity: null,
+      writesKept: false,
+      imported: {
+        fileName: 'idle.json',
+        importedAt: 30,
+        savedAt: 25,
+        savedBy: '14CUX Gauge 0.13.0',
+      },
+      formatVersion: 5,
+    };
+
+    expect(readSession(format5)).toEqual(format5);
+    expect(keepsWrites(readSession(format5))).toBe(false);
+    expect(() =>
+      readSession({ ...format5, imported: { fileName: 'idle.json' } }),
+    ).toThrow(/^The stored session could not be read: imported\.importedAt/);
+    expect(() => readSession({ ...format5, writesKept: undefined })).toThrow(
+      InvalidRecordError,
+    );
   });
 
   it('reads an identity with values that could not be read', () => {
@@ -92,10 +129,10 @@ describe('readSession', () => {
   });
 
   it('rejects a session from a newer version of the app', () => {
-    expect(() => readSession({ ...FORMAT_2, formatVersion: 5 })).toThrow(
+    expect(() => readSession({ ...FORMAT_2, formatVersion: 6 })).toThrow(
       new InvalidRecordError(
         'session',
-        'format 5 is from a newer version of the app',
+        'format 6 is from a newer version of the app',
       ),
     );
   });
@@ -121,7 +158,7 @@ describe('readSession', () => {
 });
 
 describe('keepsWrites', () => {
-  it('is true from format 3', () => {
+  it('is true from format 3 until format 5 says otherwise', () => {
     expect(keepsWrites(readSession(FORMAT_2))).toBe(false);
     expect(keepsWrites(readSession({ ...FORMAT_2, formatVersion: 3 }))).toBe(
       true,
@@ -138,5 +175,17 @@ describe('storedSession', () => {
     const format4 = { ...FORMAT_2, identity: IDENTITY, formatVersion: 4 };
 
     expect(storedSession(readSession(format4))).toEqual(format4);
+  });
+
+  it('stores a format 5 session whole', () => {
+    const format5 = {
+      ...FORMAT_2,
+      identity: IDENTITY,
+      writesKept: true,
+      imported: null,
+      formatVersion: 5,
+    };
+
+    expect(storedSession(readSession(format5))).toEqual(format5);
   });
 });

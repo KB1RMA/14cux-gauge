@@ -7,13 +7,19 @@ import { usePlatform } from '../platform/usePlatform';
 import { usePreferences } from '../preferences/usePreferences';
 import { useRecording } from '../recording/useRecording';
 import { sessionCsv, sessionCsvFileName } from '../sessions/exportCsv';
+import { formatDateTime } from '../sessions/format';
 import { Link, useNavigate } from 'react-router';
 import { SESSIONS_PATH, sessionPath, type ReplayTab } from '../routing/paths';
 import { useCurrentPath } from '../routing/useCurrentPath';
 import { useSessionList } from '../sessions/useSessionList';
 import { useSessionSamples } from '../sessions/useSessionSamples';
 import { useSessions } from '../sessions/useSessions';
-import { keepsWrites, type SessionSummary } from '../model/session';
+import { RECORDING_FILE_TYPE } from '../model/recordingFile';
+import {
+  keepsWrites,
+  type ImportNote,
+  type SessionSummary,
+} from '../model/session';
 import { DeleteSessionDialog } from './DeleteSessionDialog';
 import { SessionFields } from './SessionFields';
 import { SessionIdentity } from './SessionIdentity';
@@ -22,6 +28,16 @@ import { SessionReplay } from './SessionReplay';
 import styles from './Sessions.module.css';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed';
+
+/** Where a session opened from a file came from, as the file says. */
+function ImportedFrom({ note }: { note: ImportNote }) {
+  return (
+    <p className={styles['notice']}>
+      Opened from {note.fileName} on {formatDateTime(note.importedAt)}. The file
+      was saved by {note.savedBy} on {formatDateTime(note.savedAt)}.
+    </p>
+  );
+}
 
 function DetailsForm({ session }: { session: SessionSummary }) {
   const { edit } = useSessions();
@@ -79,7 +95,7 @@ function DetailsForm({ session }: { session: SessionSummary }) {
 export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
   const navigate = useNavigate();
   const currentPathRef = useCurrentPath();
-  const { remove } = useSessions();
+  const { remove, exportFile } = useSessions();
   const { active } = useRecording();
   const list = useSessionList();
   const samples = useSessionSamples(id);
@@ -92,6 +108,9 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
   const [exportFailed, setExportFailed] = useState<
     { id: string; message: string } | undefined
   >(undefined);
+  // The session being saved as a file, so a second click does not read and
+  // save it again.
+  const [savingId, setSavingId] = useState<string | undefined>(undefined);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const session =
     list.status === 'loaded'
@@ -149,6 +168,7 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
         {session.name}
       </h2>
       <SessionMeta session={session} recording={recording} />
+      {session.imported ? <ImportedFrom note={session.imported} /> : null}
 
       <div className={styles['detail']}>
         <section aria-labelledby="replay-title">
@@ -195,42 +215,84 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
               Export
             </h3>
             <p className={styles['hint']}>
-              The ECU’s identity and fault codes from the start of the
-              recording, then one row per sample, in your chosen units, with the
-              unit in each column heading. Invalid readings are left empty.
+              A recording file keeps everything in this session, every sample at
+              full precision, to open here or on another computer.
+            </p>
+            <p className={styles['hint']}>
+              A CSV file has the ECU’s identity and fault codes from the start
+              of the recording, then one row per sample, in your chosen units,
+              with the unit in each column heading. Invalid readings are left
+              empty.
             </p>
             {exportFailed?.id === id ? (
               <p role="alert" className={styles['error']}>
                 {exportFailed.message}
               </p>
             ) : null}
-            <button
-              type="button"
-              disabled={
-                samples.status !== 'loaded' || samples.samples.length === 0
-              }
-              onClick={() => {
-                if (samples.status === 'loaded') {
+            <div className={styles['formActions']}>
+              <button
+                type="button"
+                disabled={savingId === id}
+                onClick={() => {
                   setExportFailed(undefined);
-                  void saveFile(
-                    files,
-                    sessionCsvFileName(session.name, session.startedAt),
-                    sessionCsv(session, samples.samples, {
-                      temperatureUnit,
-                      speedUnit,
-                    }),
-                    'text/csv',
-                  ).then((feedback) => {
-                    if (feedback?.kind === 'failed') {
-                      setExportFailed({ id, message: feedback.message });
-                    }
-                  });
+                  setSavingId(id);
+                  void exportFile([id])
+                    .then(
+                      (file) =>
+                        saveFile(
+                          files,
+                          file.name,
+                          file.text,
+                          RECORDING_FILE_TYPE,
+                        ),
+                      () => ({
+                        kind: 'failed' as const,
+                        message: 'The session could not be read to save it.',
+                      }),
+                    )
+                    .then((feedback) => {
+                      if (feedback?.kind === 'failed') {
+                        setExportFailed({ id, message: feedback.message });
+                      }
+                    })
+                    .finally(() => {
+                      setSavingId((saving) =>
+                        saving === id ? undefined : saving,
+                      );
+                    });
+                }}
+              >
+                <DownloadIcon aria-hidden="true" />
+                Save as file
+              </button>
+              <button
+                type="button"
+                disabled={
+                  samples.status !== 'loaded' || samples.samples.length === 0
                 }
-              }}
-            >
-              <DownloadIcon aria-hidden="true" />
-              Export CSV
-            </button>
+                onClick={() => {
+                  if (samples.status === 'loaded') {
+                    setExportFailed(undefined);
+                    void saveFile(
+                      files,
+                      sessionCsvFileName(session.name, session.startedAt),
+                      sessionCsv(session, samples.samples, {
+                        temperatureUnit,
+                        speedUnit,
+                      }),
+                      'text/csv',
+                    ).then((feedback) => {
+                      if (feedback?.kind === 'failed') {
+                        setExportFailed({ id, message: feedback.message });
+                      }
+                    });
+                  }
+                }}
+              >
+                <DownloadIcon aria-hidden="true" />
+                Export CSV
+              </button>
+            </div>
           </section>
           <section aria-labelledby="delete-title">
             <h3 id="delete-title" className={styles['subtitle']}>

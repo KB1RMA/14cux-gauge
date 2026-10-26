@@ -36,3 +36,36 @@ export async function savedAndClosed(dialog: HTMLElement) {
 export function sessionsNav() {
   return within(screen.getByRole('navigation', { name: 'Views' }));
 }
+
+/** The table of recorded sessions. */
+export function sessionsTable() {
+  return screen.getByRole('table', { name: 'Recorded sessions' });
+}
+
+/** The row of the session named `name` in the sessions table. */
+export function sessionRow(name: string | RegExp): HTMLTableRowElement {
+  const row = within(sessionsTable())
+    .getAllByRole('row')
+    .find((candidate) => within(candidate).queryByRole('link', { name }));
+
+  if (!(row instanceof HTMLTableRowElement)) {
+    throw new Error(`No session named ${String(name)} in the table`);
+  }
+
+  return row;
+}
+
+/** What the sessions table shows for session `name` under heading `column`. */
+export function sessionCell(name: string | RegExp, column: string) {
+  const heading = within(sessionsTable()).getByRole('columnheader', {
+    name: column,
+  });
+  const cell =
+    sessionRow(name).cells[(heading as HTMLTableCellElement).cellIndex];
+
+  if (!cell) {
+    throw new Error(`No ${column} for session ${String(name)}`);
+  }
+
+  return cell;
+}

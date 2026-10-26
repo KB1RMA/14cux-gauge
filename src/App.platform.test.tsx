@@ -9,7 +9,11 @@ import { TestApp } from './test-support/TestApp';
 import { createAppServices } from './appServices';
 import { buildSyntheticRom } from './demo/syntheticRom';
 import type { FilePlatform, Platform } from './platform/platform';
-import { memorySettings, testPlatform } from './test-support/platform';
+import {
+  memorySettings,
+  noFileChosen,
+  testPlatform,
+} from './test-support/platform';
 import { storageWith } from './test-support/storage';
 import { fakeUsageCounter } from './test-support/usageCounter';
 
@@ -45,6 +49,7 @@ function desktopPlatform() {
       },
     },
     files: {
+      open: noFileChosen,
       save: (name, data, type) => {
         saved.push({ name, data, type });
 
@@ -168,7 +173,7 @@ describe('App on another platform', () => {
 
     render(
       <TestApp
-        platform={{ ...platform, files: { save } }}
+        platform={{ ...platform, files: { save, open: noFileChosen } }}
         usageCounter={undefined}
       />,
     );

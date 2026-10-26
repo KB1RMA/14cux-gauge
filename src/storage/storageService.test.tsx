@@ -171,5 +171,11 @@ describe('sessions before storage is open', () => {
     await expect(result.current.read('a')).rejects.toThrow(
       'Storage is still being opened.',
     );
+    await expect(result.current.exportFile(['a'])).rejects.toThrow(
+      'Storage is still being opened.',
+    );
+    await expect(
+      result.current.importFile({ name: 'a.json', text: '{}' }),
+    ).rejects.toThrow('Storage is still being opened.');
   });
 });

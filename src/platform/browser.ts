@@ -7,6 +7,7 @@ import type {
   AppPlatform,
   FilePlatform,
   FullscreenPlatform,
+  OpenedFile,
   Platform,
   ScreenPlatform,
   SerialPlatform,
@@ -189,7 +190,17 @@ export const browserScreen: ScreenPlatform = {
   fullscreen: browserFullscreen,
 };
 
-/** Saves files through the browser's normal download. */
+/**
+ * Settles the file picker still waiting for an answer, if any, as cancelled.
+ * Browsers without the input's `cancel` event never say the user dismissed
+ * it, so the next {@link FilePlatform.open} settles the one before.
+ */
+let cancelOpenPicker: (() => void) | undefined;
+
+/**
+ * Saves files through the browser's normal download, and opens them with its
+ * file picker.
+ */
 export const browserDownloads: FilePlatform = {
   save(name, data, type) {
     const blob =
@@ -209,6 +220,48 @@ export const browserDownloads: FilePlatform = {
 
     // A browser download has no Save dialog the page can see.
     return Promise.resolve('saved');
+  },
+  open(extensions) {
+    cancelOpenPicker?.();
+
+    const input = document.createElement('input');
+    let cancel: (() => void) | undefined;
+
+    input.type = 'file';
+    input.accept = extensions.join(',');
+    input.hidden = true;
+    // In the page while it is open, as some browsers will not show the
+    // picker for an input that is not.
+    document.body.append(input);
+
+    return new Promise<OpenedFile | 'cancelled'>((resolve, reject) => {
+      cancel = () => {
+        resolve('cancelled');
+      };
+
+      cancelOpenPicker = cancel;
+      input.addEventListener('cancel', cancel);
+      input.addEventListener('change', () => {
+        const file = input.files?.[0];
+
+        if (!file) {
+          resolve('cancelled');
+
+          return;
+        }
+
+        file.text().then((text) => {
+          resolve({ name: file.name, text });
+        }, reject);
+      });
+      input.click();
+    }).finally(() => {
+      input.remove();
+
+      if (cancelOpenPicker === cancel) {
+        cancelOpenPicker = undefined;
+      }
+    });
   },
 };
 

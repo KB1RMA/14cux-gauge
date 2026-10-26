@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
+import { readFile } from 'node:fs/promises';
 import type { Locator, Page } from '@playwright/test';
 import {
   connectionStatus,
   expect,
   expectNoAxeViolations,
   reading,
+  sessionCell,
+  sessionsTable,
   test,
 } from './support/fixtures';
 
@@ -131,6 +134,155 @@ function nav(page: Page) {
   return page.getByRole('navigation', { name: 'Views' });
 }
 
+test.describe('Recording files', () => {
+  test('saves chosen sessions to one file, and opens it again with the same samples', async ({
+    page,
+  }) => {
+    const first = await recordDemo(page);
+
+    await first.getByRole('textbox', { name: 'Name' }).fill('Warm idle');
+    await first.getByRole('button', { name: 'Save' }).click();
+    await expect(first).toBeHidden();
+    await (
+      await recordDemo(page)
+    )
+      .getByRole('button', { name: 'Skip' })
+      .click();
+    await nav(page).getByRole('link', { name: 'Sessions' }).click();
+
+    const table = sessionsTable(page);
+
+    await expect(table.getByRole('rowheader')).toHaveCount(2);
+
+    const otherName = await table
+      .getByRole('link', { name: /^Demo ECU, / })
+      .textContent();
+    const samplesBefore = await (
+      await sessionCell(page, 'Warm idle', 'Samples')
+    ).textContent();
+
+    // What the first sample of Warm idle reads, to compare once reopened.
+    await page.getByRole('link', { name: 'Warm idle', exact: true }).click();
+
+    const engineSpeed = reading(page, 'Engine speed');
+
+    await expect(engineSpeed).toHaveText(/^\d+ rpm$/);
+
+    const firstRpm = await engineSpeed.textContent();
+
+    await page.getByRole('link', { name: 'All sessions' }).click();
+
+    const save = page.getByRole('button', { name: 'Save selected as file' });
+
+    await expect(save).toBeDisabled();
+    await page.getByRole('checkbox', { name: 'Select all sessions' }).click();
+    await expect(save).toHaveAccessibleDescription('2 of 2 selected.');
+    await expectNoAxeViolations(page);
+
+    const download = page.waitForEvent('download');
+
+    await save.click();
+
+    const file = await download;
+
+    expect(file.suggestedFilename()).toMatch(
+      /^14CUX-recordings-\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d\.json$/,
+    );
+
+    const path = await file.path();
+    const saved = JSON.parse(await readFile(path, 'utf8')) as {
+      kind: string;
+      version: number;
+      recordings: { name: string; samples: unknown[] }[];
+    };
+
+    expect(saved.kind).toBe('14cux-gauge-recordings');
+    expect(saved.version).toBe(1);
+    expect(saved.recordings.map(({ name }) => name).sort()).toEqual(
+      [otherName, 'Warm idle'].sort(),
+    );
+    expect(
+      saved.recordings
+        .find(({ name }) => name === 'Warm idle')
+        ?.samples.length.toLocaleString('en-US'),
+    ).toBe(samplesBefore);
+
+    for (const name of ['Warm idle', otherName ?? '']) {
+      await page.getByRole('button', { name: `Delete ${name}` }).click();
+      await page
+        .getByRole('alertdialog', { name: 'Delete this session?' })
+        .getByRole('button', { name: 'Delete session' })
+        .click();
+    }
+
+    await expect(page.getByText(/^No sessions yet\./)).toBeVisible();
+
+    const chooser = page.waitForEvent('filechooser');
+
+    await page.getByRole('button', { name: 'Open recording file…' }).click();
+    await (
+      await chooser
+    ).setFiles({
+      name: 'from Sam.json',
+      mimeType: 'application/json',
+      buffer: await readFile(path),
+    });
+
+    const sessions = page.getByRole('region', { name: 'Recorded sessions' });
+
+    await expect(sessions.getByRole('status')).toHaveText(
+      'Opened 2 recordings from from Sam.json.',
+    );
+    await expect(await sessionCell(page, 'Warm idle', 'Samples')).toHaveText(
+      samplesBefore ?? '',
+    );
+    await expectNoAxeViolations(page);
+
+    await page.getByRole('link', { name: 'Warm idle', exact: true }).click();
+    await expect(
+      page.getByText(/^Opened from from Sam\.json on /),
+    ).toBeVisible();
+    await expect(reading(page, 'Engine speed')).toHaveText(firstRpm ?? '');
+    await expectNoAxeViolations(page);
+  });
+
+  test('says why a file from a newer version cannot be opened, and opens nothing', async ({
+    page,
+  }) => {
+    await page.goto('./');
+    await nav(page).getByRole('link', { name: 'Sessions' }).click();
+
+    const chooser = page.waitForEvent('filechooser');
+
+    await page.getByRole('button', { name: 'Open recording file…' }).click();
+    await (
+      await chooser
+    ).setFiles({
+      name: 'newer.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(
+        JSON.stringify({
+          kind: '14cux-gauge-recordings',
+          version: 2,
+          savedAt: 0,
+          savedBy: '14CUX Gauge 9.0.0',
+          recordings: [],
+        }),
+      ),
+    });
+
+    await expect(
+      page
+        .getByRole('region', { name: 'Recorded sessions' })
+        .getByRole('alert'),
+    ).toHaveText(
+      'newer.json could not be opened: it was saved by a newer version of the app (file format 2). Update the app to open it.',
+    );
+    await expect(page.getByText(/^No sessions yet\./)).toBeVisible();
+    await expectNoAxeViolations(page);
+  });
+});
+
 test.describe('Recorded sessions', () => {
   test('keeps the writes to the ECU made while recording, and marks them in replay', async ({
     page,
@@ -218,7 +370,9 @@ test.describe('Recorded sessions', () => {
       page.getByRole('heading', { name: 'Recorded sessions' }),
     ).toBeFocused();
     await expect(page.getByText('Idle settles at 750 rpm.')).toBeVisible();
-    await expect(reading(page, 'Length')).toHaveText(/^0:0[2-3]$/);
+    await expect(await sessionCell(page, 'Warm idle', 'Length')).toHaveText(
+      /^0:0[2-3]$/,
+    );
     await expectNoAxeViolations(page);
 
     await page.getByRole('link', { name: 'Warm idle', exact: true }).click();
@@ -433,11 +587,7 @@ test.describe('Recorded sessions', () => {
       await page.getByRole('button', { name: 'Record', exact: true }).click();
       await nav(page).getByRole('link', { name: 'Sessions' }).click();
       // The recording in progress, and the finished one.
-      await expect(
-        page
-          .getByRole('region', { name: 'Recorded sessions' })
-          .getByRole('listitem'),
-      ).toHaveCount(2);
+      await expect(sessionsTable(page).getByRole('rowheader')).toHaveCount(2);
       await expect(
         page.getByRole('button', { name: /^Delete Demo ECU, / }).first(),
       ).toBeDisabled();

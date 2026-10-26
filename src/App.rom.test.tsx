@@ -14,6 +14,7 @@ import type { FilePlatform } from './platform/platform';
 import { MemoryRomStore } from './storage/romStore';
 import { expectNoAxeViolations } from './test-support/a11y';
 import { connectDemo } from './test-support/demo';
+import { noFileChosen } from './test-support/platform';
 import { captureDownloads, renderApp } from './test-support/romApp';
 import { plantRecords } from './test-support/storedRecords';
 import { fakeUsageCounter } from './test-support/usageCounter';
@@ -69,11 +70,13 @@ async function readDemoRom(user: UserEvent) {
 /** Where every save is cancelled, as when a Save dialog is dismissed. */
 const CANCELLED_SAVES: FilePlatform = {
   save: () => Promise.resolve('cancelled'),
+  open: noFileChosen,
 };
 
 /** Where every save fails, as on a full disk. */
 const FAILING_SAVES: FilePlatform = {
   save: () => Promise.reject(new Error('Disk full')),
+  open: noFileChosen,
 };
 
 describe('Saving the ROM image', () => {

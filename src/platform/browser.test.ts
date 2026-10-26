@@ -562,3 +562,89 @@ describe('browserPlatform storage', () => {
     storage.close();
   });
 });
+
+describe('browserPlatform opening files', () => {
+  /** Answers the file picker the next time a page opens it. */
+  function answerPicker(answer: (input: HTMLInputElement) => void) {
+    const pickers: HTMLInputElement[] = [];
+    const spy = vi
+      .spyOn(HTMLInputElement.prototype, 'click')
+      .mockImplementation(function (this: HTMLInputElement) {
+        pickers.push(this);
+        answer(this);
+      });
+
+    onTestFinished(() => {
+      spy.mockRestore();
+    });
+
+    return pickers;
+  }
+
+  it('reads the file the user chose as text, offering only the given kinds', async () => {
+    const pickers = answerPicker((input) => {
+      Object.defineProperty(input, 'files', {
+        value: [new File(['{"kind":"x"}\n'], 'idle.json')],
+      });
+      input.dispatchEvent(new Event('change'));
+    });
+
+    expect(await browserPlatform().files.open(['.json', '.txt'])).toEqual({
+      name: 'idle.json',
+      text: '{"kind":"x"}\n',
+    });
+    expect(pickers[0]?.accept).toBe('.json,.txt');
+    expect(pickers[0]?.type).toBe('file');
+    // Gone from the page once it has answered.
+    expect(pickers[0]?.isConnected).toBe(false);
+  });
+
+  it('says the user chose nothing when the picker returns no file', async () => {
+    answerPicker((input) => {
+      Object.defineProperty(input, 'files', { value: [] });
+      input.dispatchEvent(new Event('change'));
+    });
+
+    expect(await browserPlatform().files.open(['.json'])).toBe('cancelled');
+  });
+
+  it('rejects when the chosen file cannot be read', async () => {
+    answerPicker((input) => {
+      const file = new File(['x'], 'gone.json');
+
+      vi.spyOn(file, 'text').mockRejectedValue(
+        new DOMException('Moved', 'NotReadableError'),
+      );
+      Object.defineProperty(input, 'files', { value: [file] });
+      input.dispatchEvent(new Event('change'));
+    });
+
+    await expect(browserPlatform().files.open(['.json'])).rejects.toThrow(
+      'Moved',
+    );
+  });
+
+  it('says so when the user dismisses the picker', async () => {
+    const pickers = answerPicker((input) => {
+      input.dispatchEvent(new Event('cancel'));
+    });
+
+    expect(await browserPlatform().files.open(['.json'])).toBe('cancelled');
+    expect(pickers[0]?.isConnected).toBe(false);
+  });
+
+  it('settles a picker the browser never answered once the user opens another', async () => {
+    // A browser without the `cancel` event says nothing when the user
+    // dismisses the picker.
+    const pickers = answerPicker(() => undefined);
+    const files = browserPlatform().files;
+    const first = files.open(['.json']);
+
+    void files.open(['.json']);
+
+    expect(await first).toBe('cancelled');
+    expect(pickers[0]?.isConnected).toBe(false);
+    expect(pickers[1]?.isConnected).toBe(true);
+    pickers[1]?.dispatchEvent(new Event('cancel'));
+  });
+});

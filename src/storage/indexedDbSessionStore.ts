@@ -10,6 +10,7 @@ import {
 import {
   readSession,
   storedSession,
+  type ImportedSession,
   type NewSession,
   type SessionChanges,
   type SessionSummary,
@@ -35,6 +36,7 @@ import {
   byStart,
   copyWrite,
   emptySummary,
+  importedRecords,
   newestFirst,
   UnknownSessionError,
   type SessionStore,
@@ -49,7 +51,10 @@ const writeRecordSchema = z.extend(recordedWriteSchema, {
   sessionId: z.string(),
 });
 
-type WriteRecord = WriteLogEntry & { sessionId: string };
+type WriteRecord = RecordedWrite & { sessionId: string };
+
+/** Samples per stored chunk when a whole session is stored at once. */
+const IMPORT_CHUNK = 1000;
 
 /**
  * The samples of a stored chunk. Each is only checked to be a snapshot with a
@@ -213,6 +218,47 @@ export class IndexedDbSessionStore implements SessionStore {
         return write;
       })
       .sort(byStart);
+  }
+
+  async importSessions(
+    sessions: readonly ImportedSession[],
+  ): Promise<SessionSummary[]> {
+    const records = sessions.map(importedRecords);
+    // One transaction, so a failure part way (a full quota) stores none.
+    const tx = this.db.transaction([SESSIONS, CHUNKS, WRITES], 'readwrite');
+    const chunks = tx.objectStore(CHUNKS);
+    const writes = tx.objectStore(WRITES);
+
+    try {
+      for (const { summary, samples, writes: sessionWrites } of records) {
+        tx.objectStore(SESSIONS).add(summary);
+
+        for (let start = 0; start < samples.length; start += IMPORT_CHUNK) {
+          const chunk: ChunkRecord = {
+            sessionId: summary.id,
+            samples: samples.slice(start, start + IMPORT_CHUNK),
+          };
+
+          chunks.add(chunk);
+        }
+
+        for (const write of sessionWrites) {
+          const record: WriteRecord = { ...write, sessionId: summary.id };
+
+          writes.add(record);
+        }
+      }
+    } catch (error) {
+      // A request that throws as it is made does not end the transaction;
+      // without this, those made before it would still be stored.
+      tx.abort();
+      throw error;
+    }
+
+    await completed(tx);
+    this.listeners.notify();
+
+    return records.map(({ summary }) => summary);
   }
 
   async remove(id: string): Promise<void> {

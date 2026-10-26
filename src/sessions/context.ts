@@ -5,6 +5,8 @@ import type { UnreadableRecord } from '../model/record';
 import type { SessionChanges, SessionSummary } from '../model/session';
 import type { LiveSnapshot } from '../model/snapshot';
 import type { RecordedWrite } from '../model/write';
+import type { OpenedFile } from '../platform/platform';
+import type { RecordingFileContents } from './recordingFiles';
 
 export type SessionList =
   | { status: 'loading' }
@@ -51,6 +53,17 @@ export interface SessionsValue {
    * A session still being recorded gives what has been saved so far.
    */
   read(id: string): Promise<SessionContents>;
+  /**
+   * The sessions `ids`, in that order, as one recording file to save, with
+   * everything stored for each.
+   */
+  exportFile(ids: readonly string[]): Promise<RecordingFileContents>;
+  /**
+   * Stores every recording in a file the user opened, all or none. Resolves
+   * once the list shows them, with their summaries; rejects with a
+   * `RecordingFileError` saying why if the file cannot be opened.
+   */
+  importFile(file: OpenedFile): Promise<SessionSummary[]>;
 }
 
 export const SessionsContext = createContext<SessionsValue | undefined>(

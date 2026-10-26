@@ -3,7 +3,7 @@
 import type { LiveSnapshot } from '../model/snapshot';
 import type { SessionSummary } from '../model/session';
 import { METRICS, recordedKeys, sampleOf, type DisplayUnits } from '../metrics';
-import { sourceLabel } from './format';
+import { sessionFileName, sourceLabel } from './format';
 import {
   identityRows,
   NOT_RECORDED,
@@ -122,14 +122,5 @@ export function sessionCsv(
 
 /** A file name from a session's name and start, safe on any file system. */
 export function sessionCsvFileName(name: string, startedAt: number): string {
-  const stamp = new Date(startedAt)
-    .toISOString()
-    .slice(0, 19)
-    .replaceAll(':', '-');
-  const safe = name
-    .replaceAll(/[^\p{L}\p{N}]+/gu, '-')
-    .replaceAll(/^-+|-+$/g, '')
-    .slice(0, 60);
-
-  return `${safe || 'session'}-${stamp}.csv`;
+  return sessionFileName(name, startedAt, '.csv');
 }

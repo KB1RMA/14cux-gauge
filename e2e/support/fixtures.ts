@@ -129,6 +129,41 @@ export function reading(scope: Page | Locator, name: string): Locator {
     .locator('xpath=following-sibling::dd[1]');
 }
 
+/** The table of recorded sessions. */
+export function sessionsTable(page: Page): Locator {
+  return page.getByRole('table', { name: 'Recorded sessions' });
+}
+
+/**
+ * What the sessions table shows for the session named `name` under the
+ * heading `column`.
+ */
+export async function sessionCell(
+  page: Page,
+  name: string,
+  column: string,
+): Promise<Locator> {
+  const table = sessionsTable(page);
+  const heading = table.getByRole('columnheader', {
+    name: column,
+    exact: true,
+  });
+
+  await expect(heading).toBeVisible();
+
+  const index = await heading.evaluate(
+    (cell) => (cell as HTMLTableCellElement).cellIndex,
+  );
+
+  // A cell belongs to its heading by position only; no role expresses that.
+  // eslint-disable-next-line playwright/no-raw-locators -- see above
+  return table
+    .getByRole('row')
+    .filter({ has: page.getByRole('link', { name, exact: true }) })
+    .locator(':scope > td, :scope > th')
+    .nth(index);
+}
+
 /** What the connection bar says about the ECU connection. */
 export function connectionStatus(page: Page): Locator {
   return page.getByRole('region', { name: 'Connection' }).getByRole('status');

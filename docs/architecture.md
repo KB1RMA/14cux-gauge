@@ -126,6 +126,8 @@ These are kept in the browser's database:
   are saved beside it in batches.
 - **Writes.** Each command sent to the ECU during a recording, with when it
   started and ended and how it went: done, failed, or only partly done.
+- **Where it came from.** A session opened from a recording file notes the
+  file's name, when it was opened, and when and by what the file was saved.
 - **ROM images.** The copied program, with its tune number, size, a
   fingerprint (SHA-256) to tell copies apart, and whether it came from a real
   ECU or the demo.
@@ -143,6 +145,15 @@ changes, its version number goes up. Older items are updated as they are read;
 they are never rewritten where they sit. Every item is checked against its
 shape when it is read. If the app cannot read one, it lists it so you can
 delete it, instead of hiding it.
+
+### Recording files
+
+You can save sessions as a file and open them again, here or on another
+computer. The file is JSON, and its shape is written down in
+[recording-file.md](recording-file.md), because other people and tools may
+rely on it. It keeps everything a session has, with every sample exactly as it
+was recorded. When the app opens a file, it checks all of it first. If any part
+is wrong, or the file is from a newer version, it says why and opens nothing.
 
 ### Replay
 
@@ -167,7 +178,7 @@ flowchart TB
     Connect[ConnectScreen]
     Dash["Dashboard (lazy)<br/>LiveTiles · GraphsView · FuelMapView<br/>FaultCodes · EcuInfo · tests"]
     DashV["DashView (lazy)<br/>large readings, stale marking"]
-    Sessions["SessionsView (lazy)<br/>SessionList · SessionDetail · SessionReplay"]
+    Sessions["SessionsView (lazy)<br/>SessionList · SessionTable<br/>SessionDetail · SessionReplay"]
     Chrome["StatusBar · Preferences · Footer<br/>SaveSessionDialog · AppNotices"]
   end
 
@@ -206,7 +217,7 @@ flowchart TB
   subgraph platform["platform/ — the only reader of browser globals"]
     direction LR
     Serial["serial<br/>WebSerialTransport"]
-    Files["files<br/>save"]
+    Files["files<br/>save · open"]
     StorePlat["storage<br/>open"]
     SettingsBE["settings<br/>localStorage"]
     AppPlat["app<br/>reload"]
@@ -339,7 +350,7 @@ sequenceDiagram
 
 As a recording starts, the `Recorder` asks `EcuSession.readNow` to run
 `readIdentity` (in `ecu/reads.ts`) beside polling, and stores the result in
-the session's summary (format 4). `readNow` reads nothing while a ROM read
+the session's summary (since format 4). `readNow` reads nothing while a ROM read
 has the link to itself, and the identity then says it was not read. A holder
 that takes the link while a `readNow` read is running waits for it before
 polling pauses. The tune revision is in the ROM, so `reads.ts` keeps the last
@@ -383,6 +394,16 @@ once to show why it cannot. `readingState` turns a sample and its limits into a
 tone and a note for `LiveTiles` and `DashView`; `dialBands` and
 `limitLinesPlugin` draw the same levels on dials and live graphs. Replay passes
 no limits.
+
+`SessionsProvider` saves and opens recording files through
+`sessions/recordingFiles.ts`: saving reads each chosen session from the
+`SessionStore`, and opening checks the whole file against the `zod/mini`
+schema in `model/recordingFile.ts` before `SessionStore.importSessions` stores
+every recording in one transaction, each under a new id and in session format
+5 with an `imported` note. The views ask `platform.files` to save the text or
+to let the user choose a file to open. `SessionTable` uses TanStack Table
+(`sessions/sessionTable.ts` defines its columns) for sorting and for choosing
+sessions to save together; the chosen ids are React state in `SessionList`.
 
 Replay reads a stored session through `useSessionSamples`, and
 `useRecordedSeries` builds a `SampleHistory` from it with `pushSnapshot`, as

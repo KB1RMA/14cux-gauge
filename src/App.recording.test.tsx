@@ -14,7 +14,9 @@ import {
   collectSamples,
   recordAndStop,
   savedAndClosed,
+  sessionCell,
   sessionsNav,
+  sessionsTable,
 } from './test-support/recording';
 import { notification } from './test-support/notifications';
 import { fakeUsageCounter } from './test-support/usageCounter';
@@ -91,18 +93,19 @@ describe('Recording and browsing sessions', () => {
       screen.getByText(/recordings last only until the page is closed/),
     ).toBeInTheDocument();
 
-    const item = within(screen.getByRole('listitem'));
-
     expect(
-      item.getByRole('heading', { level: 3, name: 'Idle wobble' }),
+      within(sessionsTable()).getByRole('rowheader', {
+        name: 'Idle wobble Hunts between 600 and 900 rpm.',
+      }),
     ).toBeInTheDocument();
-    expect(
-      item.getByText('Hunts between 600 and 900 rpm.'),
-    ).toBeInTheDocument();
-    expect(readingFor('Source')).toHaveTextContent('Demo ECU');
-    expect(readingFor('Length')).toHaveTextContent(/^0:0\d$/);
+    expect(sessionCell('Idle wobble', 'Source')).toHaveTextContent('Demo ECU');
+    expect(sessionCell('Idle wobble', 'Length')).toHaveTextContent(/^0:0\d$/);
     // Live polling and the status bar carry on while browsing.
-    expect(screen.getByRole('status')).toHaveTextContent('Demo ECU · Polling');
+    expect(
+      within(screen.getByRole('region', { name: 'Connection' })).getByRole(
+        'status',
+      ),
+    ).toHaveTextContent('Demo ECU · Polling');
     await expectNoAxeViolations(container);
 
     await user.click(sessionsNav().getByRole('link', { name: 'Live' }));
@@ -259,7 +262,7 @@ describe('Recording and browsing sessions', () => {
     expect(
       await screen.findByRole('link', { name: /^Demo ECU, / }),
     ).toBeInTheDocument();
-    expect(readingFor('Length')).toHaveTextContent(/^0:0\d$/);
+    expect(sessionCell(/^Demo ECU, /, 'Length')).toHaveTextContent(/^0:0\d$/);
   });
 
   it('shows a recording in progress, which cannot be deleted', async () => {
@@ -272,7 +275,9 @@ describe('Recording and browsing sessions', () => {
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
 
     await screen.findByRole('link', { name: /^Demo ECU, / });
-    expect(readingFor('Length')).toHaveTextContent('Recording…');
+    expect(sessionCell(/^Demo ECU, /, 'Length')).toHaveTextContent(
+      'Recording…',
+    );
     expect(
       screen.getByRole('button', { name: /^Delete Demo ECU, / }),
     ).toBeDisabled();
