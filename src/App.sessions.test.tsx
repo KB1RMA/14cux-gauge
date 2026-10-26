@@ -22,6 +22,7 @@ import {
 } from './test-support/recording';
 import { IDENTITY } from './test-support/identity';
 import { snapshotAt } from './test-support/snapshots';
+import { noFileChosen } from './test-support/platform';
 import { storageWith } from './test-support/storage';
 import { plantRecords } from './test-support/storedRecords';
 
@@ -419,7 +420,10 @@ describe('Recording and browsing sessions', () => {
       <TestApp
         pollIntervalMs={{ demo: 10 }}
         platform={browserPlatform({
-          files: { save: () => Promise.reject(new Error('Disk full')) },
+          files: {
+            save: () => Promise.reject(new Error('Disk full')),
+            open: noFileChosen,
+          },
         })}
       />,
     );
@@ -627,7 +631,7 @@ describe('Recording and browsing sessions', () => {
     };
 
     await plantRecords(factory, {
-      sessions: [good, { ...good, id: 'newer', formatVersion: 5 }],
+      sessions: [good, { ...good, id: 'newer', formatVersion: 6 }],
     });
 
     const { container } = render(
@@ -640,12 +644,12 @@ describe('Recording and browsing sessions', () => {
 
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
 
-    const row = (
-      await screen.findByRole('heading', { name: 'Session that can’t be read' })
-    ).closest('li');
+    const unreadable = await screen.findByRole('region', {
+      name: 'Sessions that can’t be read',
+    });
 
-    expect(row).toHaveTextContent(
-      'format 5 is from a newer version of the app. Its ID is newer.',
+    expect(within(unreadable).getByRole('listitem')).toHaveTextContent(
+      'format 6 is from a newer version of the app. Its ID is newer.',
     );
     expect(screen.getByRole('link', { name: 'Cold start' })).toBeVisible();
     await expectNoAxeViolations(container);
@@ -669,7 +673,7 @@ describe('Recording and browsing sessions', () => {
 
     await waitFor(() => {
       expect(
-        screen.queryByRole('heading', { name: 'Session that can’t be read' }),
+        screen.queryByRole('region', { name: 'Sessions that can’t be read' }),
       ).not.toBeInTheDocument();
     });
     expect(screen.getByRole('link', { name: 'Cold start' })).toBeVisible();

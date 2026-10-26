@@ -63,17 +63,27 @@ export function parseRecord<T>(
   const result = schema.safeParse(raw);
 
   if (!result.success) {
-    throw new InvalidRecordError(
-      what,
-      result.error.issues
-        .map(({ path, message }) =>
-          path.length > 0 ? `${path.join('.')}: ${message}` : message,
-        )
-        .join('; '),
-    );
+    throw new InvalidRecordError(what, describeIssues(result.error));
   }
 
   return result.data;
+}
+
+/** What a failed parse found wrong, each issue led by where it is. */
+export function describeIssues(error: z.core.$ZodError): string {
+  return error.issues
+    .map((issue) => {
+      // Named, as the message alone does not say which keys.
+      const message =
+        issue.code === 'unrecognized_keys'
+          ? `unknown ${issue.keys.join(', ')}`
+          : issue.message;
+
+      return issue.path.length > 0
+        ? `${issue.path.join('.')}: ${message}`
+        : message;
+    })
+    .join('; ');
 }
 
 /** Treats `raw` as a plain object, or an empty one if it is not. */

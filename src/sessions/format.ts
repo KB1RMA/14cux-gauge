@@ -56,6 +56,27 @@ export function formatTimeOfDay(ms: number): string {
   return new Intl.DateTimeFormat(undefined, { timeStyle: 'medium' }).format(ms);
 }
 
+/**
+ * A file name from a name and a start time, safe on any file system:
+ * "Warm-idle-2026-10-05T14-32-00.csv". `extension` includes its dot.
+ */
+export function sessionFileName(
+  name: string,
+  startedAt: number,
+  extension: string,
+): string {
+  const stamp = new Date(startedAt)
+    .toISOString()
+    .slice(0, 19)
+    .replaceAll(':', '-');
+  const safe = name
+    .replaceAll(/[^\p{L}\p{N}]+/gu, '-')
+    .replaceAll(/^-+|-+$/g, '')
+    .slice(0, 60);
+
+  return `${safe || 'session'}-${stamp}${extension}`;
+}
+
 /** The name a recording gets until the user chooses one. */
 export function defaultSessionName(
   kind: RecordedSource,

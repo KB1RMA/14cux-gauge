@@ -5,7 +5,7 @@ import type { FilePlatform } from '../platform/platform';
 import { MemoryRomStore } from '../storage/romStore';
 import { MemorySessionStore } from '../storage/sessionStore';
 import { connectedSession } from '../test-support/ecuSession';
-import { testPlatform } from '../test-support/platform';
+import { noFileChosen, testPlatform } from '../test-support/platform';
 import { controllersOn } from '../test-support/services';
 import { storageWith } from '../test-support/storage';
 
@@ -33,7 +33,7 @@ async function readerOn(transport = new SimulatedTransport()) {
   const services = await controllersOn(
     session,
     testPlatform({
-      files: { save },
+      files: { save, open: noFileChosen },
       storage: { open: storageWith({ roms, sessions }) },
     }),
   );

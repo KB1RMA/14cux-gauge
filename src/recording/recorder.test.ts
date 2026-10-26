@@ -113,7 +113,7 @@ describe('Recorder', () => {
     const [saved] = await sessions.list();
     const identity = saved?.identity;
 
-    expect(saved?.formatVersion).toBe(4);
+    expect(saved?.formatVersion).toBe(5);
     expect(identity).toMatchObject({
       tune: {
         status: 'read',

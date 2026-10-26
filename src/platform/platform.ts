@@ -65,6 +65,13 @@ export interface SerialPlatform {
  */
 export type SaveResult = 'saved' | 'cancelled';
 
+/** A file the user chose to open, read as UTF-8 text. */
+export interface OpenedFile {
+  /** Its name, without the folder. */
+  name: string;
+  text: string;
+}
+
 export interface FilePlatform {
   /**
    * Offers `data` to the user as a file named `name`, of MIME type `type`;
@@ -76,6 +83,13 @@ export interface FilePlatform {
     data: string | Uint8Array,
     type: string,
   ): Promise<SaveResult>;
+  /**
+   * Asks the user to choose a file to open, offering those whose names end
+   * in one of `extensions` (such as `.json`), and reads it as text.
+   * Resolves `cancelled` if they dismiss the dialog; rejects if the file
+   * could not be read.
+   */
+  open(extensions: readonly string[]): Promise<OpenedFile | 'cancelled'>;
 }
 
 export interface AppPlatform {

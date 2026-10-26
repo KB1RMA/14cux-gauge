@@ -4,7 +4,9 @@ import { useMemo, type ReactNode } from 'react';
 import type { SessionStore } from '../storage/sessionStore';
 import { useStorage, useStorageStatus } from '../services/useStorage';
 import { useStoreQuery } from '../storage/useStoreQuery';
+import { BUILD_INFO } from '../buildInfo';
 import { SessionsContext, type SessionsValue } from './context';
+import { openRecordings, saveRecordings } from './recordingFiles';
 
 async function readList(store: SessionStore) {
   const [sessions, unreadable] = await Promise.all([
@@ -28,7 +30,12 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
 
   // Kept apart from the list, so reading a session's samples does not
   // start again each time the list changes.
-  const actions = useMemo<Pick<SessionsValue, 'edit' | 'remove' | 'read'>>(
+  const actions = useMemo<
+    Pick<
+      SessionsValue,
+      'edit' | 'remove' | 'read' | 'exportFile' | 'importFile'
+    >
+  >(
     () => ({
       // Each resolves once the list shows the change, so a view acting on
       // it next (moving focus, say) sees the list as it now is.
@@ -51,6 +58,24 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
         ]);
 
         return { samples, writes };
+      },
+      exportFile: (ids) =>
+        store
+          ? saveRecordings(store, ids, {
+              savedAt: Date.now(),
+              savedBy: `14CUX Gauge ${BUILD_INFO.version}`,
+            })
+          : notOpen(),
+      importFile: async (file) => {
+        if (!store) {
+          return notOpen();
+        }
+
+        const imported = await openRecordings(store, file, Date.now());
+
+        await settled();
+
+        return imported;
       },
     }),
     [store, settled],
