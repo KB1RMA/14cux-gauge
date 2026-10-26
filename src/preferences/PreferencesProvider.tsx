@@ -2,6 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { useLayoutEffect, useMemo, type ReactNode } from 'react';
 import type {
+  GaugeStylePreference,
   PalettePreference,
   ThemePreference,
   UsageCountsPreference,
@@ -58,6 +59,9 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       },
       setPalette: (palette: PalettePreference) => {
         setPreferences((p) => ({ ...p, palette }));
+      },
+      setGaugeStyle: (gaugeStyle: GaugeStylePreference) => {
+        setPreferences((p) => ({ ...p, gaugeStyle }));
       },
       setUsageCounts: (usageCounts: UsageCountsPreference) => {
         setPreferences((p) => ({ ...p, usageCounts }));

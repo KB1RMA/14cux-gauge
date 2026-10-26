@@ -2,9 +2,10 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { CheckIcon, GearIcon } from '@radix-ui/react-icons';
 import { DropdownMenu } from 'radix-ui';
-import { useId } from 'react';
+import { useId, type KeyboardEvent } from 'react';
 import { useCanKeepScreenOn } from '../screen/useScreenWake';
 import type {
+  GaugeStylePreference,
   PalettePreference,
   ThemePreference,
   UsageCountsPreference,
@@ -29,6 +30,101 @@ interface ChoiceGroupProps<T extends string> {
   onChange(value: T): void;
 }
 
+/** Picks an option by its value, for `RadioGroup`'s untyped callback. */
+function choose<T extends string>(
+  options: readonly Option<T>[],
+  next: string,
+  onChange: (value: T) => void,
+): void {
+  const option = options.find((o) => o.value === next);
+
+  if (option) {
+    onChange(option.value);
+  }
+}
+
+/** Keeps the menu open, so several preferences can be changed in one visit. */
+const stayOpen = (event: Event) => {
+  event.preventDefault();
+};
+
+/**
+ * Moves focus to the segment beside the focused one on Left or Right, as the
+ * row's layout suggests. The menu itself moves only on Up and Down, and
+ * Radix marks whichever item has focus as highlighted.
+ */
+function moveAlongRow(event: KeyboardEvent<HTMLDivElement>): void {
+  const step =
+    event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+
+  if (step === 0) {
+    return;
+  }
+
+  event.preventDefault();
+
+  const segments = [
+    ...event.currentTarget.querySelectorAll<HTMLElement>(
+      '[role="menuitemradio"]',
+    ),
+  ];
+  const current = segments.findIndex((segment) => segment === event.target);
+
+  segments[current + step]?.focus();
+}
+
+/**
+ * A few short choices side by side on one row, beside their label, like a
+ * segmented toggle. Still `menuitemradio`s, so Up and Down move through the
+ * menu and Enter or Space picks, as in `ChoiceGroup`; Left and Right also
+ * move along the row. Each shows its `hint` if it has one, named with the
+ * full text and the hint, so the name includes what is shown.
+ */
+function ChoiceRow<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: ChoiceGroupProps<T>) {
+  const labelId = useId();
+
+  return (
+    <div className={styles['row']}>
+      <DropdownMenu.Label id={labelId} className={styles['rowLabel']}>
+        {label}
+      </DropdownMenu.Label>
+      <DropdownMenu.RadioGroup
+        aria-labelledby={labelId}
+        value={value}
+        onValueChange={(next) => {
+          choose(options, next, onChange);
+        }}
+        className={styles['segments']}
+        onKeyDown={moveAlongRow}
+      >
+        {options.map((option) => (
+          <DropdownMenu.RadioItem
+            key={option.value}
+            value={option.value}
+            className={styles['segment']}
+            aria-label={
+              option.hint ? `${option.text} (${option.hint})` : undefined
+            }
+            onSelect={stayOpen}
+          >
+            <span className={styles['tick']}>
+              <DropdownMenu.ItemIndicator>
+                <CheckIcon aria-hidden="true" />
+              </DropdownMenu.ItemIndicator>
+            </span>
+            {option.hint ?? option.text}
+          </DropdownMenu.RadioItem>
+        ))}
+      </DropdownMenu.RadioGroup>
+    </div>
+  );
+}
+
 /** A labelled set of `menuitemradio`s: arrow keys move, Enter or Space picks. */
 function ChoiceGroup<T extends string>({
   label,
@@ -47,11 +143,7 @@ function ChoiceGroup<T extends string>({
         aria-labelledby={labelId}
         value={value}
         onValueChange={(next) => {
-          const option = options.find((o) => o.value === next);
-
-          if (option) {
-            onChange(option.value);
-          }
+          choose(options, next, onChange);
         }}
       >
         {options.map((option) => (
@@ -59,10 +151,7 @@ function ChoiceGroup<T extends string>({
             key={option.value}
             value={option.value}
             className={styles['item']}
-            // Stay open, so several preferences can be changed in one visit.
-            onSelect={(event) => {
-              event.preventDefault();
-            }}
+            onSelect={stayOpen}
           >
             <DropdownMenu.ItemIndicator className={styles['indicator']}>
               <CheckIcon aria-hidden="true" />
@@ -97,6 +186,11 @@ const SPEED_OPTIONS = [
   { value: 'kmh', text: 'Kilometres per hour', hint: 'km/h' },
 ] as const satisfies readonly Option<SpeedUnit>[];
 
+const GAUGE_STYLE_OPTIONS = [
+  { value: 'tiles', text: 'Tiles' },
+  { value: 'dials', text: 'Dials' },
+] as const satisfies readonly Option<GaugeStylePreference>[];
+
 const THEME_OPTIONS = [
   { value: 'system', text: 'System' },
   { value: 'light', text: 'Light' },
@@ -120,9 +214,9 @@ const USAGE_COUNT_OPTIONS = [
 ] as const satisfies readonly Option<UsageCountsPreference>[];
 
 /**
- * The app bar's settings menu: display units, theme and paint, kept off the
- * dashboard. `offerUsageCounts` adds the usage-counts choice, which only
- * matters where the app counts usage (the published site).
+ * The app bar's settings menu: display units, gauge style, theme and paint,
+ * kept off the dashboard. `offerUsageCounts` adds the usage-counts choice,
+ * which only matters where the app counts usage (the published site).
  */
 export function PreferencesMenu({
   offerUsageCounts = false,
@@ -134,6 +228,8 @@ export function PreferencesMenu({
     setTemperatureUnit,
     speedUnit,
     setSpeedUnit,
+    gaugeStyle,
+    setGaugeStyle,
     theme,
     setTheme,
     palette,
@@ -160,21 +256,28 @@ export function PreferencesMenu({
           sideOffset={6}
           collisionPadding={16}
         >
-          <ChoiceGroup
+          <ChoiceRow
             label="Temperature"
             options={TEMPERATURE_OPTIONS}
             value={temperatureUnit}
             onChange={setTemperatureUnit}
           />
           <DropdownMenu.Separator className={styles['separator']} />
-          <ChoiceGroup
+          <ChoiceRow
             label="Speed"
             options={SPEED_OPTIONS}
             value={speedUnit}
             onChange={setSpeedUnit}
           />
           <DropdownMenu.Separator className={styles['separator']} />
-          <ChoiceGroup
+          <ChoiceRow
+            label="Gauge style"
+            options={GAUGE_STYLE_OPTIONS}
+            value={gaugeStyle}
+            onChange={setGaugeStyle}
+          />
+          <DropdownMenu.Separator className={styles['separator']} />
+          <ChoiceRow
             label="Theme"
             options={THEME_OPTIONS}
             value={theme}
@@ -196,10 +299,7 @@ export function PreferencesMenu({
             checked={keepScreenOn}
             disabled={!canKeepScreenOn}
             onCheckedChange={setKeepScreenOn}
-            // Stay open, like the choices above.
-            onSelect={(event) => {
-              event.preventDefault();
-            }}
+            onSelect={stayOpen}
           >
             <DropdownMenu.ItemIndicator className={styles['indicator']}>
               <CheckIcon aria-hidden="true" />

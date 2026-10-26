@@ -106,6 +106,8 @@ describe('useSetting', () => {
       speedUnit: 'kmh',
       theme: 'dark',
       palette: 'arles',
+      // Earlier versions had no dials.
+      gaugeStyle: 'tiles',
       usageCounts: 'off',
       keepScreenOn: false,
     });
@@ -120,6 +122,45 @@ describe('useSetting', () => {
     expect(renderHook(() => useSetting('doubleSpeed')).result.current[0]).toBe(
       true,
     );
+  });
+
+  it('keeps what a newer version saved when a change is made here', () => {
+    // A newer version of the app stored a preference this one does not know.
+    localStorage.setItem(
+      'cuxGauge.preferences',
+      '{"temperatureUnit":"C","theme":"dark","dashLayout":"compact"}',
+    );
+
+    const { result } = renderHook(() => useSetting('preferences'));
+
+    // Read as this version knows it, without the newer field.
+    expect(result.current[0]).toEqual({
+      temperatureUnit: 'C',
+      speedUnit: 'mph',
+      theme: 'dark',
+      palette: 'coniston',
+      gaugeStyle: 'tiles',
+      usageCounts: 'on',
+      keepScreenOn: false,
+    });
+
+    act(() => {
+      result.current[1]((previous) => ({ ...previous, theme: 'light' }));
+    });
+
+    // The change is saved, and the newer version's choice is still there.
+    expect(
+      JSON.parse(localStorage.getItem('cuxGauge.preferences') ?? 'null'),
+    ).toEqual({
+      temperatureUnit: 'C',
+      speedUnit: 'mph',
+      theme: 'light',
+      palette: 'coniston',
+      gaugeStyle: 'tiles',
+      usageCounts: 'on',
+      keepScreenOn: false,
+      dashLayout: 'compact',
+    });
   });
 
   it('shares one value between every component using it', async () => {

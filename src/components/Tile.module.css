@@ -64,3 +64,8 @@
   font-size: 0.9rem;
   font-weight: 600;
 }
+
+/* A dial's value sits centred under it. */
+.tile[data-dial] .value {
+  text-align: center;
+}

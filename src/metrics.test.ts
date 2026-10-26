@@ -246,6 +246,28 @@ describe('metrics', () => {
     expect(metric('engineRpm').tone).toBeUndefined();
   });
 
+  it('says in words when coolant is hot or overheating', () => {
+    const coolant = metric('coolantTempF');
+
+    expect(coolant.tone?.(220)).toBe('normal');
+    expect(coolant.note?.(220)).toBeUndefined();
+    // 221 °F is 105 °C.
+    expect(coolant.tone?.(221)).toBe('warn');
+    expect(coolant.note?.(221)).toBe('hot');
+    expect(coolant.tone?.(238)).toBe('warn');
+    expect(coolant.note?.(238)).toBe('hot');
+    // 239 °F is 115 °C.
+    expect(coolant.tone?.(239)).toBe('alert');
+    expect(coolant.note?.(239)).toBe('overheating');
+    expect(coolant.note?.(300)).toBe('overheating');
+    // Cold is not flagged: the ECU enriches for it.
+    expect(coolant.tone?.(-13)).toBe('normal');
+    expect(coolant.note?.(-13)).toBeUndefined();
+    // The thresholds change the colour and note, never the reading.
+    expect(formatSample(coolant, 230, IMPERIAL)).toBe('230');
+    expect(formatSample(coolant, 230, METRIC)).toBe('110');
+  });
+
   it('explains every reading', () => {
     expect(
       METRICS.filter((m) => !/^[A-Z].{20,}\.$/.test(m.description)).map(

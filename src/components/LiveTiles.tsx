@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { useId, type ReactNode } from 'react';
+import { useId, useMemo, type ReactNode } from 'react';
 import { useLiveSample } from '../ecu/useLiveData';
 import type { LiveSnapshot } from '../model/snapshot';
 import {
@@ -9,24 +9,54 @@ import {
   METRIC_KEYS,
   metricsInGroup,
   sampleOf,
+  type DialScale,
   type Metric,
   type MetricKey,
 } from '../metrics';
+import type { PreferencesContextValue } from '../preferences/context';
 import { usePreferences } from '../preferences/usePreferences';
+import { Dial } from './Dial';
 import { Meter } from './Meter';
 import { MetricInfo } from './MetricInfo';
 import { Tile } from './Tile';
 import styles from './LiveTiles.module.css';
 
-function Group({ title, children }: { title: string; children: ReactNode }) {
+/**
+ * A group's readings under its heading. Dials, being larger, sit in a grid
+ * of their own above the tiles, so a short tile never stands beside a tall
+ * dial.
+ */
+function Group({
+  title,
+  dials,
+  tiles,
+}: {
+  title: string;
+  dials: ReactNode[];
+  tiles: ReactNode[];
+}) {
   const id = useId();
 
   return (
     <section aria-labelledby={id} className={styles['group']}>
       <h3 id={id}>{title}</h3>
-      <dl className={styles['grid']}>{children}</dl>
+      {dials.length > 0 ? <dl className={styles['dials']}>{dials}</dl> : null}
+      {tiles.length > 0 ? <dl className={styles['grid']}>{tiles}</dl> : null}
     </section>
   );
+}
+
+/**
+ * The dial scale to draw `metric` on, or `undefined` to draw it as a tile.
+ * The one place that decides, so a dial never lands among the tiles.
+ */
+function dialScaleFor(
+  metric: Metric,
+  preferences: PreferencesContextValue,
+): DialScale | undefined {
+  return preferences.gaugeStyle === 'dials'
+    ? metric.dial?.(preferences)
+    : undefined;
 }
 
 function MetricTile({
@@ -38,6 +68,10 @@ function MetricTile({
   sample: number | null | undefined;
 }) {
   const units = usePreferences();
+  const display = sample == null ? sample : metric.toDisplay(sample, units);
+  // The same scale object until the metric or a preference changes, so the
+  // dial's face is not redrawn with each reading.
+  const scale = useMemo(() => dialScaleFor(metric, units), [metric, units]);
 
   return (
     <Tile
@@ -53,10 +87,12 @@ function MetricTile({
       info={<MetricInfo metric={metric} />}
       meter={
         metric.meter ? (
-          <Meter
-            meter={metric.meter}
-            display={sample == null ? sample : metric.toDisplay(sample, units)}
-          />
+          <Meter meter={metric.meter} display={display} />
+        ) : undefined
+      }
+      dial={
+        scale ? (
+          <Dial metric={metric} scale={scale} units={units} display={display} />
         ) : undefined
       }
     />
@@ -75,6 +111,10 @@ function TileGroups({
   keys: readonly MetricKey[];
   tile(metric: Metric): ReactNode;
 }) {
+  const preferences = usePreferences();
+  const asDial = (metric: Metric) =>
+    dialScaleFor(metric, preferences) !== undefined;
+
   return (
     <div className={styles['groups']}>
       {METRIC_GROUPS.map((group) => {
@@ -83,9 +123,12 @@ function TileGroups({
         );
 
         return metrics.length === 0 ? null : (
-          <Group key={group.id} title={group.title}>
-            {metrics.map(tile)}
-          </Group>
+          <Group
+            key={group.id}
+            title={group.title}
+            dials={metrics.filter(asDial).map(tile)}
+            tiles={metrics.filter((m) => !asDial(m)).map(tile)}
+          />
         );
       })}
     </div>

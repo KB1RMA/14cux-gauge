@@ -18,6 +18,11 @@ export const PALETTE_PREFERENCES = [
 
 export type PalettePreference = (typeof PALETTE_PREFERENCES)[number];
 
+/** How the dashboard draws readings that have a dial: tiles, or dials. */
+export const GAUGE_STYLE_PREFERENCES = ['tiles', 'dials'] as const;
+
+export type GaugeStylePreference = (typeof GAUGE_STYLE_PREFERENCES)[number];
+
 export const USAGE_COUNTS_PREFERENCES = ['on', 'off'] as const;
 
 /** Whether the app may count visits and connections anonymously. */
@@ -28,6 +33,8 @@ export interface Preferences {
   speedUnit: SpeedUnit;
   theme: ThemePreference;
   palette: PalettePreference;
+  /** Tiles unless dials are chosen. */
+  gaugeStyle: GaugeStylePreference;
   usageCounts: UsageCountsPreference;
   /** Keep the screen on while an ECU is connected; off unless chosen. */
   keepScreenOn: boolean;

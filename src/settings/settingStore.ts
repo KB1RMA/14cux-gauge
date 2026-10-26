@@ -1,10 +1,36 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
+import { fieldsOf } from '../model/record';
 import type { SettingsBackend } from '../platform/platform';
 import { parseRawSetting, type SettingParser } from './parseSetting';
 import { settingParser, type SettingKey, type SettingValue } from './registry';
 
 const UNREAD = Symbol('unread');
+
+/**
+ * `value`, plus any fields in the JSON last stored that `value` does not
+ * have. A newer version of the app may have stored fields this one does not
+ * know; saving a change here keeps them, so going back to the newer version
+ * (or using it in another window) does not lose a choice made there.
+ */
+function withUnknownFields(
+  raw: string | null | undefined,
+  value: unknown,
+): unknown {
+  if (fieldsOf(value) !== value || raw === null || raw === undefined) {
+    return value;
+  }
+
+  let stored: unknown;
+
+  try {
+    stored = JSON.parse(raw);
+  } catch {
+    return value;
+  }
+
+  return { ...fieldsOf(stored), ...fieldsOf(value) };
+}
 
 /**
  * One setting, shared by every component that uses it: an external store
@@ -53,8 +79,11 @@ export class SettingStore<T> {
         ? (next as (previous: T) => T)(previous)
         : next;
 
+    const raw = this.raw === UNREAD ? undefined : this.raw;
+
     // If it is not stored, keep it until storage holds something else.
-    this.raw = this.backend.write(this.key, value) ?? this.raw;
+    this.raw =
+      this.backend.write(this.key, withUnknownFields(raw, value)) ?? this.raw;
     this.value = value;
     this.notify();
   };

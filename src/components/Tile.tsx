@@ -19,6 +19,8 @@ export interface TileProps {
   info?: ReactNode;
   /** A picture of the value under it, such as `Meter`; hidden from assistive tech. */
   meter?: ReactNode;
+  /** A dial picturing the value above it, such as `Dial`; hidden from assistive tech. */
+  dial?: ReactNode;
 }
 
 /** One name/value pair. Render inside a `<dl>`. */
@@ -30,14 +32,20 @@ export function Tile({
   note,
   info,
   meter,
+  dial,
 }: TileProps) {
   return (
-    <div className={styles['tile']} data-tone={tone}>
+    <div
+      className={styles['tile']}
+      data-tone={tone}
+      data-dial={dial ? '' : undefined}
+    >
       <dt className={styles['label']}>
         {label}
         {info}
       </dt>
       <dd className={styles['value']}>
+        {dial}
         {value === null ? (
           <>
             <span aria-hidden="true">—</span>
