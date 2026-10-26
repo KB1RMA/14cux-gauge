@@ -52,23 +52,34 @@ function DashTile({
       <dd className={styles['value']}>
         {stale ? (
           <>
-            <span aria-hidden="true">—</span>
+            <span aria-hidden="true" className={styles['reading']}>
+              —
+            </span>
             <span className={styles['state']}>Stale</span>
           </>
         ) : current === null ? (
           <>
-            <span aria-hidden="true">—</span>
+            <span aria-hidden="true" className={styles['reading']}>
+              —
+            </span>
             <VisuallyHidden.Root>No valid reading</VisuallyHidden.Root>
           </>
         ) : current === undefined ? (
           <>
-            <span aria-hidden="true">—</span>
+            <span aria-hidden="true" className={styles['reading']}>
+              —
+            </span>
             <span className={styles['state']}>Waiting for data</span>
           </>
         ) : (
           <>
-            {formatSample(metric, current, units)}
-            {unit ? <span className={styles['unit']}> {unit}</span> : null}
+            <span
+              className={styles['reading']}
+              data-words={metric.group === 'states' ? '' : undefined}
+            >
+              {formatSample(metric, current, units)}
+              {unit ? <span className={styles['unit']}> {unit}</span> : null}
+            </span>
             {note ? <span className={styles['note']}> {note}</span> : null}
           </>
         )}
@@ -90,6 +101,34 @@ function PolledDashTile({ metric, stale }: { metric: Metric; stale: boolean }) {
   );
 }
 
+/**
+ * How many columns `count` tiles take in a grid `aspect` times as wide as it
+ * is tall, so each tile comes out about as wide as a reading (a number and
+ * its unit) needs: wider than tall, but not a thin strip. The rows are then
+ * filled as evenly as they can be.
+ */
+function columnsFor(count: number, aspect: number): number {
+  const tileAspect = 1.8;
+  const columns = Math.min(
+    count,
+    Math.max(1, Math.round(Math.sqrt((count * aspect) / tileAspect))),
+  );
+
+  return Math.ceil(count / Math.ceil(count / columns));
+}
+
+/**
+ * The grid's shape, in the steps `DashView.module.css` tells apart, and an
+ * aspect ratio typical of each.
+ */
+const GRID_SHAPES = [
+  ['tall', 0.6],
+  ['square', 1.1],
+  ['wide', 1.8],
+  ['wider', 2.6],
+  ['widest', 3.6],
+] as const;
+
 /** The readings in `keys`, in the order of the metrics, one large tile each. */
 function DashGrid({
   keys,
@@ -107,9 +146,19 @@ function DashGrid({
       No readings chosen. Use “Choose dash readings” to pick some.
     </p>
   ) : (
-    <dl aria-label={label} className={styles['grid']}>
-      {shown.map(tile)}
-    </dl>
+    <div
+      className={styles['fit']}
+      style={Object.fromEntries(
+        GRID_SHAPES.map(([shape, aspect]) => [
+          `--columns-${shape}`,
+          columnsFor(shown.length, aspect),
+        ]),
+      )}
+    >
+      <dl aria-label={label} className={styles['grid']}>
+        {shown.map(tile)}
+      </dl>
+    </div>
   );
 }
 
