@@ -489,6 +489,42 @@ describe('IndexedDbSessionStore failures', () => {
     uuid.mockRestore();
     store.close();
   });
+
+  it('stores none of the sessions from a file when one cannot be stored', async () => {
+    const store = await openIndexedDb(new IDBFactory());
+    const session = {
+      name: 'Idle',
+      notes: '',
+      source: 'serial',
+      startedAt: 1000,
+      endedAt: 2000,
+      identity: null,
+      writesKept: true,
+      imported: {
+        fileName: 'idle.json',
+        importedAt: 9000,
+        savedAt: 8000,
+        savedBy: '14CUX Gauge 0.13.0',
+      },
+    } as const;
+    // A value IndexedDB cannot store, so adding it throws as it is made,
+    // after the first session's records have been added.
+    const unstorable = {
+      ...PUMP_STOPPED,
+      outcome: { status: 'done', message: (() => 'x') as unknown as string },
+    } satisfies WriteLogEntry;
+
+    await expect(
+      store.importSessions([
+        { session, samples: [snapshotAt(1000)], writes: [PUMP_STOPPED] },
+        { session, samples: [snapshotAt(1000)], writes: [unstorable] },
+      ]),
+    ).rejects.toThrow(
+      expect.objectContaining({ name: 'DataCloneError' }) as Error,
+    );
+    expect(await store.list()).toEqual([]);
+    store.close();
+  });
 });
 
 describe('openStorage', () => {

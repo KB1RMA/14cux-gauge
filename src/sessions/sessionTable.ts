@@ -6,6 +6,7 @@ import {
   rowSelectionFeature,
   rowSortingFeature,
   tableFeatures,
+  type SortFn,
   type SortingState,
 } from '@tanstack/react-table';
 import type { SessionSummary } from '../model/session';
@@ -31,6 +32,12 @@ export const sessionTableFeatures = tableFeatures({
   sortedRowModel: createSortedRowModel(),
 });
 
+const collator = new Intl.Collator();
+
+/** Sorts a column of text as the user's language orders it. */
+const textSort: SortFn<typeof sessionTableFeatures, SessionRow> = (a, b, id) =>
+  collator.compare(a.getValue<string>(id), b.getValue<string>(id));
+
 const column = createColumnHelper<typeof sessionTableFeatures, SessionRow>();
 
 /** How long a session ran, or `undefined` while recording or if it never stopped. */
@@ -44,8 +51,7 @@ export const sessionColumns = column.columns([
   column.accessor((row) => row.session.name, {
     id: 'name',
     header: 'Name',
-    sortFn: (a, b, id) =>
-      a.getValue<string>(id).localeCompare(b.getValue<string>(id)),
+    sortFn: textSort,
   }),
   column.accessor((row) => row.session.startedAt, {
     id: 'recorded',
@@ -67,8 +73,7 @@ export const sessionColumns = column.columns([
   column.accessor((row) => sourceLabel(row.session.source), {
     id: 'source',
     header: 'Source',
-    sortFn: (a, b, id) =>
-      a.getValue<string>(id).localeCompare(b.getValue<string>(id)),
+    sortFn: textSort,
   }),
 ]);
 

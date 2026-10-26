@@ -276,6 +276,16 @@ describe('The sessions table', () => {
     );
 
     expect(namesInOrder()).toEqual(['Cold start']);
+    // Deleted, so no longer chosen.
+    expect(
+      screen.getByRole('checkbox', { name: 'Select all sessions' }),
+    ).not.toBePartiallyChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Select all sessions' }),
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole('button', { name: 'Save selected as file' }),
+    ).toHaveAccessibleDescription('Choose sessions to save them together.');
 
     toOpen.push({ name: 'idle from Sam.json', text: String(saved[0]?.data) });
     await user.click(
@@ -339,6 +349,43 @@ describe('The sessions table', () => {
         endedAt: START + 65_000,
       },
     ]);
+  });
+
+  it('saves a session as a file once however often the button is pressed', async () => {
+    const user = userEvent.setup();
+    let finishSave = () => undefined as void;
+    const names: string[] = [];
+
+    renderApp(await twoSessions(), [], {
+      save: (name) => {
+        names.push(name);
+
+        return new Promise((resolve) => {
+          finishSave = () => {
+            resolve('saved');
+          };
+        });
+      },
+    });
+
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: 'Idle wobble' }));
+
+    const save = within(
+      screen.getByRole('region', { name: 'Export' }),
+    ).getByRole('button', { name: 'Save as file' });
+
+    await user.click(save);
+
+    expect(save).toBeDisabled();
+
+    await user.click(save);
+    finishSave();
+
+    await vi.waitFor(() => {
+      expect(save).toBeEnabled();
+    });
+    expect(names).toEqual(['Idle-wobble-2026-10-05T14-00-00.json']);
   });
 
   it('says why a file cannot be opened, and opens nothing from it', async () => {

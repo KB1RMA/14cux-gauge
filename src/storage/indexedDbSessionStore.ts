@@ -229,23 +229,30 @@ export class IndexedDbSessionStore implements SessionStore {
     const chunks = tx.objectStore(CHUNKS);
     const writes = tx.objectStore(WRITES);
 
-    for (const { summary, samples, writes: sessionWrites } of records) {
-      tx.objectStore(SESSIONS).add(summary);
+    try {
+      for (const { summary, samples, writes: sessionWrites } of records) {
+        tx.objectStore(SESSIONS).add(summary);
 
-      for (let start = 0; start < samples.length; start += IMPORT_CHUNK) {
-        const chunk: ChunkRecord = {
-          sessionId: summary.id,
-          samples: samples.slice(start, start + IMPORT_CHUNK),
-        };
+        for (let start = 0; start < samples.length; start += IMPORT_CHUNK) {
+          const chunk: ChunkRecord = {
+            sessionId: summary.id,
+            samples: samples.slice(start, start + IMPORT_CHUNK),
+          };
 
-        chunks.add(chunk);
+          chunks.add(chunk);
+        }
+
+        for (const write of sessionWrites) {
+          const record: WriteRecord = { ...write, sessionId: summary.id };
+
+          writes.add(record);
+        }
       }
-
-      for (const write of sessionWrites) {
-        const record: WriteRecord = { ...write, sessionId: summary.id };
-
-        writes.add(record);
-      }
+    } catch (error) {
+      // A request that throws as it is made does not end the transaction;
+      // without this, those made before it would still be stored.
+      tx.abort();
+      throw error;
     }
 
     await completed(tx);

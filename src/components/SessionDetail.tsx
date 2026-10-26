@@ -108,6 +108,9 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
   const [exportFailed, setExportFailed] = useState<
     { id: string; message: string } | undefined
   >(undefined);
+  // The session being saved as a file, so a second click does not read and
+  // save it again.
+  const [savingId, setSavingId] = useState<string | undefined>(undefined);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const session =
     list.status === 'loaded'
@@ -229,8 +232,10 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
             <div className={styles['formActions']}>
               <button
                 type="button"
+                disabled={savingId === id}
                 onClick={() => {
                   setExportFailed(undefined);
+                  setSavingId(id);
                   void exportFile([id])
                     .then(
                       (file) =>
@@ -249,6 +254,11 @@ export function SessionDetail({ id, tab }: { id: string; tab: ReplayTab }) {
                       if (feedback?.kind === 'failed') {
                         setExportFailed({ id, message: feedback.message });
                       }
+                    })
+                    .finally(() => {
+                      setSavingId((saving) =>
+                        saving === id ? undefined : saving,
+                      );
                     });
                 }}
               >

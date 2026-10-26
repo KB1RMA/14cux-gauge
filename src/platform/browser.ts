@@ -191,6 +191,13 @@ export const browserScreen: ScreenPlatform = {
 };
 
 /**
+ * Settles the file picker still waiting for an answer, if any, as cancelled.
+ * Browsers without the input's `cancel` event never say the user dismissed
+ * it, so the next {@link FilePlatform.open} settles the one before.
+ */
+let cancelOpenPicker: (() => void) | undefined;
+
+/**
  * Saves files through the browser's normal download, and opens them with its
  * file picker.
  */
@@ -215,7 +222,10 @@ export const browserDownloads: FilePlatform = {
     return Promise.resolve('saved');
   },
   open(extensions) {
+    cancelOpenPicker?.();
+
     const input = document.createElement('input');
+    let cancel: (() => void) | undefined;
 
     input.type = 'file';
     input.accept = extensions.join(',');
@@ -225,9 +235,12 @@ export const browserDownloads: FilePlatform = {
     document.body.append(input);
 
     return new Promise<OpenedFile | 'cancelled'>((resolve, reject) => {
-      input.addEventListener('cancel', () => {
+      cancel = () => {
         resolve('cancelled');
-      });
+      };
+
+      cancelOpenPicker = cancel;
+      input.addEventListener('cancel', cancel);
       input.addEventListener('change', () => {
         const file = input.files?.[0];
 
@@ -244,6 +257,10 @@ export const browserDownloads: FilePlatform = {
       input.click();
     }).finally(() => {
       input.remove();
+
+      if (cancelOpenPicker === cancel) {
+        cancelOpenPicker = undefined;
+      }
     });
   },
 };

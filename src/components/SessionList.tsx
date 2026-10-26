@@ -45,8 +45,11 @@ export function SessionList({ returnTo }: { returnTo: string | undefined }) {
   const loaded = list.status === 'loaded';
   const sessions = list.status === 'loaded' ? list.sessions : [];
   // Only sessions still in the list: one deleted since keeps its choice in
-  // `selection`, but is not saved.
+  // `selection` until the next change, but is neither saved nor counted.
   const selected = sessions.filter((session) => selection[session.id]);
+  const shownSelection: RowSelectionState = Object.fromEntries(
+    selected.map((session) => [session.id, true]),
+  );
 
   // Once the list is on screen, put the user where they were.
   useEffect(() => {
@@ -81,8 +84,12 @@ export function SessionList({ returnTo }: { returnTo: string | undefined }) {
     }
   };
 
+  // Not busy while the picker is up: a browser that never says the user
+  // dismissed it would leave the buttons disabled.
   const openFile = async () => {
     let file;
+
+    setFeedback(undefined);
 
     try {
       file = await files.open([RECORDING_FILE_EXTENSION]);
@@ -99,6 +106,8 @@ export function SessionList({ returnTo }: { returnTo: string | undefined }) {
       return;
     }
 
+    setBusy(true);
+
     try {
       const imported = await importFile(file);
 
@@ -114,6 +123,8 @@ export function SessionList({ returnTo }: { returnTo: string | undefined }) {
             ? error.message
             : `${file.name} could not be opened: the browser could not store it.`,
       });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -153,7 +164,9 @@ export function SessionList({ returnTo }: { returnTo: string | undefined }) {
         <button
           type="button"
           disabled={!opened || busy}
-          onClick={fileAction(openFile)}
+          onClick={() => {
+            void openFile();
+          }}
         >
           <UploadIcon aria-hidden="true" />
           Open recording file…
@@ -207,7 +220,7 @@ export function SessionList({ returnTo }: { returnTo: string | undefined }) {
         <SessionTable
           sessions={list.sessions}
           recordingId={active?.id}
-          selection={selection}
+          selection={shownSelection}
           onSelectionChange={setSelection}
           onDelete={setDeleting}
           linkRef={(id, link) => {

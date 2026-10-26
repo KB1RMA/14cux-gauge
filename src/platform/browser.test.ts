@@ -632,4 +632,19 @@ describe('browserPlatform opening files', () => {
     expect(await browserPlatform().files.open(['.json'])).toBe('cancelled');
     expect(pickers[0]?.isConnected).toBe(false);
   });
+
+  it('settles a picker the browser never answered once the user opens another', async () => {
+    // A browser without the `cancel` event says nothing when the user
+    // dismisses the picker.
+    const pickers = answerPicker(() => undefined);
+    const files = browserPlatform().files;
+    const first = files.open(['.json']);
+
+    void files.open(['.json']);
+
+    expect(await first).toBe('cancelled');
+    expect(pickers[0]?.isConnected).toBe(false);
+    expect(pickers[1]?.isConnected).toBe(true);
+    pickers[1]?.dispatchEvent(new Event('cancel'));
+  });
 });
