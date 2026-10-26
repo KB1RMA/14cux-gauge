@@ -112,23 +112,49 @@
 }
 
 /* Saving chosen sessions to a file, and opening one. */
+.tableFrame {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* Actions on the sessions, along the top of the table. */
 .toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border);
 }
 
 .toolbar button {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.9rem;
+}
+
+/* Actions that are not on the chosen sessions sit at the far end. */
+.toolbar .toolbarEnd {
+  margin-inline-start: auto;
 }
 
 .selected {
   margin: 0;
   color: var(--text-muted);
   font-size: 0.9rem;
+}
+
+/* What became of a file just opened or saved, under the toolbar. */
+.banner,
+.opened {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .opened {
@@ -139,12 +165,21 @@
   display: none;
 }
 
+/* Loading, empty or failed, in place of the table. */
+.frameMessage {
+  margin: 0;
+  padding: 1rem 0.75rem;
+}
+
 /* The sessions, one row each. */
 .table {
   width: 100%;
   border-collapse: collapse;
-  background: var(--surface);
-  border: 1px solid var(--border);
+}
+
+/* The frame draws the bottom edge. */
+.table tbody tr:last-child > * {
+  border-bottom: 0;
 }
 
 .table th,

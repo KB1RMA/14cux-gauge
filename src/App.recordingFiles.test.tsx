@@ -186,8 +186,13 @@ describe('The sessions table', () => {
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
     await screen.findByRole('link', { name: 'Idle wobble' });
 
-    const save = screen.getByRole('button', { name: 'Save selected as file' });
+    // The file actions share one toolbar along the top of the table.
+    const toolbar = within(screen.getByRole('toolbar', { name: 'Sessions' }));
+    const save = toolbar.getByRole('button', { name: 'Save selected as file' });
 
+    expect(
+      toolbar.getByRole('button', { name: 'Open recording file…' }),
+    ).toBeEnabled();
     expect(save).toBeDisabled();
     expect(save).toHaveAccessibleDescription(
       'Choose sessions to save them together.',

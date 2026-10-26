@@ -2,7 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { DownloadIcon, UploadIcon } from '@radix-ui/react-icons';
 import type { RowSelectionState } from '@tanstack/react-table';
-import { VisuallyHidden } from 'radix-ui';
+import { Toolbar, VisuallyHidden } from 'radix-ui';
 import { useEffect, useRef, useState } from 'react';
 import {
   RECORDING_FILE_EXTENSION,
@@ -160,31 +160,82 @@ export function SessionList({ returnTo }: { returnTo: string | undefined }) {
         </p>
       ) : null}
 
-      <div className={styles['toolbar']}>
-        <button
-          type="button"
-          disabled={!opened || busy}
-          onClick={() => {
-            void openFile();
-          }}
-        >
-          <UploadIcon aria-hidden="true" />
-          Open recording file…
-        </button>
-        <button
-          type="button"
-          disabled={selected.length === 0 || busy}
-          aria-describedby="sessions-selected"
-          onClick={fileAction(saveSelected)}
-        >
-          <DownloadIcon aria-hidden="true" />
-          Save selected as file
-        </button>
-        <p id="sessions-selected" className={styles['selected']}>
-          {selected.length === 0
-            ? 'Choose sessions to save them together.'
-            : `${String(selected.length)} of ${String(sessions.length)} selected.`}
-        </p>
+      <div className={styles['tableFrame']}>
+        <Toolbar.Root aria-label="Sessions" className={styles['toolbar']}>
+          <p id="sessions-selected" className={styles['selected']}>
+            {selected.length === 0
+              ? 'Choose sessions to save them together.'
+              : `${String(selected.length)} of ${String(sessions.length)} selected.`}
+          </p>
+          <Toolbar.Button
+            disabled={selected.length === 0 || busy}
+            aria-describedby="sessions-selected"
+            onClick={fileAction(saveSelected)}
+          >
+            <DownloadIcon aria-hidden="true" />
+            Save selected as file
+          </Toolbar.Button>
+          <Toolbar.Button
+            className={styles['toolbarEnd']}
+            disabled={!opened || busy}
+            onClick={() => {
+              void openFile();
+            }}
+          >
+            <UploadIcon aria-hidden="true" />
+            Open recording file…
+          </Toolbar.Button>
+        </Toolbar.Root>
+        {/* Present before it has anything to say, so it is announced. */}
+        <output className={styles['opened']}>
+          {feedback?.kind === 'opened' ? feedback.message : null}
+        </output>
+        {feedback?.kind === 'failed' ? (
+          <p
+            role="alert"
+            className={`${styles['error'] ?? ''} ${styles['banner'] ?? ''}`}
+          >
+            {feedback.message}
+          </p>
+        ) : null}
+
+        {list.status === 'loading' ? (
+          <p className={styles['frameMessage']}>Loading sessions…</p>
+        ) : null}
+        {list.status === 'failed' ? (
+          <p
+            role="alert"
+            className={`${styles['error'] ?? ''} ${styles['frameMessage'] ?? ''}`}
+          >
+            The recorded sessions could not be read.
+          </p>
+        ) : null}
+        {list.status === 'loaded' &&
+        list.sessions.length === 0 &&
+        list.unreadable.length === 0 ? (
+          <p
+            className={`${styles['empty'] ?? ''} ${styles['frameMessage'] ?? ''}`}
+          >
+            No sessions yet. While connected to an ECU, choose Record in the
+            status bar to record one, or open a recording file.
+          </p>
+        ) : null}
+        {list.status === 'loaded' && list.sessions.length > 0 ? (
+          <SessionTable
+            sessions={list.sessions}
+            recordingId={active?.id}
+            selection={shownSelection}
+            onSelectionChange={setSelection}
+            onDelete={setDeleting}
+            linkRef={(id, link) => {
+              if (link) {
+                openLinksRef.current.set(id, link);
+              } else {
+                openLinksRef.current.delete(id);
+              }
+            }}
+          />
+        ) : null}
       </div>
       <p className={styles['hint']}>
         A recording file keeps every sample at full precision, with notes, the
@@ -192,46 +243,7 @@ export function SessionList({ returnTo }: { returnTo: string | undefined }) {
         another computer. Use Export CSV on a session to analyse it in another
         tool.
       </p>
-      {/* Present before it has anything to say, so it is announced. */}
-      <output className={styles['opened']}>
-        {feedback?.kind === 'opened' ? feedback.message : null}
-      </output>
-      {feedback?.kind === 'failed' ? (
-        <p role="alert" className={styles['error']}>
-          {feedback.message}
-        </p>
-      ) : null}
 
-      {list.status === 'loading' ? <p>Loading sessions…</p> : null}
-      {list.status === 'failed' ? (
-        <p role="alert" className={styles['error']}>
-          The recorded sessions could not be read.
-        </p>
-      ) : null}
-      {list.status === 'loaded' &&
-      list.sessions.length === 0 &&
-      list.unreadable.length === 0 ? (
-        <p className={styles['empty']}>
-          No sessions yet. While connected to an ECU, choose Record in the
-          status bar to record one, or open a recording file.
-        </p>
-      ) : null}
-      {list.status === 'loaded' && list.sessions.length > 0 ? (
-        <SessionTable
-          sessions={list.sessions}
-          recordingId={active?.id}
-          selection={shownSelection}
-          onSelectionChange={setSelection}
-          onDelete={setDeleting}
-          linkRef={(id, link) => {
-            if (link) {
-              openLinksRef.current.set(id, link);
-            } else {
-              openLinksRef.current.delete(id);
-            }
-          }}
-        />
-      ) : null}
       {list.status === 'loaded' && list.unreadable.length > 0 ? (
         <section aria-labelledby="unreadable-title">
           <h3 id="unreadable-title" className={styles['subtitle']}>
