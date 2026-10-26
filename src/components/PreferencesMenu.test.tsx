@@ -72,12 +72,12 @@ describe('PreferencesMenu', () => {
         .getAllByRole('group')
         .map((group) => group.getAttribute('aria-labelledby'))
         .map((id) => document.getElementById(id ?? '')?.textContent),
-    ).toEqual(['Temperature', 'Speed', 'Theme', 'Paint']);
+    ).toEqual(['Temperature', 'Speed', 'Gauge style', 'Theme', 'Paint']);
     expect(
-      within(menu).getByRole('menuitemradio', { name: 'Fahrenheit' }),
+      within(menu).getByRole('menuitemradio', { name: /^Fahrenheit / }),
     ).toBeChecked();
     expect(
-      within(menu).getByRole('menuitemradio', { name: 'Miles per hour' }),
+      within(menu).getByRole('menuitemradio', { name: /^Miles per hour / }),
     ).toBeChecked();
     expect(
       within(menu).getByRole('menuitemradio', { name: 'System' }),
@@ -85,6 +85,82 @@ describe('PreferencesMenu', () => {
     expect(
       within(menu).getByRole('menuitemradio', { name: 'Coniston Green' }),
     ).toBeChecked();
+  });
+
+  it('draws dials when chosen, without changing what the readings say', async () => {
+    const user = userEvent.setup();
+    const { container } = renderWithTiles();
+    /** The picture beside a reading, hidden from assistive tech. */
+    const picture = (label: string) =>
+      readingFor(label).querySelector('[aria-hidden="true"]');
+
+    expect(picture('Coolant')).toBeNull();
+
+    await user.click(trigger());
+
+    const choices = screen.getByRole('menu', { name: 'Preferences' });
+
+    expect(
+      within(choices).getByRole('menuitemradio', { name: 'Tiles' }),
+    ).toBeChecked();
+    await user.click(
+      within(choices).getByRole('menuitemradio', { name: 'Dials' }),
+    );
+    expect(
+      within(choices).getByRole('menuitemradio', { name: 'Dials' }),
+    ).toBeChecked();
+    await user.keyboard('{Escape}');
+
+    for (const label of [
+      'Engine speed',
+      'Road speed',
+      'Coolant',
+      'Fuel temp',
+    ]) {
+      expect(picture(label)).not.toBeNull();
+    }
+
+    // Readings without a dial stay as they were.
+    expect(picture('Target idle')).toBeNull();
+    // Exactly the reading, as a tile shows it: the scale adds no text.
+    expect(readingFor('Engine speed')).toHaveTextContent(/^750 rpm$/);
+    expect(readingFor('Road speed')).toHaveTextContent(/^62 mph$/);
+    expect(readingFor('Coolant')).toHaveTextContent(/^212 °F$/);
+    expect(readingFor('Fuel temp')).toHaveTextContent(/^95 °F$/);
+    await expectNoAxeViolations(container);
+
+    await user.click(trigger());
+    await user.click(screen.getByRole('menuitemradio', { name: /^Celsius / }));
+    await user.click(
+      screen.getByRole('menuitemradio', { name: /^Kilometres per hour / }),
+    );
+    await user.keyboard('{Escape}');
+
+    // 62 mph is 99.78 km/h; 212 °F is 100 °C and 95 °F is 35 °C.
+    expect(readingFor('Road speed')).toHaveTextContent(/^100 km\/h$/);
+    expect(readingFor('Coolant')).toHaveTextContent(/^100 °C$/);
+    expect(readingFor('Fuel temp')).toHaveTextContent(/^35 °C$/);
+
+    await user.click(trigger());
+
+    const menu = screen.getByRole('menu', { name: 'Preferences' });
+
+    expect(
+      within(menu).getByRole('menuitemradio', { name: 'Dials' }),
+    ).toBeChecked();
+    await user.click(
+      within(menu).getByRole('menuitemradio', { name: 'Tiles' }),
+    );
+    expect(
+      within(menu).getByRole('menuitemradio', { name: 'Tiles' }),
+    ).toBeChecked();
+    await user.keyboard('{Escape}');
+
+    // Tiles draw no dials, and say the same.
+    expect(picture('Coolant')).toBeNull();
+    expect(picture('Engine speed')).toBeNull();
+    expect(readingFor('Coolant')).toHaveTextContent(/^100 °C$/);
+    expect(readingFor('Road speed')).toHaveTextContent(/^100 km\/h$/);
   });
 
   it('converts readings when the units change, and remembers the choice', async () => {
@@ -95,13 +171,13 @@ describe('PreferencesMenu', () => {
     expect(readingFor('Road speed')).toHaveTextContent('62 mph');
 
     await user.click(trigger());
-    await user.click(screen.getByRole('menuitemradio', { name: 'Celsius' }));
+    await user.click(screen.getByRole('menuitemradio', { name: /^Celsius / }));
     await user.click(
-      screen.getByRole('menuitemradio', { name: 'Kilometres per hour' }),
+      screen.getByRole('menuitemradio', { name: /^Kilometres per hour / }),
     );
 
     expect(
-      screen.getByRole('menuitemradio', { name: 'Celsius' }),
+      screen.getByRole('menuitemradio', { name: /^Celsius / }),
     ).toBeChecked();
 
     // The menu is modal: the page behind it is hidden from assistive tech
@@ -130,13 +206,13 @@ describe('PreferencesMenu', () => {
     await user.keyboard('{Enter}');
 
     expect(
-      screen.getByRole('menuitemradio', { name: 'Fahrenheit' }),
+      screen.getByRole('menuitemradio', { name: /^Fahrenheit / }),
     ).toHaveFocus();
 
     await user.keyboard('{ArrowDown}{Enter}');
 
     expect(
-      screen.getByRole('menuitemradio', { name: 'Celsius' }),
+      screen.getByRole('menuitemradio', { name: /^Celsius / }),
     ).toBeChecked();
 
     await user.keyboard('{Escape}');
@@ -168,7 +244,7 @@ describe('PreferencesMenu', () => {
     expect(root).not.toHaveAttribute('data-theme');
   });
 
-  it('saves the units, theme and paint, and restores them on the next visit', async () => {
+  it('saves the units, gauge style, theme and paint, and restores them on the next visit', async () => {
     const user = userEvent.setup();
     const first = renderWithTiles();
 
@@ -181,6 +257,7 @@ describe('PreferencesMenu', () => {
     );
     await user.click(screen.getByRole('menuitemradio', { name: 'Dark' }));
     await user.click(screen.getByRole('menuitemradio', { name: 'Arles Blue' }));
+    await user.click(screen.getByRole('menuitemradio', { name: 'Dials' }));
 
     expect(
       JSON.parse(localStorage.getItem('cuxGauge.preferences') ?? 'null'),
@@ -189,6 +266,7 @@ describe('PreferencesMenu', () => {
       speedUnit: 'kmh',
       theme: 'dark',
       palette: 'arles',
+      gaugeStyle: 'dials',
       usageCounts: 'on',
       keepScreenOn: false,
     });
@@ -210,6 +288,7 @@ describe('PreferencesMenu', () => {
     expect(
       screen.getByRole('menuitemradio', { name: 'Arles Blue' }),
     ).toBeChecked();
+    expect(screen.getByRole('menuitemradio', { name: 'Dials' })).toBeChecked();
   });
 
   it('applies a stored theme on load', () => {

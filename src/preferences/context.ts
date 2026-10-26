@@ -2,6 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { createContext } from 'react';
 import type {
+  GaugeStylePreference,
   Preferences,
   PalettePreference,
   ThemePreference,
@@ -14,6 +15,7 @@ export interface PreferencesContextValue extends Preferences {
   setSpeedUnit(unit: SpeedUnit): void;
   setTheme(theme: ThemePreference): void;
   setPalette(palette: PalettePreference): void;
+  setGaugeStyle(gaugeStyle: GaugeStylePreference): void;
   setUsageCounts(usageCounts: UsageCountsPreference): void;
   setKeepScreenOn(keepScreenOn: boolean): void;
 }

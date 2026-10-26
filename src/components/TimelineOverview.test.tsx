@@ -101,7 +101,7 @@ describe('TimelineOverview', () => {
     expect(drawn.data.at(-1)?.[0]).toEqual([0, 1]);
 
     await user.click(screen.getByRole('button', { name: 'Preferences' }));
-    await user.click(screen.getByRole('menuitemradio', { name: 'Celsius' }));
+    await user.click(screen.getByRole('menuitemradio', { name: /^Celsius / }));
     await user.keyboard('{Escape}');
 
     await vi.waitFor(() => {

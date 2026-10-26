@@ -7,12 +7,13 @@ const defaults = { usageCounts: 'on' } as const;
 describe('preferences', () => {
   const parse = settingParser('preferences', defaults);
 
-  it('defaults to °F, mph, the system theme and Coniston, counting usage', () => {
+  it('defaults to °F, mph, tiles, the system theme and Coniston, counting usage', () => {
     expect(parse(undefined)).toEqual({
       temperatureUnit: 'F',
       speedUnit: 'mph',
       theme: 'system',
       palette: 'coniston',
+      gaugeStyle: 'tiles',
       usageCounts: 'on',
       keepScreenOn: false,
     });
@@ -25,6 +26,7 @@ describe('preferences', () => {
         speedUnit: 'kmh',
         theme: 'dark',
         palette: 'racing-green',
+        gaugeStyle: 'dials',
         usageCounts: 'off',
         keepScreenOn: true,
       }),
@@ -33,6 +35,7 @@ describe('preferences', () => {
       speedUnit: 'kmh',
       theme: 'dark',
       palette: 'racing-green',
+      gaugeStyle: 'dials',
       usageCounts: 'off',
       keepScreenOn: true,
     });
@@ -49,13 +52,19 @@ describe('preferences', () => {
       speedUnit: 'mph',
       theme: 'system',
       palette: 'coniston',
+      gaugeStyle: 'tiles',
       usageCounts: 'on',
       keepScreenOn: false,
     };
 
-    expect(parse({ temperatureUnit: 'K', theme: 'sepia', palette: 3 })).toEqual(
-      unchosen,
-    );
+    expect(
+      parse({
+        temperatureUnit: 'K',
+        theme: 'sepia',
+        palette: 3,
+        gaugeStyle: 'needles',
+      }),
+    ).toEqual(unchosen);
     expect(parse(['F'])).toEqual(unchosen);
   });
 

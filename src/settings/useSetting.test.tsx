@@ -106,6 +106,8 @@ describe('useSetting', () => {
       speedUnit: 'kmh',
       theme: 'dark',
       palette: 'arles',
+      // Earlier versions had no dials.
+      gaugeStyle: 'tiles',
       usageCounts: 'off',
       keepScreenOn: false,
     });

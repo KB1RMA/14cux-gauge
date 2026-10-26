@@ -37,6 +37,33 @@ export type MetricGroup = 'engine' | 'air' | 'fuelling' | 'fuelMap' | 'states';
 
 export type MetricTone = 'normal' | 'good' | 'warn' | 'alert';
 
+/**
+ * A sample at or above `from` (in library units) needs attention: `tone`
+ * colours it and `note` says why in words. A metric lists its thresholds in
+ * rising order; the highest one reached applies.
+ */
+export interface Threshold {
+  from: number;
+  tone: 'warn' | 'alert';
+  note: string;
+}
+
+/**
+ * How to draw a metric as an analogue dial. The scale is in display units
+ * and on round-number steps, so each unit system gets its own.
+ */
+export interface DialScale {
+  /** The scale's ends, in display units. */
+  range: readonly [number, number];
+  /** Distance between labelled ticks, in display units. */
+  step: number;
+  /**
+   * Labels show each tick divided by this, with the caption "×divisor", so
+   * a wide scale such as engine speed fits round the dial.
+   */
+  divisor?: number;
+}
+
 export interface Metric {
   key: MetricKey;
   label: string;
@@ -54,6 +81,11 @@ export interface Metric {
    * said simply. A guide only; engines, tunes and conditions vary.
    */
   typical?(units: DisplayUnits): string;
+  /**
+   * Levels that need attention. When set, `tone` and `note` follow them, and
+   * a dial draws them as bands.
+   */
+  thresholds?: readonly Threshold[];
   /** Colour emphasis for a sample; `note` must carry the meaning in text. */
   tone?(sample: number): MetricTone;
   /** A word or two shown beside a value that needs attention. */
@@ -84,6 +116,12 @@ export interface Metric {
    * low end. Only a picture of the value, which the text still carries.
    */
   meter?: { range: readonly [number, number]; centred?: boolean };
+  /**
+   * The scale for an analogue dial, chosen in Preferences instead of a tile.
+   * A value off the scale stops the needle at its end; the text under the
+   * dial still shows the reading.
+   */
+  dial?(units: DisplayUnits): DialScale;
 }
 
 export const METRIC_GROUPS: readonly { id: MetricGroup; title: string }[] = [
@@ -120,6 +158,42 @@ export function injectorDuty(pulseUs: number, rpm: number): number {
 
 const temperatureUnit = ({ temperatureUnit: unit }: DisplayUnits) =>
   temperatureLabel(unit);
+
+/**
+ * A temperature dial from -40 to 140 °C or 280 °F, which covers the
+ * thermistors' whole range: the coldest reading the ECU can give is -13 °F.
+ */
+const temperatureDial = ({ temperatureUnit: unit }: DisplayUnits): DialScale =>
+  unit === 'C'
+    ? { range: [-40, 140], step: 20 }
+    : { range: [-40, 280], step: 40 };
+
+/** The highest of `thresholds` that `sample` reaches, if any. */
+function thresholdFor(
+  thresholds: readonly Threshold[],
+  sample: number,
+): Threshold | undefined {
+  return thresholds.findLast((threshold) => sample >= threshold.from);
+}
+
+/** A metric's tone, note and thresholds, all from one list. */
+const flagged = (
+  thresholds: readonly Threshold[],
+): Pick<Metric, 'thresholds' | 'tone' | 'note'> => ({
+  thresholds,
+  tone: (sample) => thresholdFor(thresholds, sample)?.tone ?? 'normal',
+  note: (sample) => thresholdFor(thresholds, sample)?.note,
+});
+
+/**
+ * Coolant above the usual 80–95 °C once warm. 105 °C (221 °F) is hotter
+ * than a healthy cooling system runs; by 115 °C (239 °F) the coolant is
+ * close to boiling under a 15 psi cap. A guide, as `typical` is.
+ */
+const COOLANT_THRESHOLDS: readonly Threshold[] = [
+  { from: 221, tone: 'warn', note: 'hot' },
+  { from: 239, tone: 'alert', note: 'overheating' },
+];
 
 /** A Fahrenheit range in the user's temperature unit, such as "80–95 °C". */
 const temperatureRange = (
@@ -218,6 +292,7 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     toDisplay: same,
     format: fixed(0),
     chart: {},
+    dial: () => ({ range: [0, 7000], step: 1000, divisor: 1000 }),
   },
   roadSpeedMph: {
     label: 'Road speed',
@@ -229,6 +304,12 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
       speedUnit === 'kmh' ? mphToKmh(sample) : sample,
     format: fixed(0),
     chart: {},
+    // The ECU counts road speed in a byte of km/h, so 255 km/h (158 mph) at
+    // most.
+    dial: ({ speedUnit }) =>
+      speedUnit === 'kmh'
+        ? { range: [0, 280], step: 40 }
+        : { range: [0, 160], step: 20 },
   },
   targetIdleRpm: {
     label: 'Target idle',
@@ -250,7 +331,9 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     unit: temperatureUnit,
     toDisplay: temperature,
     format: fixed(0),
+    ...flagged(COOLANT_THRESHOLDS),
     chart: {},
+    dial: temperatureDial,
   },
   fuelTempF: {
     label: 'Fuel temp',
@@ -263,6 +346,7 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     toDisplay: temperature,
     format: fixed(0),
     chart: {},
+    dial: temperatureDial,
   },
   throttle: {
     label: 'Throttle',

@@ -100,6 +100,22 @@ describe('LiveTiles', () => {
     );
   });
 
+  it('says in words when coolant is hot or overheating', () => {
+    const { rerender } = renderTiles({ ...SNAPSHOT, coolantTempF: 230 });
+
+    expect(readingFor('Coolant')).toHaveTextContent(/^230 °F hot$/);
+
+    rerender(
+      <TestPlatform platform={browserPlatform()}>
+        <PreferencesProvider>
+          <SnapshotTiles snapshot={{ ...SNAPSHOT, coolantTempF: 245 }} />
+        </PreferencesProvider>
+      </TestPlatform>,
+    );
+
+    expect(readingFor('Coolant')).toHaveTextContent(/^245 °F overheating$/);
+  });
+
   it('groups readings under headings', () => {
     renderTiles(SNAPSHOT);
 

@@ -3,6 +3,7 @@
 import * as z from 'zod/mini';
 import { METRIC_KEYS } from '../metrics';
 import {
+  GAUGE_STYLE_PREFERENCES,
   PALETTE_PREFERENCES,
   THEME_PREFERENCES,
   USAGE_COUNTS_PREFERENCES,
@@ -32,13 +33,14 @@ import {
  */
 
 export const SETTINGS = {
-  /** Units, theme, palette, usage counts and keeping the screen on, chosen in Preferences. */
+  /** Units, theme, palette, gauge style, usage counts and keeping the screen on, chosen in Preferences. */
   preferences: (defaults: SettingDefaults) =>
     settingObject({
       temperatureUnit: choice(TEMPERATURE_UNITS, 'F'),
       speedUnit: choice(SPEED_UNITS, 'mph'),
       theme: choice(THEME_PREFERENCES, 'system'),
       palette: choice(PALETTE_PREFERENCES, 'coniston'),
+      gaugeStyle: choice(GAUGE_STYLE_PREFERENCES, 'tiles'),
       // The platform's default applies until a choice is made in Preferences.
       usageCounts: choice(USAGE_COUNTS_PREFERENCES, defaults.usageCounts),
       keepScreenOn: z.catch(z.boolean(), false),

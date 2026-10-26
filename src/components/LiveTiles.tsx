@@ -13,6 +13,7 @@ import {
   type MetricKey,
 } from '../metrics';
 import { usePreferences } from '../preferences/usePreferences';
+import { Dial } from './Dial';
 import { Meter } from './Meter';
 import { MetricInfo } from './MetricInfo';
 import { Tile } from './Tile';
@@ -38,6 +39,8 @@ function MetricTile({
   sample: number | null | undefined;
 }) {
   const units = usePreferences();
+  const display = sample == null ? sample : metric.toDisplay(sample, units);
+  const scale = units.gaugeStyle === 'dials' ? metric.dial?.(units) : undefined;
 
   return (
     <Tile
@@ -53,10 +56,12 @@ function MetricTile({
       info={<MetricInfo metric={metric} />}
       meter={
         metric.meter ? (
-          <Meter
-            meter={metric.meter}
-            display={sample == null ? sample : metric.toDisplay(sample, units)}
-          />
+          <Meter meter={metric.meter} display={display} />
+        ) : undefined
+      }
+      dial={
+        scale ? (
+          <Dial metric={metric} scale={scale} units={units} display={display} />
         ) : undefined
       }
     />
