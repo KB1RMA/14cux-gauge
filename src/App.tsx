@@ -8,7 +8,7 @@ import { useUsageCounts } from './usage/useUsageCounts';
 import { AppNotices } from './components/AppNotices';
 import { ConnectScreen } from './components/ConnectScreen';
 import { Footer } from './components/Footer';
-import { PreferencesMenu } from './components/PreferencesMenu';
+import { Preferences } from './components/Preferences';
 import { SaveSessionDialog } from './components/SaveSessionDialog';
 import { StatusBar } from './components/StatusBar';
 import { lazyView } from './components/lazyView';
@@ -173,7 +173,7 @@ export function App({
                                     </NavLink>
                                   ))}
                                 </nav>
-                                <PreferencesMenu
+                                <Preferences
                                   offerUsageCounts={usageCounter !== undefined}
                                 />
                               </header>

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { useLayoutEffect, useMemo, type ReactNode } from 'react';
+import type { Limits } from '../model/limits';
+import { withLimits, type LimitMetric } from '../settings/limitSettings';
 import type {
   GaugeStylePreference,
   PalettePreference,
@@ -35,6 +37,7 @@ function applyPalette(palette: PalettePreference): void {
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferences] = useSetting('preferences');
+  const [{ own: ownLimits }, setLimits] = useSetting('limits');
 
   // Before paint, so a stored theme does not flash the system one first.
   useLayoutEffect(() => {
@@ -69,8 +72,14 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       setKeepScreenOn: (keepScreenOn: boolean) => {
         setPreferences((p) => ({ ...p, keepScreenOn }));
       },
+      ownLimits,
+      setReadingLimits: (metric: LimitMetric, limits: Limits) => {
+        // From the stored value, not this render's, so a change made since
+        // (in another window, or to another reading) is kept.
+        setLimits(({ own }) => ({ own: withLimits(own, metric, limits) }));
+      },
     }),
-    [preferences, setPreferences],
+    [preferences, setPreferences, ownLimits, setLimits],
   );
 
   return <PreferencesContext value={value}>{children}</PreferencesContext>;

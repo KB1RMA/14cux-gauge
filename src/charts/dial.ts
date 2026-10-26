@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import type { DialScale, DisplayUnits, Metric, MetricTone } from '../metrics';
+import type { LimitLevel, Limits } from '../model/limits';
 
 /**
  * The geometry of an analogue dial, kept apart from any view so the
@@ -108,33 +109,48 @@ export interface DialBand {
 }
 
 /**
- * The metric's thresholds as bands on the scale, as fractions. Each runs
- * from its threshold to the next one, or to the end of the scale. Bands off
- * the scale are left out.
+ * The limits as bands on the scale, as fractions. A low level's band runs
+ * from the low end of the scale (or the alert level below it) up to the
+ * level; a high level's from the level up to the alert level above it, or
+ * the high end. Bands off the scale are left out.
  */
 export function dialBands(
   metric: Metric,
   scale: DialScale,
   units: DisplayUnits,
+  limits: Limits,
 ): DialBand[] {
-  const thresholds = metric.thresholds ?? [];
+  const at = (level: LimitLevel) => {
+    const sample = limits[level];
 
-  return thresholds
-    .map((threshold, index) => {
-      const next = thresholds[index + 1];
+    return sample === undefined
+      ? undefined
+      : dialFraction(scale.range, metric.toDisplay(sample, units));
+  };
 
-      return {
-        from: dialFraction(
-          scale.range,
-          metric.toDisplay(threshold.from, units),
-        ),
-        to: next
-          ? dialFraction(scale.range, metric.toDisplay(next.from, units))
-          : 1,
-        tone: threshold.tone,
-      };
-    })
-    .filter((band) => band.to > band.from);
+  const lowAlert = at('lowAlert');
+  const lowWarn = at('lowWarn');
+  const highWarn = at('highWarn');
+  const highAlert = at('highAlert');
+  const bands: DialBand[] = [];
+
+  if (lowAlert !== undefined) {
+    bands.push({ from: 0, to: lowAlert, tone: 'alert' });
+  }
+
+  if (lowWarn !== undefined) {
+    bands.push({ from: lowAlert ?? 0, to: lowWarn, tone: 'warn' });
+  }
+
+  if (highWarn !== undefined) {
+    bands.push({ from: highWarn, to: highAlert ?? 1, tone: 'warn' });
+  }
+
+  if (highAlert !== undefined) {
+    bands.push({ from: highAlert, to: 1, tone: 'alert' });
+  }
+
+  return bands.filter((band) => band.to > band.from);
 }
 
 /** A labelled tick's text, formatted as the metric formats its readings. */

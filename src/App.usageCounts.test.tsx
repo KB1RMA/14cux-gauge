@@ -88,7 +88,7 @@ describe('App usage counts', () => {
 
     await user.click(screen.getByRole('button', { name: 'Preferences' }));
     await user.click(
-      screen.getByRole('menuitemradio', { name: 'Don’t count my visits' }),
+      screen.getByRole('radio', { name: 'Don’t count my visits' }),
     );
     await user.keyboard('{Escape}');
     unmount();
@@ -115,11 +115,11 @@ describe('App usage counts', () => {
     await user.click(screen.getByRole('button', { name: 'Preferences' }));
 
     expect(
-      screen.getByRole('menuitemradio', { name: 'Don’t count my visits' }),
+      screen.getByRole('radio', { name: 'Don’t count my visits' }),
     ).toBeChecked();
 
     await user.click(
-      screen.getByRole('menuitemradio', {
+      screen.getByRole('radio', {
         name: 'Count my visits anonymously',
       }),
     );
@@ -139,7 +139,7 @@ describe('App usage counts', () => {
     await user.click(screen.getByRole('button', { name: 'Preferences' }));
 
     expect(
-      screen.queryByRole('menuitemradio', {
+      screen.queryByRole('radio', {
         name: 'Count my visits anonymously',
       }),
     ).not.toBeInTheDocument();

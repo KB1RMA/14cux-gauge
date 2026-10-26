@@ -219,3 +219,43 @@ export async function expectNoAxeViolations(
     ),
   ).toEqual([]);
 }
+
+/** A section of the Preferences dialog, as its tab is named. */
+export type PreferencesSection = 'General' | 'Appearance' | 'Limits';
+
+/**
+ * Opens Preferences from the app bar's gear at `section`, as the user does,
+ * and returns the dialog.
+ */
+export async function openPreferences(
+  page: Page,
+  section: PreferencesSection = 'General',
+): Promise<Locator> {
+  await page.getByRole('button', { name: 'Preferences' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Preferences' });
+
+  await dialog.getByRole('tab', { name: section }).click();
+  await expect(
+    dialog.getByRole('tab', { name: section, selected: true }),
+  ).toBeVisible();
+
+  return dialog;
+}
+
+/** Picks options in one section of Preferences, then closes it. */
+export async function choosePreferences(
+  page: Page,
+  section: PreferencesSection,
+  ...options: string[]
+): Promise<void> {
+  const dialog = await openPreferences(page, section);
+
+  for (const option of options) {
+    await dialog.getByRole('radio', { name: option }).click();
+    await expect(dialog.getByRole('radio', { name: option })).toBeChecked();
+  }
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+}

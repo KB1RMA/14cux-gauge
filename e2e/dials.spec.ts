@@ -2,10 +2,11 @@
 // Derived from libcomm14cux (https://github.com/colinbourassa/libcomm14cux)
 // Copyright (C) Colin Bourassa. Licensed under the GNU GPL v3.
 // ECU memory offsets and raw value encodings; written for 14cux-gauge, 2026.
-import type { Page } from '@playwright/test';
 import {
+  choosePreferences,
   expect,
   expectNoAxeViolations,
+  openPreferences,
   reading,
   test,
 } from './support/fixtures';
@@ -33,20 +34,6 @@ const PAINTS = [
   'British Racing Green',
 ] as const;
 
-/** Picks options in the Preferences menu, then closes it. */
-async function choose(page: Page, ...options: string[]): Promise<void> {
-  await page.getByRole('button', { name: 'Preferences' }).click();
-
-  const menu = page.getByRole('menu');
-
-  for (const option of options) {
-    await menu.getByRole('menuitemradio', { name: option }).click();
-  }
-
-  await page.keyboard.press('Escape');
-  await expect(menu).toBeHidden();
-}
-
 test.describe('Dials', () => {
   test.beforeEach(async ({ page, emulatedSerial }) => {
     await page.goto('./');
@@ -65,7 +52,7 @@ test.describe('Dials', () => {
   }) => {
     const live = page.getByRole('region', { name: 'Live data' });
 
-    await choose(page, 'Dials');
+    await choosePreferences(page, 'General', 'Dials');
 
     // The dial's scale adds nothing to the reading's text.
     await expect(reading(live, 'Engine speed')).toHaveText('750 rpm');
@@ -74,7 +61,7 @@ test.describe('Dials', () => {
     await expect(reading(live, 'Road speed')).toHaveText('62 mph');
 
     // 40.6 °C rounds up, 32 °F is 0 °C, 99.78 km/h rounds to 100.
-    await choose(page, 'Celsius', 'Kilometres per hour');
+    await choosePreferences(page, 'General', 'Celsius', 'Kilometres per hour');
     await expect(reading(live, 'Coolant')).toHaveText('41 °C');
     await expect(reading(live, 'Fuel temp')).toHaveText('0 °C');
     await expect(reading(live, 'Road speed')).toHaveText('100 km/h');
@@ -82,9 +69,8 @@ test.describe('Dials', () => {
 
     // Remembered after a reload.
     await page.reload();
-    await page.getByRole('button', { name: 'Preferences' }).click();
     await expect(
-      page.getByRole('menu').getByRole('menuitemradio', { name: 'Dials' }),
+      (await openPreferences(page)).getByRole('radio', { name: 'Dials' }),
     ).toBeChecked();
   });
 
@@ -94,10 +80,11 @@ test.describe('Dials', () => {
     }) => {
       const live = page.getByRole('region', { name: 'Live data' });
 
-      await choose(page, 'Dials', theme);
+      await choosePreferences(page, 'General', 'Dials');
+      await choosePreferences(page, 'Appearance', theme);
 
       for (const paint of PAINTS) {
-        await choose(page, paint);
+        await choosePreferences(page, 'Appearance', paint);
         await expect(reading(live, 'Coolant')).toHaveText('105 °F');
         await expectNoAxeViolations(page);
       }

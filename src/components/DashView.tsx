@@ -8,14 +8,17 @@ import type { LiveStatus } from '../ecu/liveStatus';
 import {
   formatSample,
   METRICS,
+  readingState,
   sampleOf,
   type Metric,
   type MetricKey,
 } from '../metrics';
+import type { Limits } from '../model/limits';
 import type { LiveSnapshot } from '../model/snapshot';
 import { usePreferences } from '../preferences/usePreferences';
 import { useRecording } from '../recording/useRecording';
 import { useReadings } from '../readings/useReadings';
+import { limitsFor } from '../settings/limitSettings';
 import { useSetting } from '../settings/useSetting';
 import { DashPicker } from './DashPicker';
 import { FullscreenButton } from './FullscreenButton';
@@ -25,18 +28,22 @@ function DashTile({
   metric,
   sample,
   stale,
+  limits,
 }: {
   metric: Metric;
   /** In library units; `null` is an invalid reading, `undefined` no data yet. */
   sample: number | null | undefined;
   /** Readings are not being taken now, so any sample is not current. */
   stale: boolean;
+  /** The limits to show the reading against. */
+  limits?: Limits | undefined;
 }) {
   const units = usePreferences();
   const current = stale ? undefined : sample;
-  const tone =
-    current == null ? 'normal' : (metric.tone?.(current) ?? 'normal');
-  const note = current == null ? undefined : metric.note?.(current);
+  const { tone, note } =
+    current == null
+      ? { tone: 'normal', note: undefined }
+      : readingState(metric, limits, current);
   const unit = metric.unit(units);
 
   return (
@@ -71,11 +78,14 @@ function DashTile({
 }
 
 function PolledDashTile({ metric, stale }: { metric: Metric; stale: boolean }) {
+  const { ownLimits } = usePreferences();
+
   return (
     <DashTile
       metric={metric}
       sample={useLiveSample(metric.key)}
       stale={stale}
+      limits={limitsFor(metric, ownLimits)}
     />
   );
 }
@@ -103,7 +113,10 @@ function DashGrid({
   );
 }
 
-/** Like `DashView`'s readings, from `snapshot`, with `status` given. */
+/**
+ * Like `DashView`'s readings, from `snapshot`, with `status` given, against
+ * the limits that apply now.
+ */
 export function SnapshotDash({
   keys,
   snapshot,
@@ -113,6 +126,8 @@ export function SnapshotDash({
   snapshot: LiveSnapshot | undefined;
   status: LiveStatus;
 }) {
+  const { ownLimits } = usePreferences();
+
   return (
     <DashGrid
       keys={keys}
@@ -123,6 +138,7 @@ export function SnapshotDash({
           metric={metric}
           sample={snapshot ? sampleOf(snapshot, metric.key) : undefined}
           stale={!status.live}
+          limits={limitsFor(metric, ownLimits)}
         />
       )}
     />

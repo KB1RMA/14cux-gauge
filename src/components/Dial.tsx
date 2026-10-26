@@ -15,6 +15,7 @@ import {
   polar,
 } from '../charts/dial';
 import type { DialScale, DisplayUnits, Metric } from '../metrics';
+import { NO_LIMITS, type Limits } from '../model/limits';
 import styles from './Dial.module.css';
 
 /** The drawing's size in SVG units; the bottom is cropped below the scale. */
@@ -43,10 +44,12 @@ const Face = memo(function Face({
   metric,
   scale,
   units,
+  limits,
 }: {
   metric: Metric;
   scale: DialScale;
   units: DisplayUnits;
+  limits: Limits;
 }) {
   const ticks = dialTicks(scale);
 
@@ -56,9 +59,9 @@ const Face = memo(function Face({
         className={styles['track']}
         d={arcPath(CENTRE, TRACK, DIAL_START, DIAL_START + DIAL_SWEEP)}
       />
-      {dialBands(metric, scale, units).map((band) => (
+      {dialBands(metric, scale, units, limits).map((band) => (
         <path
-          key={band.from}
+          key={`${band.tone} ${String(band.from)}`}
           className={styles['band']}
           data-tone={band.tone}
           d={arcPath(CENTRE, TRACK, dialAngle(band.from), dialAngle(band.to))}
@@ -150,7 +153,7 @@ function Needle({ scale, display }: { scale: DialScale; display: number }) {
 
 /**
  * An analogue dial picturing a reading on its metric's scale, with bands
- * for the metric's thresholds. Hidden from assistive tech: the value text
+ * for the limits that apply. Hidden from assistive tech: the value text
  * beside it is the reading. The needle jumps straight to each reading, so it
  * never shows a value the ECU did not report, and with no valid sample there
  * is no needle, so it never looks like the low end of the scale.
@@ -162,12 +165,15 @@ export function Dial({
   metric,
   scale,
   units,
+  limits = NO_LIMITS,
   display,
 }: {
   metric: Metric;
   /** Keep the same object while the scale is unchanged, so the face is not redrawn. */
   scale: DialScale;
   units: DisplayUnits;
+  /** The limits to draw as bands, in library units; none in replay. */
+  limits?: Limits | undefined;
   /** The display value, or `null` / `undefined` when there is no reading. */
   display: number | null | undefined;
 }) {
@@ -178,7 +184,7 @@ export function Dial({
         className={styles['face']}
         focusable="false"
       >
-        <Face metric={metric} scale={scale} units={units} />
+        <Face metric={metric} scale={scale} units={units} limits={limits} />
         {display == null ? null : <Needle scale={scale} display={display} />}
       </svg>
       <Labels metric={metric} scale={scale} units={units} />

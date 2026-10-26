@@ -4,11 +4,18 @@ import { useEffect, useId, useRef } from 'react';
 import type uPlot from 'uplot';
 import { cursorReadout } from '../charts/cursorReadout';
 import { mountPlot } from '../charts/mountPlot';
+import {
+  limitLinesFor,
+  limitLinesPlugin,
+  type LimitLine,
+} from '../charts/limitLines';
 import { formatAgoPrecise, plotOptions } from '../charts/plotOptions';
 import { chartData, extremes } from '../history/chartSeries';
 import { useHistory } from '../history/useHistory';
-import type { Metric } from '../metrics';
+import { describeLimits, type Metric } from '../metrics';
+import { NO_LIMITS } from '../model/limits';
 import { usePreferences } from '../preferences/usePreferences';
+import { limitsFor } from '../settings/limitSettings';
 import { ChartCaption, ChartStats } from './ChartParts';
 import type { GraphWindow } from '../settings/graphSettings';
 import styles from './TimeSeriesChart.module.css';
@@ -24,7 +31,8 @@ const MIN_SESSION_SECONDS = 30;
 
 /**
  * One metric's recent history as a scrolling line graph, with its latest,
- * lowest and highest values as text. The canvas is hidden from assistive
+ * lowest and highest values as text, and the limits that apply as dashed
+ * lines and as text. The canvas is hidden from assistive
  * tech; the text carries the same information. Over the graph, the pointer
  * shows the time and value of the nearest sample, with a crosshair that
  * every graph with the same `syncKey` follows.
@@ -70,6 +78,10 @@ export function TimeSeriesChart({
     unit ? `${metric.format(value)} ${unit}` : metric.format(value);
   // The readout's formatter, which outlives any one render.
   const formatRef = useRef(format);
+  const limits = limitsFor(metric, units.ownLimits) ?? NO_LIMITS;
+  const lines = limitLinesFor(metric, limits, units);
+  // The lines to draw, which the plugin reads on each draw.
+  const linesRef = useRef<readonly LimitLine[]>(lines);
 
   // The chart is built once per metric and window, then fed new data.
   useEffect(() => {
@@ -91,6 +103,7 @@ export function TimeSeriesChart({
               syncKey,
             }),
             plugins: [
+              limitLinesPlugin(plot, () => linesRef.current),
               cursorReadout(styles['readout'] ?? '', {
                 time: formatAgoPrecise,
                 value: (value) => formatRef.current(value),
@@ -111,6 +124,7 @@ export function TimeSeriesChart({
   useEffect(() => {
     spanRef.current = span;
     formatRef.current = format;
+    linesRef.current = lines;
     dataRef.current = [times, shown];
     // Rescales y to fit the data, and x to the window.
     chartRef.current?.setData(dataRef.current, true);
@@ -121,7 +135,12 @@ export function TimeSeriesChart({
     // from its caption.
     <figure className={styles['chart']} aria-labelledby={captionId}>
       <ChartCaption id={captionId} label={metric.label} unit={unit} />
-      <ChartStats {...summary} step={metric.chart.step} format={format} />
+      <ChartStats
+        {...summary}
+        step={metric.chart.step}
+        format={format}
+        limits={describeLimits(metric, limits, units)}
+      />
       <div ref={plotRef} className={styles['plot']} aria-hidden="true" />
     </figure>
   );

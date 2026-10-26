@@ -83,6 +83,18 @@ Everyone else waits. EcuWrites and RomReader borrow the key when they need it.
 7. If you are recording, the Recorder collects snapshots and saves them about
    once a second.
 
+A reading can also have **limits**: up to four levels (very low, low, high,
+very high) that you set in Preferences. The app suggests a starting point for
+some readings, such as coolant and voltage, and you can change or clear any
+of them. Limits are kept in the ECU library's units, like readings. A live
+reading is checked against them at full precision, never after rounding.
+When it reaches one, its tile says so in words ("hot", "low") and in colour,
+a dial shows the levels as coloured bands, and a live graph draws them as
+dashed lines and lists them. Recordings do not keep limits, so replay shows
+none. If you type a level the app cannot use, it says why beside the box.
+If you then try to close Preferences, it stays open once to show you, so a
+mistake is never thrown away without you seeing it.
+
 Some readings change slowly, such as coolant temperature and battery voltage.
 The app reads those less often, usually on every tenth pass. In the passes
 between, a snapshot repeats the last value it read.
@@ -118,8 +130,9 @@ These are kept in the browser's database:
   fingerprint (SHA-256) to tell copies apart, and whether it came from a real
   ECU or the demo.
 
-**Settings**, such as units, theme and which readings to show (one list for
-the overview, graphs and recordings, and another for the Dash view), are small. They
+**Settings**, such as units, theme, reading limits and which readings to show
+(one list for the overview, graphs and recordings, and another for the Dash
+view), are small. They
 are kept apart from the database, in the browser's local storage. Every
 setting has a default, and so does each part of one. A new version can add a
 setting without breaking an older one: the older version uses its default for
@@ -155,7 +168,7 @@ flowchart TB
     Dash["Dashboard (lazy)<br/>LiveTiles · GraphsView · FuelMapView<br/>FaultCodes · EcuInfo · tests"]
     DashV["DashView (lazy)<br/>large readings, stale marking"]
     Sessions["SessionsView (lazy)<br/>SessionList · SessionDetail · SessionReplay"]
-    Chrome["StatusBar · PreferencesMenu · Footer<br/>SaveSessionDialog · AppNotices"]
+    Chrome["StatusBar · Preferences · Footer<br/>SaveSessionDialog · AppNotices"]
   end
 
   subgraph react["Hooks and providers — React"]
@@ -167,7 +180,7 @@ flowchart TB
     HSess["useSessions · useSessionList<br/>useSessionSamples"]
     HSet["useSetting · usePreferences<br/>ReadingsProvider"]
     HReplay["useReplay<br/>useRecordedSeries"]
-    HRoute["routing/<br/>React Router"]
+    HRoute["routing/<br/>React Router · usePreferencesRoute"]
     HAppStatus[useAppStatus]
     HScreen["useScreenWake<br/>useFullscreen"]
     HPlat[usePlatform]
@@ -319,7 +332,7 @@ sequenceDiagram
   Session-->>View: notify subscribers
   View->>Session: getSnapshot (useSyncExternalStore)
   View->>History: series for graphs (useHistory, then chartSeries in the chart)
-  Note over View: metric.format converts units<br/>and rounds for display only
+  Note over View: metric.format converts units<br/>and rounds for display only.<br/>readingState checks the full-precision sample<br/>against the limits from usePreferences
   Session-->>Recorder: snapshot event, while recording
   Recorder->>Store: append full-precision samples<br/>(buffered, saved about once a second)
 ```
@@ -343,6 +356,33 @@ ECU writes (clearing faults, actuator tests) go the other way: a view behind
 the `Lease` from `EcuSession`, calls the `Ecu` through it, keys the outcome by
 `EcuLink`, and the `Recorder` logs it into the current session. `RomReader`
 reads the ROM image the same way, through a `Lease` of its own.
+
+Preferences is a dialog over whichever view is showing, opened by the gear
+in the app bar. Which section is open is a query on the view's address
+(`#/live?preferences=limits`, see `routing/paths.ts`), read and changed by
+`usePreferencesRoute`: opening pushes a history entry, changing section
+replaces it, and closing goes back to the entry before, so Back closes the
+dialog. Opened from a link, closing removes the query instead. Every choice
+in it applies at once through `PreferencesProvider`.
+
+Limits live in the `limits` setting (`settings/limitSettings.ts`), which
+stores only the readings whose limits differ from their suggestion
+(`Metric.limits.suggested` in `metrics.ts`), in library units.
+`PreferencesProvider` exposes them as `ownLimits`, and `limitsFor` picks the
+user's or the suggestion; `setReadingLimits` changes one reading's from the
+stored value, so a change made in another window is kept. One zod schema,
+`limitsSchema` in `model/limits.ts`, checks a reading's levels are finite and
+in order, both when the setting is read (a reading out of order falls back to
+its suggestion) and when the user types them: `limitFormSchema`
+(`settings/limitForm.ts`) turns the typed text into library units and pipes
+it into `limitsSchema`, and each reading in `LimitsPreferences` is a
+react-hook-form form checked by that schema through `zodResolver`.
+`Preferences` holds a `PendingEdits` (`components/pendingEdits.ts`) so that
+closing it or changing section applies what was typed first, or stays open
+once to show why it cannot. `readingState` turns a sample and its limits into a
+tone and a note for `LiveTiles` and `DashView`; `dialBands` and
+`limitLinesPlugin` draw the same levels on dials and live graphs. Replay passes
+no limits.
 
 Replay reads a stored session through `useSessionSamples`, and
 `useRecordedSeries` builds a `SampleHistory` from it with `pushSnapshot`, as

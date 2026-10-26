@@ -12,8 +12,16 @@ export function fahrenheitToCelsius(fahrenheit: number): number {
   return ((fahrenheit - 32) * 5) / 9;
 }
 
+export function celsiusToFahrenheit(celsius: number): number {
+  return (celsius * 9) / 5 + 32;
+}
+
 export function mphToKmh(mph: number): number {
   return mph * 1.609344;
+}
+
+export function kmhToMph(kmh: number): number {
+  return kmh / 1.609344;
 }
 
 export function temperatureLabel(unit: TemperatureUnit): string {

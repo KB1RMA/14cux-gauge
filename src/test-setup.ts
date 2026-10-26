@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 // jsdom does no layout, so it leaves out APIs that Radix's positioned
-// popups (the Preferences menu) call. These no-op stand-ins only let them
+// popups (menus and popovers) call. These no-op stand-ins only let them
 // mount; nothing in the tests depends on where a popup is drawn.
 /* eslint-disable @typescript-eslint/no-unnecessary-condition -- feature detection: jsdom leaves these undefined despite the DOM types */
 globalThis.ResizeObserver ??= class {
