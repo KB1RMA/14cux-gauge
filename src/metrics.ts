@@ -188,7 +188,8 @@ const flagged = (
 /**
  * Coolant above the usual 80–95 °C once warm. 105 °C (221 °F) is hotter
  * than a healthy cooling system runs; by 115 °C (239 °F) the coolant is
- * close to boiling under a 15 psi cap. A guide, as `typical` is.
+ * close to boiling under a 15 psi cap. A guide, as `typical` is. Fixed for
+ * now; letting users change or turn off levels is #105.
  */
 const COOLANT_THRESHOLDS: readonly Threshold[] = [
   { from: 221, tone: 'warn', note: 'hot' },

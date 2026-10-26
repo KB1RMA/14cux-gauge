@@ -119,7 +119,10 @@ These are kept in the browser's database:
   ECU or the demo.
 
 **Settings**, such as units, theme and which readings to show, are small. They
-are kept apart from the database, in the browser's local storage.
+are kept apart from the database, in the browser's local storage. Every
+setting has a default, and so does each part of one. A new version can add a
+setting without breaking an older one: the older version uses its default for
+anything it does not know, and keeps the new part when it saves.
 
 Each saved item carries a **format version**. When the shape of an item
 changes, its version number goes up. Older items are updated as they are read;
