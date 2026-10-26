@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1](https://github.com/KB1RMA/14cux-gauge/compare/v0.13.0...v0.13.1) (2026-10-26)
+
+
+### Bug Fixes
+
+* lay out the dash's readings in tiles they fill ([#129](https://github.com/KB1RMA/14cux-gauge/issues/129)) ([37fbd38](https://github.com/KB1RMA/14cux-gauge/commit/37fbd38a51f575d237f615dbc8d26bd9e8b76f9e))
+
 ## [0.13.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.12.0...v0.13.0) (2026-10-26)
 
 
