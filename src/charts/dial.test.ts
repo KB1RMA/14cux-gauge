@@ -208,12 +208,15 @@ describe('dial scales', () => {
 });
 
 describe('dial bands', () => {
-  it("draws coolant's hot and overheating levels, from 221 °F and 239 °F", () => {
+  const coolantLimits = { highWarn: 221, highAlert: 239 };
+
+  it('draws coolant’s suggested limits, from 221 °F and 239 °F', () => {
     const coolant = metric('coolantTempF');
     const bands = dialBands(
       coolant,
       scaleOf('coolantTempF', IMPERIAL),
       IMPERIAL,
+      coolantLimits,
     );
 
     // (221 + 40) / 320 and (239 + 40) / 320 of the way round.
@@ -223,11 +226,12 @@ describe('dial bands', () => {
     ]);
   });
 
-  it('draws the same levels at 105 °C and 115 °C', () => {
+  it('draws the same limits at 105 °C and 115 °C', () => {
     const bands = dialBands(
       metric('coolantTempF'),
       scaleOf('coolantTempF', METRIC),
       METRIC,
+      coolantLimits,
     );
 
     // (105 + 40) / 180 and (115 + 40) / 180 of the way round.
@@ -238,22 +242,64 @@ describe('dial bands', () => {
     expect(bands[1]?.to).toBe(1);
   });
 
-  it('draws no bands for a reading without thresholds', () => {
+  it('draws low limits from the low end of the scale', () => {
+    const rpm = metric('engineRpm');
+    const scale = scaleOf('engineRpm', IMPERIAL);
+
+    // 0–7000 rpm: 500 is 1/14 of the way round, 700 is 1/10.
+    expect(
+      dialBands(rpm, scale, IMPERIAL, { lowAlert: 500, lowWarn: 700 }),
+    ).toEqual([
+      { from: 0, to: 500 / 7000, tone: 'alert' },
+      { from: 500 / 7000, to: 0.1, tone: 'warn' },
+    ]);
+    expect(dialBands(rpm, scale, IMPERIAL, { lowWarn: 700 })).toEqual([
+      { from: 0, to: 0.1, tone: 'warn' },
+    ]);
+    expect(dialBands(rpm, scale, IMPERIAL, { lowAlert: 700 })).toEqual([
+      { from: 0, to: 0.1, tone: 'alert' },
+    ]);
+  });
+
+  it('runs a high warning to the end of the scale when no alert is set', () => {
+    expect(
+      dialBands(metric('engineRpm'), scaleOf('engineRpm', IMPERIAL), IMPERIAL, {
+        highWarn: 5600,
+      }),
+    ).toEqual([{ from: 0.8, to: 1, tone: 'warn' }]);
+  });
+
+  it('draws no bands without limits', () => {
     for (const key of ['engineRpm', 'roadSpeedMph', 'fuelTempF'] as const) {
-      expect(dialBands(metric(key), scaleOf(key, IMPERIAL), IMPERIAL)).toEqual(
-        [],
-      );
+      expect(
+        dialBands(metric(key), scaleOf(key, IMPERIAL), IMPERIAL, {}),
+      ).toEqual([]);
     }
   });
 
   it('leaves out a band that falls off the scale', () => {
     const coolant = metric('coolantTempF');
 
-    expect(dialBands(coolant, { range: [0, 200], step: 40 }, IMPERIAL)).toEqual(
-      [],
-    );
-    expect(dialBands(coolant, { range: [0, 230], step: 10 }, IMPERIAL)).toEqual(
-      [{ from: 221 / 230, to: 1, tone: 'warn' }],
-    );
+    expect(
+      dialBands(
+        coolant,
+        { range: [0, 200], step: 40 },
+        IMPERIAL,
+        coolantLimits,
+      ),
+    ).toEqual([]);
+    expect(
+      dialBands(
+        coolant,
+        { range: [0, 230], step: 10 },
+        IMPERIAL,
+        coolantLimits,
+      ),
+    ).toEqual([{ from: 221 / 230, to: 1, tone: 'warn' }]);
+    expect(
+      dialBands(coolant, { range: [0, 230], step: 10 }, IMPERIAL, {
+        lowWarn: -40,
+      }),
+    ).toEqual([]);
   });
 });

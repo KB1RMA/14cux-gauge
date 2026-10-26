@@ -74,46 +74,20 @@ describe('LiveTiles', () => {
     expect(readingFor('Idle control')).toHaveTextContent('Active');
   });
 
-  it('says in words when the injectors are near or at their limit', () => {
-    const { rerender } = renderTiles({
+  it('shows no limits in replay, which does not keep the limits that applied', () => {
+    renderTiles({
       ...SNAPSHOT,
       engineRpm: 6000,
-      injectorPulseUs: 9000,
+      injectorPulseUs: 10500,
+      coolantTempF: 245,
+      mainVoltage: 10,
     });
 
-    expect(readingFor('Injector duty')).toHaveTextContent(
-      /^90\.0 % near limit$/,
-    );
-
-    rerender(
-      <TestPlatform platform={browserPlatform()}>
-        <PreferencesProvider>
-          <SnapshotTiles
-            snapshot={{ ...SNAPSHOT, engineRpm: 6000, injectorPulseUs: 10500 }}
-          />
-        </PreferencesProvider>
-      </TestPlatform>,
-    );
-
-    expect(readingFor('Injector duty')).toHaveTextContent(
-      /^105\.0 % maxed out$/,
-    );
-  });
-
-  it('says in words when coolant is hot or overheating', () => {
-    const { rerender } = renderTiles({ ...SNAPSHOT, coolantTempF: 230 });
-
-    expect(readingFor('Coolant')).toHaveTextContent(/^230 °F hot$/);
-
-    rerender(
-      <TestPlatform platform={browserPlatform()}>
-        <PreferencesProvider>
-          <SnapshotTiles snapshot={{ ...SNAPSHOT, coolantTempF: 245 }} />
-        </PreferencesProvider>
-      </TestPlatform>,
-    );
-
-    expect(readingFor('Coolant')).toHaveTextContent(/^245 °F overheating$/);
+    // Live, each of these is past a suggested limit.
+    expect(readingFor('Injector duty')).toHaveTextContent(/^105\.0 %$/);
+    expect(readingFor('Coolant')).toHaveTextContent(/^245 °F$/);
+    expect(readingFor('Main voltage')).toHaveTextContent(/^10\.0 V$/);
+    expect(readingFor('Engine speed')).toHaveTextContent(/^6000 rpm$/);
   });
 
   it('groups readings under headings', () => {

@@ -118,6 +118,45 @@ describe('dash', () => {
   });
 });
 
+describe('limits', () => {
+  const parse = settingParser('limits', defaults);
+
+  it('stores no limits of the user’s own by default', () => {
+    expect(parse(undefined)).toEqual({ own: {} });
+  });
+
+  it('keeps each reading’s levels, including a reading with every level cleared', () => {
+    expect(
+      parse({
+        own: {
+          coolantTempF: { highWarn: 212, highAlert: 230 },
+          mainVoltage: { lowAlert: 10.5, lowWarn: 11.8 },
+          fuelTempF: {},
+        },
+      }),
+    ).toEqual({
+      own: {
+        coolantTempF: { highWarn: 212, highAlert: 230 },
+        mainVoltage: { lowAlert: 10.5, lowWarn: 11.8 },
+        fuelTempF: {},
+      },
+    });
+  });
+
+  it('drops levels that are not finite numbers, and readings that take no limits', () => {
+    expect(
+      parse({
+        own: {
+          coolantTempF: { highWarn: '212', highAlert: null, lowWarn: 32 },
+          mainVoltage: 'high',
+          milOn: { highWarn: 1 },
+          noSuchReading: { highWarn: 1 },
+        },
+      }),
+    ).toEqual({ own: { coolantTempF: { lowWarn: 32 } } });
+  });
+});
+
 describe('graphs', () => {
   const parse = settingParser('graphs', defaults);
 

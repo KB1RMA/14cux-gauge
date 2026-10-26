@@ -20,7 +20,7 @@ These rules apply to any AI coding agent or assistant working in this repository
 ### Precision and rounding
 
 - Precision is per reading, in `src/metrics.ts`, so all views agree.
-- If users need to change how many decimals are shown or how values are rounded, that is **one global preference** in `PreferencesMenu` and `PreferencesProvider`, applied through `src/metrics.ts` to every view. Never add precision or rounding settings to a single tile, graph, table or export, and never let two views show the same reading with different precision.
+- If users need to change how many decimals are shown or how values are rounded, that is **one global preference** in the `Preferences` dialog and `PreferencesProvider`, applied through `src/metrics.ts` to every view. Never add precision or rounding settings to a single tile, graph, table or export, and never let two views show the same reading with different precision.
 - Rounding a value for display must never change what is stored, recorded, exported or compared against a threshold.
 
 ### Graphs
@@ -92,7 +92,7 @@ Keep the dependency set small. Do not add a state-management library, router or 
 
 - [Radix Primitives](https://www.radix-ui.com/primitives) (the `radix-ui` package, MIT) is the UI component base, with `@radix-ui/react-icons` for icons. Build interactive widgets that have an ARIA pattern (menus, dialogs, checkboxes, radio groups, toggles, tabs, tooltips) from the matching Radix primitive rather than hand-rolling the keyboard and ARIA behaviour. Import from `'radix-ui'`, not the individual `@radix-ui/react-*` packages.
 - Radix is unstyled. Style it with CSS modules and the tokens in `src/styles/theme.css`, using its `data-state` / `data-highlighted` attributes for state. Do not add Radix Themes or another UI kit without asking.
-- Keep the main view for the readings. User preferences (units, theme) belong in `PreferencesMenu` in the app bar, not on the dashboard; add new ones there and to `PreferencesProvider`.
+- Keep the main view for the readings. User preferences (units, theme, limits) belong in the `Preferences` dialog, opened by the gear in the app bar, not on the dashboard; add new ones to a section there and to `PreferencesProvider`. Which section is open is part of the address (`?preferences=<section>`, via `usePreferencesRoute`); preference values never are.
 
 ## Copying code
 

@@ -5,6 +5,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import {
+  choosePreferences,
   expect,
   expectNoAxeViolations,
   reading,
@@ -196,12 +197,7 @@ test.describe('Recorded values', () => {
     expect(rpm.slice(rpm.indexOf('1500'))).not.toContain('750');
 
     // In °C, the conversion keeps its full precision too.
-    await page.getByRole('button', { name: 'Preferences' }).click();
-    await page
-      .getByRole('menu')
-      .getByRole('menuitemradio', { name: /Celsius/ })
-      .click();
-    await page.keyboard.press('Escape');
+    await choosePreferences(page, 'General', 'Celsius');
 
     const celsius = page.waitForEvent('download');
 

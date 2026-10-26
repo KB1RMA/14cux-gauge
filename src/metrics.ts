@@ -1,11 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { PurgeValveState, type Gear } from '@kb1rma/libcomm14cux-ts';
+import {
+  limitReached,
+  LIMIT_LEVELS,
+  type LimitLevel,
+  type Limits,
+} from './model/limits';
 import type { LiveSnapshot, ReadingKey } from './model/snapshot';
 import {
+  celsiusToFahrenheit,
   fahrenheitToCelsius,
   formatGear,
   formatSigned,
+  kmhToMph,
   mphToKmh,
   speedLabel,
   temperatureLabel,
@@ -38,14 +46,24 @@ export type MetricGroup = 'engine' | 'air' | 'fuelling' | 'fuelMap' | 'states';
 export type MetricTone = 'normal' | 'good' | 'warn' | 'alert';
 
 /**
- * A sample at or above `from` (in library units) needs attention: `tone`
- * colours it and `note` says why in words. A metric lists its thresholds in
- * rising order; the highest one reached applies.
+ * A continuous reading's limits, which the user sets in Preferences. A
+ * sample at a level needs attention: the level's tone colours it and its
+ * note says why in words. Limits are compared with the full-precision
+ * sample, never a rounded one.
  */
-export interface Threshold {
-  from: number;
-  tone: 'warn' | 'alert';
-  note: string;
+export interface MetricLimits {
+  /**
+   * A first starting point from what owners and specialists report for the
+   * 14CUX, until the user sets their own. Empty where there is no sound
+   * general guide. Not a statement of what is safe for any engine.
+   */
+  suggested: Limits;
+  /** Where the suggestion comes from, in a sentence of plain language. */
+  basis?(units: DisplayUnits): string;
+  /** Words shown beside a value at each level, in place of the usual ones. */
+  notes?: Partial<Record<LimitLevel, string>>;
+  /** Converts a display value, as the user types it, back to a sample. */
+  fromDisplay(display: number, units: DisplayUnits): number;
 }
 
 /**
@@ -82,14 +100,15 @@ export interface Metric {
    */
   typical?(units: DisplayUnits): string;
   /**
-   * Levels that need attention. When set, `tone` and `note` follow them, and
-   * a dial draws them as bands.
+   * For a continuous reading, the limits a user can set (see
+   * `readingState`). A dial draws them as bands and a live graph as lines.
    */
-  thresholds?: readonly Threshold[];
-  /** Colour emphasis for a sample; `note` must carry the meaning in text. */
+  limits?: MetricLimits;
+  /**
+   * Colour emphasis for an on/off or enumerated reading's sample; its
+   * formatted value carries the meaning in text.
+   */
   tone?(sample: number): MetricTone;
-  /** A word or two shown beside a value that needs attention. */
-  note?(sample: number): string | undefined;
   /**
    * For a metric worked out by the app: the readings it needs, all from the
    * same snapshot, and how to work out its sample from their samples.
@@ -134,11 +153,14 @@ export const METRIC_GROUPS: readonly { id: MetricGroup; title: string }[] = [
 
 const same = (sample: number) => sample;
 const percent = (sample: number) => sample * 100;
+const fromPercent = (display: number) => display / 100;
 // Math.round for whole numbers, so -0.4 shows as "0" rather than "-0".
 const fixed = (decimals: number) => (display: number) =>
   decimals === 0 ? Math.round(display).toString() : display.toFixed(decimals);
 const temperature = (sample: number, { temperatureUnit }: DisplayUnits) =>
   temperatureUnit === 'C' ? fahrenheitToCelsius(sample) : sample;
+const fromTemperature = (display: number, { temperatureUnit }: DisplayUnits) =>
+  temperatureUnit === 'C' ? celsiusToFahrenheit(display) : display;
 /**
  * Each injector bank fires once per crankshaft revolution while the engine
  * runs: the ECU's spark interrupt runs on every spark (four per revolution
@@ -168,33 +190,10 @@ const temperatureDial = ({ temperatureUnit: unit }: DisplayUnits): DialScale =>
     ? { range: [-40, 140], step: 20 }
     : { range: [-40, 280], step: 40 };
 
-/** The highest of `thresholds` that `sample` reaches, if any. */
-function thresholdFor(
-  thresholds: readonly Threshold[],
-  sample: number,
-): Threshold | undefined {
-  return thresholds.findLast((threshold) => sample >= threshold.from);
-}
-
-/** A metric's tone, note and thresholds, all from one list. */
-const flagged = (
-  thresholds: readonly Threshold[],
-): Pick<Metric, 'thresholds' | 'tone' | 'note'> => ({
-  thresholds,
-  tone: (sample) => thresholdFor(thresholds, sample)?.tone ?? 'normal',
-  note: (sample) => thresholdFor(thresholds, sample)?.note,
-});
-
-/**
- * Coolant above the usual 80–95 °C once warm. 105 °C (221 °F) is hotter
- * than a healthy cooling system runs; by 115 °C (239 °F) the coolant is
- * close to boiling under a 15 psi cap. A guide, as `typical` is. Fixed for
- * now; letting users change or turn off levels is #105.
- */
-const COOLANT_THRESHOLDS: readonly Threshold[] = [
-  { from: 221, tone: 'warn', note: 'hot' },
-  { from: 239, tone: 'alert', note: 'overheating' },
-];
+/** Limits with no suggestion, for a reading shown as it is. */
+const limitsFrom = (
+  fromDisplay: MetricLimits['fromDisplay'],
+): MetricLimits => ({ suggested: {}, fromDisplay });
 
 /** A Fahrenheit range in the user's temperature unit, such as "80–95 °C". */
 const temperatureRange = (
@@ -207,12 +206,18 @@ const temperatureRange = (
   return `${show(lowF)}–${show(highF)} ${temperatureUnit(units)}`;
 };
 
+/** A Fahrenheit temperature in the user's unit, such as "105 °C". */
+const temperatureText = (f: number, units: DisplayUnits): string =>
+  `${Math.round(temperature(f, units)).toString()} ${temperatureUnit(units)}`;
+
 const trim = (label: string): Omit<Metric, 'key' | 'description'> => ({
   label,
   group: 'fuelling',
   unit: () => 'counts',
   toDisplay: same,
   format: formatSigned,
+  // No suggestion: owners report no general range for a healthy engine.
+  limits: limitsFrom(same),
   chart: {},
   // The library's full range of trim counts, centred on no correction.
   meter: { range: [-256, 255], centred: true },
@@ -292,6 +297,14 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     unit: () => 'rpm',
     toDisplay: same,
     format: fixed(0),
+    limits: {
+      suggested: { highWarn: 5000, highAlert: 5500 },
+      basis: () =>
+        'Land Rover’s tunes are reported to cut fuel at about 5,500 rpm, ' +
+        'and some owners report it a little over 5,000 rpm. The ECU info ' +
+        'shows your tune’s own rev limit.',
+      fromDisplay: same,
+    },
     chart: {},
     dial: () => ({ range: [0, 7000], step: 1000, divisor: 1000 }),
   },
@@ -304,6 +317,12 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     toDisplay: (sample, { speedUnit }) =>
       speedUnit === 'kmh' ? mphToKmh(sample) : sample,
     format: fixed(0),
+    // No suggestion: a safe or legal speed is not the ECU's to say.
+    limits: {
+      suggested: {},
+      fromDisplay: (display, { speedUnit }) =>
+        speedUnit === 'kmh' ? kmhToMph(display) : display,
+    },
     chart: {},
     // The ECU counts road speed in a byte of km/h, so 255 km/h (158 mph) at
     // most.
@@ -321,6 +340,7 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     unit: () => 'rpm',
     toDisplay: same,
     format: fixed(0),
+    limits: limitsFrom(same),
     chart: {},
   },
   coolantTempF: {
@@ -332,7 +352,19 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     unit: temperatureUnit,
     toDisplay: temperature,
     format: fixed(0),
-    ...flagged(COOLANT_THRESHOLDS),
+    limits: {
+      // Hotter than a healthy cooling system runs at 105 °C (221 °F); close
+      // to boiling under a 15 psi cap by 115 °C (239 °F).
+      suggested: { highWarn: 221, highAlert: 239 },
+      basis: (units) =>
+        `Coolant runs at about ${temperatureRange(176, 203, units)} once ` +
+        `warm; the thermostat opens at ${temperatureText(190.4, units)}. ` +
+        `${temperatureText(221, units)} is hotter than a healthy cooling ` +
+        `system runs, and by ${temperatureText(239, units)} coolant is close ` +
+        'to boiling under a 15 psi cap.',
+      notes: { highWarn: 'hot', highAlert: 'overheating' },
+      fromDisplay: fromTemperature,
+    },
     chart: {},
     dial: temperatureDial,
   },
@@ -346,6 +378,17 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     unit: temperatureUnit,
     toDisplay: temperature,
     format: fixed(0),
+    limits: {
+      // 70 °C is 158 °F.
+      suggested: { highWarn: 158 },
+      basis: (units) =>
+        'Owners report fuel rail readings of about ' +
+        `${temperatureRange(77, 122, units)} while driving. From about ` +
+        `${temperatureText(158, units)} fuel can start to vaporise in the ` +
+        'rail, which the ECU’s hot-start enrichment exists to clear.',
+      notes: { highWarn: 'hot' },
+      fromDisplay: fromTemperature,
+    },
     chart: {},
     dial: temperatureDial,
   },
@@ -359,6 +402,7 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     unit: () => '%',
     toDisplay: percent,
     format: fixed(0),
+    limits: limitsFrom(fromPercent),
     chart: { range: [0, 100] },
   },
   airflow: {
@@ -370,6 +414,7 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     unit: () => '%',
     toDisplay: percent,
     format: fixed(1),
+    limits: limitsFrom(fromPercent),
     chart: { range: [0, 100] },
   },
   idleBypass: {
@@ -382,6 +427,7 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     unit: () => '% open',
     toDisplay: percent,
     format: fixed(0),
+    limits: limitsFrom(fromPercent),
     chart: { range: [0, 100] },
     meter: { range: [0, 100] },
   },
@@ -395,6 +441,19 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     unit: () => 'V',
     toDisplay: same,
     format: fixed(1),
+    limits: {
+      suggested: {
+        lowAlert: 11,
+        lowWarn: 12,
+        highWarn: 14.8,
+        highAlert: 15.5,
+      },
+      basis: () =>
+        'About 13.5–14.5 V while the alternator charges and 12–12.8 V with ' +
+        'the engine stopped. Below 12 V the battery is flat or not ' +
+        'charging; above about 14.8 V the alternator is overcharging.',
+      fromDisplay: same,
+    },
     chart: {},
   },
   injectorPulseUs: {
@@ -407,6 +466,7 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     unit: () => 'ms',
     toDisplay: (sample) => sample / 1000,
     format: fixed(2),
+    limits: limitsFrom((display) => display * 1000),
     chart: {},
   },
   injectorDuty: {
@@ -427,14 +487,14 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     // Pulse width has 1 µs and engine speed 1 rpm resolution, so the duty is
     // known far more finely than 0.1 %; 0.1 % shows its movement at idle.
     format: fixed(1),
-    tone: (sample) =>
-      sample >= 1 ? 'alert' : sample > DUTY_NEAR_LIMIT ? 'warn' : 'normal',
-    note: (sample) =>
-      sample >= 1
-        ? 'maxed out'
-        : sample > DUTY_NEAR_LIMIT
-          ? 'near limit'
-          : undefined,
+    limits: {
+      suggested: { highWarn: DUTY_NEAR_LIMIT, highAlert: 1 },
+      basis: () =>
+        'Injectors are usually sized to stay under about 85 % duty; at ' +
+        '100 % they never close and cannot deliver more fuel.',
+      notes: { highWarn: 'near limit', highAlert: 'maxed out' },
+      fromDisplay: fromPercent,
+    },
     derived: {
       from: ['injectorPulseUs', 'engineRpm'],
       sample: ([pulseUs = 0, rpm = 0]) => injectorDuty(pulseUs, rpm),
@@ -459,6 +519,7 @@ const DEFINITIONS: Record<MetricKey, Omit<Metric, 'key'>> = {
     toDisplay: same,
     // The ECU's reading has 10 bits over 5 V, steps of about 4.9 mV.
     format: fixed(3),
+    limits: limitsFrom(same),
     chart: { range: [0, 5] },
   },
   lambdaShortOdd: shortTrim('Short trim, odd', 'odd'),
@@ -650,6 +711,75 @@ export const RPM_LIMIT = {
   unit: 'rpm',
   format: fixed(0),
 } as const;
+
+/** The words for each level, unless a metric gives its own. */
+const LIMIT_NOTES: Record<LimitLevel, string> = {
+  lowAlert: 'very low',
+  lowWarn: 'low',
+  highWarn: 'high',
+  highAlert: 'very high',
+};
+
+/** The words shown beside a value at `level` of `metric`'s limits. */
+export function limitNote(metric: Metric, level: LimitLevel): string {
+  return metric.limits?.notes?.[level] ?? LIMIT_NOTES[level];
+}
+
+export interface ReadingState {
+  /** Colour emphasis only; `note` or the value carries the meaning. */
+  tone: MetricTone;
+  /** A word or two shown after the value, such as "hot". */
+  note?: string;
+}
+
+/**
+ * How a sample stands: for a continuous reading, against `limits` (the
+ * user's, or none where limits do not apply, as in replay); for an on/off
+ * or enumerated one, by its own tone. Compares the full-precision sample.
+ */
+export function readingState(
+  metric: Metric,
+  limits: Limits | undefined,
+  sample: number,
+): ReadingState {
+  const level = limits ? limitReached(limits, sample) : undefined;
+
+  if (level === undefined) {
+    return { tone: metric.tone?.(sample) ?? 'normal' };
+  }
+
+  return {
+    tone: level === 'lowAlert' || level === 'highAlert' ? 'alert' : 'warn',
+    note: limitNote(metric, level),
+  };
+}
+
+/**
+ * Each level set in `limits`, as text in the user's units, lowest first:
+ * "low ≤ 12.0 V", "hot ≥ 105 °C".
+ */
+export function describeLimits(
+  metric: Metric,
+  limits: Limits,
+  units: DisplayUnits,
+): string[] {
+  const unit = metric.unit(units);
+
+  return LIMIT_LEVELS.flatMap((level) => {
+    const value = limits[level];
+
+    if (value === undefined) {
+      return [];
+    }
+
+    const sign = level.startsWith('low') ? '≤' : '≥';
+    const shown = formatSample(metric, value, units);
+
+    return [
+      `${limitNote(metric, level)} ${sign} ${unit ? `${shown} ${unit}` : shown}`,
+    ];
+  });
+}
 
 /** Formats a sample for display, with the user's units. */
 export function formatSample(
