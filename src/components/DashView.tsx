@@ -20,6 +20,7 @@ import { useRecording } from '../recording/useRecording';
 import { useReadings } from '../readings/useReadings';
 import { limitsFor } from '../settings/limitSettings';
 import { useSetting } from '../settings/useSetting';
+import { columnProperties } from './dashColumns';
 import { DashPicker } from './DashPicker';
 import { FullscreenButton } from './FullscreenButton';
 import styles from './DashView.module.css';
@@ -101,34 +102,6 @@ function PolledDashTile({ metric, stale }: { metric: Metric; stale: boolean }) {
   );
 }
 
-/**
- * How many columns `count` tiles take in a grid `aspect` times as wide as it
- * is tall, so each tile comes out about as wide as a reading (a number and
- * its unit) needs: wider than tall, but not a thin strip. The rows are then
- * filled as evenly as they can be.
- */
-function columnsFor(count: number, aspect: number): number {
-  const tileAspect = 1.8;
-  const columns = Math.min(
-    count,
-    Math.max(1, Math.round(Math.sqrt((count * aspect) / tileAspect))),
-  );
-
-  return Math.ceil(count / Math.ceil(count / columns));
-}
-
-/**
- * The grid's shape, in the steps `DashView.module.css` tells apart, and an
- * aspect ratio typical of each.
- */
-const GRID_SHAPES = [
-  ['tall', 0.6],
-  ['square', 1.1],
-  ['wide', 1.8],
-  ['wider', 2.6],
-  ['widest', 3.6],
-] as const;
-
 /** The readings in `keys`, in the order of the metrics, one large tile each. */
 function DashGrid({
   keys,
@@ -146,18 +119,18 @@ function DashGrid({
       No readings chosen. Use “Choose dash readings” to pick some.
     </p>
   ) : (
-    <div
-      className={styles['fit']}
-      style={Object.fromEntries(
-        GRID_SHAPES.map(([shape, aspect]) => [
-          `--columns-${shape}`,
-          columnsFor(shown.length, aspect),
-        ]),
-      )}
-    >
-      <dl aria-label={label} className={styles['grid']}>
-        {shown.map(tile)}
-      </dl>
+    <div className={styles['fit']}>
+      {/* Focusable, so keyboard users can scroll it when the readings do not
+          all fit. */}
+      <section
+        aria-label={label}
+        className={styles['frame']}
+        style={columnProperties(shown.length)}
+        // eslint-disable-next-line jsx-a11y-x/no-noninteractive-tabindex -- a scrolling region must be focusable to scroll by keyboard (WCAG 2.1.1)
+        tabIndex={0}
+      >
+        <dl className={styles['grid']}>{shown.map(tile)}</dl>
+      </section>
     </div>
   );
 }
