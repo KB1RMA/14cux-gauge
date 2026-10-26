@@ -297,4 +297,42 @@ describe('App in demo mode', () => {
       expect(within(dash).queryByText(note)).not.toBeInTheDocument();
     });
   });
+
+  it('offers to connect when the dash is opened before any connection', async () => {
+    window.location.hash = '#/dash';
+    render(<TestApp pollIntervalMs={{ demo: 10 }} />);
+
+    expect(
+      await screen.findByRole('button', { name: 'Demo mode' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', { name: 'Dash' }),
+    ).not.toBeInTheDocument();
+    window.location.hash = '';
+  });
+
+  it('adds a chosen reading to the dash and remembers the choice', async () => {
+    const user = userEvent.setup();
+
+    render(<TestApp pollIntervalMs={{ demo: 10 }} />);
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }));
+    await user.click(await screen.findByRole('link', { name: 'Dash' }));
+    await screen.findByRole('region', { name: 'Dash' });
+
+    expect(screen.queryByText('Throttle')).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: /Choose dash readings/ }),
+    );
+    await user.click(screen.getByRole('checkbox', { name: 'Throttle' }));
+    await user.keyboard('{Escape}');
+
+    expect(
+      screen.getByText('Throttle', { selector: 'dt' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Choose dash readings/ }),
+    ).toHaveTextContent('6 of 25');
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+  });
 });

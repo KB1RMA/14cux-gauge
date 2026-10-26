@@ -54,4 +54,10 @@ describe('liveStatus', () => {
       reason: 'Polling is paused while the app reads the ECU’s ROM.',
     });
   });
+
+  it('still says so when polling is paused for no known holder', () => {
+    expect(
+      liveStatus({ status: 'connected', source }, undefined, true),
+    ).toEqual({ live: false, reason: 'Polling is paused.' });
+  });
 });

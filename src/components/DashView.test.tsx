@@ -91,4 +91,23 @@ describe('SnapshotDash', () => {
     expect(screen.queryByText(/750/)).not.toBeInTheDocument();
     await expectNoAxeViolations(container);
   });
+
+  it('says in words when coolant is hot, as the overview does', () => {
+    renderDash({ ...SNAPSHOT, coolantTempF: 230 });
+
+    expect(readingFor('Coolant')).toHaveTextContent(/^230 °F hot$/);
+  });
+
+  it('says so when no readings are chosen', () => {
+    render(
+      <TestPlatform platform={browserPlatform()}>
+        <PreferencesProvider>
+          <SnapshotDash keys={[]} snapshot={SNAPSHOT} status={LIVE} />
+        </PreferencesProvider>
+      </TestPlatform>,
+    );
+
+    expect(screen.getByText(/No readings chosen/)).toBeInTheDocument();
+    expect(screen.queryByRole('term')).not.toBeInTheDocument();
+  });
 });
