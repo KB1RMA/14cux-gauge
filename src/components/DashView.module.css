@@ -35,17 +35,84 @@
   box-shadow: inset 0 0 0 1px var(--warn);
 }
 
-/* Fills the screen below the app bar, status bar and tabs (about 21rem), in
-   as many columns as fit. It scrolls only when there are more readings than
-   the rows can hold. */
+/* Fills the screen below the app bar, status bar and tabs (about 21rem). The
+   view works out how many columns suit each shape of screen (--columns-*),
+   so tiles come out wider than tall rather than as thin strips; the frame's
+   own aspect ratio picks which applies. The frame scrolls only when there
+   are more readings than its rows can hold. On a short window it keeps
+   enough height for readings to be read, and the page scrolls too. */
+.fit {
+  container: dash-width / inline-size;
+}
+
+.frame {
+  container: dash / size;
+  height: calc(100dvh - 21rem);
+  min-height: 18rem;
+  overflow-y: auto;
+  border-radius: var(--radius);
+}
+
+.frame:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 .grid {
+  --columns: var(--columns-wide);
+
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  grid-template-columns: repeat(var(--columns), minmax(0, 1fr));
   grid-auto-rows: minmax(6rem, 1fr);
   gap: 0.75rem;
-  height: calc(100dvh - 21rem);
-  min-height: 12rem;
+  height: 100%;
   margin: 0;
+}
+
+/* The shapes and their bounds are GRID_SHAPES in dashColumns.ts; keep the
+   two in step. */
+@container dash (aspect-ratio < 0.8) {
+  .grid {
+    --columns: var(--columns-tall);
+  }
+}
+
+@container dash (0.8 <= aspect-ratio < 1.4) {
+  .grid {
+    --columns: var(--columns-square);
+  }
+}
+
+@container dash (2.2 <= aspect-ratio < 3.2) {
+  .grid {
+    --columns: var(--columns-wider);
+  }
+}
+
+@container dash (aspect-ratio >= 3.2) {
+  .grid {
+    --columns: var(--columns-widest);
+  }
+}
+
+/* A narrow screen has room for one column only, whatever its shape, and
+   each tile needs the height for numerals as large as its width allows. The
+   frame then grows with its tiles and the page scrolls, rather than
+   scrolling a small box inside it. */
+@container dash-width (width < 22rem) {
+  .frame {
+    height: auto;
+    min-height: 0;
+    overflow-y: visible;
+    container-type: normal;
+  }
+
+  .grid {
+    --columns: 1;
+
+    grid-auto-rows: 9rem;
+    height: auto;
+  }
 }
 
 .empty {
@@ -53,14 +120,18 @@
   color: var(--text-muted);
 }
 
-/* Each tile sizes its numerals from its own box, so they grow with the
-   screen without overflowing it. */
+/* Each tile sizes its text from its own box, so the reading grows with the
+   screen without overflowing it: its height, or its width over the widest
+   reading's (about 4.2 em of numerals and unit, "+255 counts"). Its padding
+   is a share of its own width (percentages of the grid area), as container
+   units on the tile would measure the frame instead. The vertical padding
+   stays small enough that the label, reading and note fit a 6rem row. */
 .tile {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  display: grid;
+  grid-template-rows: auto 1fr;
   min-width: 0;
-  padding: 0.5rem 0.75rem;
+  min-height: 0;
+  padding: clamp(0.5rem, 3%, 1rem) clamp(0.75rem, 4%, 1.5rem);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -78,27 +149,43 @@
 }
 
 .label {
-  font-size: clamp(0.75rem, 10cqh, 1.25rem);
+  font-size: clamp(0.75rem, min(9cqh, 7cqw), 1.5rem);
   font-weight: 600;
+  line-height: 1.2;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 
 .value {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
   margin: 0;
+}
+
+.reading {
   font-family: var(--font-mono);
-  font-size: clamp(1.75rem, min(34cqh, 26cqw), 9rem);
+  font-size: clamp(1.5rem, min(48cqh, 22cqw), 12rem);
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
+  line-height: 1;
   white-space: nowrap;
 }
 
-.tile[data-tone='warn'] .value {
+/* States read as words ("Toggling", "No reading": about 5.6 em), which
+   need no fixed-width numerals and are wider in them. */
+.reading[data-words] {
+  font-family: var(--font-sans);
+  font-size: clamp(1.5rem, min(44cqh, 15cqw), 10rem);
+  font-weight: 600;
+}
+
+.tile[data-tone='warn'] .reading {
   color: var(--warn);
 }
 
-.tile[data-tone='alert'] .value {
+.tile[data-tone='alert'] .reading {
   color: var(--danger);
 }
 
@@ -107,14 +194,28 @@
   color: var(--text-muted);
 }
 
+.reading[data-words] .unit {
+  font-weight: 400;
+}
+
+/* A word under the reading, at the label's size: "hot", "Stale". */
 .note,
 .state {
+  margin-top: 0.4em;
   font-family: var(--font-sans);
-  font-size: 0.35em;
+  font-size: clamp(0.75rem, min(10cqh, 8cqw), 1.75rem);
   font-weight: 600;
+  line-height: 1.2;
+}
+
+.tile[data-tone='warn'] .note {
+  color: var(--warn);
+}
+
+.tile[data-tone='alert'] .note {
+  color: var(--danger);
 }
 
 .state {
-  margin-left: 0.5em;
   color: var(--text-muted);
 }

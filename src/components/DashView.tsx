@@ -20,6 +20,7 @@ import { useRecording } from '../recording/useRecording';
 import { useReadings } from '../readings/useReadings';
 import { limitsFor } from '../settings/limitSettings';
 import { useSetting } from '../settings/useSetting';
+import { columnProperties } from './dashColumns';
 import { DashPicker } from './DashPicker';
 import { FullscreenButton } from './FullscreenButton';
 import styles from './DashView.module.css';
@@ -52,23 +53,34 @@ function DashTile({
       <dd className={styles['value']}>
         {stale ? (
           <>
-            <span aria-hidden="true">—</span>
+            <span aria-hidden="true" className={styles['reading']}>
+              —
+            </span>
             <span className={styles['state']}>Stale</span>
           </>
         ) : current === null ? (
           <>
-            <span aria-hidden="true">—</span>
+            <span aria-hidden="true" className={styles['reading']}>
+              —
+            </span>
             <VisuallyHidden.Root>No valid reading</VisuallyHidden.Root>
           </>
         ) : current === undefined ? (
           <>
-            <span aria-hidden="true">—</span>
+            <span aria-hidden="true" className={styles['reading']}>
+              —
+            </span>
             <span className={styles['state']}>Waiting for data</span>
           </>
         ) : (
           <>
-            {formatSample(metric, current, units)}
-            {unit ? <span className={styles['unit']}> {unit}</span> : null}
+            <span
+              className={styles['reading']}
+              data-words={metric.group === 'states' ? '' : undefined}
+            >
+              {formatSample(metric, current, units)}
+              {unit ? <span className={styles['unit']}> {unit}</span> : null}
+            </span>
             {note ? <span className={styles['note']}> {note}</span> : null}
           </>
         )}
@@ -107,9 +119,19 @@ function DashGrid({
       No readings chosen. Use “Choose dash readings” to pick some.
     </p>
   ) : (
-    <dl aria-label={label} className={styles['grid']}>
-      {shown.map(tile)}
-    </dl>
+    <div className={styles['fit']}>
+      {/* Focusable, so keyboard users can scroll it when the readings do not
+          all fit. */}
+      <section
+        aria-label={label}
+        className={styles['frame']}
+        style={columnProperties(shown.length)}
+        // eslint-disable-next-line jsx-a11y-x/no-noninteractive-tabindex -- a scrolling region must be focusable to scroll by keyboard (WCAG 2.1.1)
+        tabIndex={0}
+      >
+        <dl className={styles['grid']}>{shown.map(tile)}</dl>
+      </section>
+    </div>
   );
 }
 
