@@ -32,15 +32,16 @@ export async function saveRecordings(
 ): Promise<RecordingFileContents> {
   const sessions = await Promise.all(
     ids.map(async (id) => {
-      const [session, samples, writes] = await Promise.all([
-        store.get(id),
-        store.readSamples(id),
-        store.readWrites(id),
-      ]);
+      const session = await store.get(id);
 
       if (!session) {
         throw new UnknownSessionError(id);
       }
+
+      const [samples, writes] = await Promise.all([
+        store.readSamples(id),
+        store.readWrites(id),
+      ]);
 
       return { session, recording: fileRecording(session, samples, writes) };
     }),

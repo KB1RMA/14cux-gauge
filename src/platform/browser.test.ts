@@ -599,6 +599,31 @@ describe('browserPlatform opening files', () => {
     expect(pickers[0]?.isConnected).toBe(false);
   });
 
+  it('says the user chose nothing when the picker returns no file', async () => {
+    answerPicker((input) => {
+      Object.defineProperty(input, 'files', { value: [] });
+      input.dispatchEvent(new Event('change'));
+    });
+
+    expect(await browserPlatform().files.open(['.json'])).toBe('cancelled');
+  });
+
+  it('rejects when the chosen file cannot be read', async () => {
+    answerPicker((input) => {
+      const file = new File(['x'], 'gone.json');
+
+      vi.spyOn(file, 'text').mockRejectedValue(
+        new DOMException('Moved', 'NotReadableError'),
+      );
+      Object.defineProperty(input, 'files', { value: [file] });
+      input.dispatchEvent(new Event('change'));
+    });
+
+    await expect(browserPlatform().files.open(['.json'])).rejects.toThrow(
+      'Moved',
+    );
+  });
+
   it('says so when the user dismisses the picker', async () => {
     const pickers = answerPicker((input) => {
       input.dispatchEvent(new Event('cancel'));

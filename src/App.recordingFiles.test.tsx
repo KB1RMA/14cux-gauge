@@ -3,8 +3,9 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TestApp } from './test-support/TestApp';
-import type { OpenedFile } from './platform/platform';
-import { MemorySessionStore } from './storage/sessionStore';
+import type { FilePlatform, OpenedFile } from './platform/platform';
+import { MemorySessionStore, type SessionStore } from './storage/sessionStore';
+import type { ImportedSession, SessionSummary } from './model/session';
 import { expectNoAxeViolations } from './test-support/a11y';
 import { testPlatform } from './test-support/platform';
 import {
@@ -27,7 +28,11 @@ interface SavedFile {
  * The app over `store`, keeping every file it saves, and opening the files
  * in `toOpen` in turn (then nothing, as if the dialog were dismissed).
  */
-function renderApp(store: MemorySessionStore, toOpen: OpenedFile[] = []) {
+function renderApp(
+  store: SessionStore,
+  toOpen: OpenedFile[] = [],
+  files: Partial<FilePlatform> = {},
+) {
   const saved: SavedFile[] = [];
   const { container } = render(
     <TestApp
@@ -40,6 +45,7 @@ function renderApp(store: MemorySessionStore, toOpen: OpenedFile[] = []) {
             return Promise.resolve('saved');
           },
           open: () => Promise.resolve(toOpen.shift() ?? 'cancelled'),
+          ...files,
         },
       })}
     />,
@@ -131,9 +137,51 @@ describe('The sessions table', () => {
     expect(namesInOrder()).toEqual(['Idle wobble', 'Cold start']);
   });
 
+  it('sorts by samples and source, with unfinished sessions last by length', async () => {
+    const user = userEvent.setup();
+    const store = await twoSessions();
+    const { id } = await store.create({
+      name: 'Cut short',
+      source: 'serial',
+      startedAt: START + 7_200_000,
+      identity: null,
+    });
+
+    await store.append(id, [
+      snapshotAt(START + 7_200_000),
+      snapshotAt(START + 7_200_100),
+      snapshotAt(START + 7_200_200),
+    ]);
+    renderApp(store);
+
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await screen.findByRole('link', { name: 'Cut short' });
+
+    expect(sessionCell('Cut short', 'Length')).toHaveTextContent('Unfinished');
+
+    await user.click(screen.getByRole('button', { name: 'Length' }));
+
+    expect(namesInOrder()).toEqual(['Idle wobble', 'Cold start', 'Cut short']);
+
+    await user.click(screen.getByRole('button', { name: 'Length' }));
+
+    expect(namesInOrder()).toEqual(['Cold start', 'Idle wobble', 'Cut short']);
+
+    // Most samples first.
+    await user.click(screen.getByRole('button', { name: 'Samples' }));
+
+    expect(namesInOrder()).toEqual(['Cut short', 'Idle wobble', 'Cold start']);
+
+    await user.click(screen.getByRole('button', { name: 'Source' }));
+
+    expect(namesInOrder().slice(0, 1)).toEqual(['Cold start']);
+    expect(sessionCell('Cold start', 'Source')).toHaveTextContent('Demo ECU');
+  });
+
   it('saves the chosen sessions together in one recording file', async () => {
     const user = userEvent.setup();
-    const { container, saved } = renderApp(await twoSessions());
+    const toOpen: OpenedFile[] = [];
+    const { container, saved } = renderApp(await twoSessions(), toOpen);
 
     await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
     await screen.findByRole('link', { name: 'Idle wobble' });
@@ -191,6 +239,19 @@ describe('The sessions table', () => {
     );
 
     expect(save).toBeDisabled();
+
+    // Opened again, both come back as copies.
+    toOpen.push({ name: 'both.json', text: String(saved[0]?.data) });
+    await user.click(
+      screen.getByRole('button', { name: 'Open recording file…' }),
+    );
+
+    expect(
+      await within(
+        screen.getByRole('region', { name: 'Recorded sessions' }),
+      ).findByText(/^Opened /),
+    ).toHaveTextContent('Opened 2 recordings from both.json.');
+    expect(within(sessionsTable()).getAllByRole('rowheader')).toHaveLength(4);
   });
 
   it('opens a saved recording file, and shows where the session came from', async () => {
@@ -322,6 +383,148 @@ describe('The sessions table', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'drive.csv could not be opened: it is not a recording file.',
+    );
+    expect(await store.list()).toEqual([]);
+  });
+});
+
+describe('When a recording file cannot be saved or opened', () => {
+  it('says why the chosen sessions were not saved', async () => {
+    const user = userEvent.setup();
+
+    renderApp(await twoSessions(), [], {
+      save: () => Promise.reject(new Error('Disk full')),
+    });
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(
+      await screen.findByRole('checkbox', { name: 'Select Idle wobble' }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Save selected as file' }),
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Idle-wobble-2026-10-05T14-00-00.json could not be saved: Error: Disk full.',
+    );
+  });
+
+  it('says so when the sessions cannot be read to save them', async () => {
+    const user = userEvent.setup();
+
+    class UnreadableSamples extends MemorySessionStore {
+      override readSamples(): Promise<never> {
+        return Promise.reject(new DOMException('Gone', 'UnknownError'));
+      }
+    }
+
+    const store = new UnreadableSamples();
+
+    await store.create({
+      name: 'Idle wobble',
+      source: 'serial',
+      startedAt: START,
+      identity: null,
+    });
+    renderApp(store);
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(
+      await screen.findByRole('checkbox', { name: 'Select Idle wobble' }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Save selected as file' }),
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The recordings could not be read to save them.',
+    );
+
+    await user.click(screen.getByRole('link', { name: 'Idle wobble' }));
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Export' })).getByRole(
+        'button',
+        { name: 'Save as file' },
+      ),
+    );
+
+    expect(
+      await within(screen.getByRole('region', { name: 'Export' })).findByRole(
+        'alert',
+      ),
+    ).toHaveTextContent('The session could not be read to save it.');
+  });
+
+  it('says why a session was not saved from its page', async () => {
+    const user = userEvent.setup();
+
+    renderApp(await twoSessions(), [], {
+      save: () => Promise.reject(new Error('Disk full')),
+    });
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(await screen.findByRole('link', { name: 'Cold start' }));
+    await user.click(
+      within(screen.getByRole('region', { name: 'Export' })).getByRole(
+        'button',
+        { name: 'Save as file' },
+      ),
+    );
+
+    expect(
+      await within(screen.getByRole('region', { name: 'Export' })).findByRole(
+        'alert',
+      ),
+    ).toHaveTextContent(
+      'Cold-start-2026-10-05T15-00-00.json could not be saved: Error: Disk full.',
+    );
+  });
+
+  it('says so when the chosen file cannot be read', async () => {
+    const user = userEvent.setup();
+
+    renderApp(new MemorySessionStore(), [], {
+      open: () => Promise.reject(new DOMException('Moved', 'NotReadableError')),
+    });
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Open recording file…' }),
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The file could not be read.',
+    );
+  });
+
+  it('says so when the browser cannot store what the file holds', async () => {
+    const user = userEvent.setup();
+
+    class Full extends MemorySessionStore {
+      override importSessions(
+        _sessions: readonly ImportedSession[],
+      ): Promise<SessionSummary[]> {
+        return Promise.reject(new DOMException('Full', 'QuotaExceededError'));
+      }
+    }
+
+    const store = new Full();
+
+    renderApp(store, [
+      {
+        name: 'drive.json',
+        text: JSON.stringify({
+          kind: '14cux-gauge-recordings',
+          version: 1,
+          savedAt: START,
+          savedBy: '14CUX Gauge 0.13.0',
+          recordings: [],
+        }),
+      },
+    ]);
+    await user.click(sessionsNav().getByRole('link', { name: 'Sessions' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Open recording file…' }),
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'drive.json could not be opened: the browser could not store it.',
     );
     expect(await store.list()).toEqual([]);
   });

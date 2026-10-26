@@ -236,6 +236,12 @@ describe('readRecordingFile', () => {
     );
   });
 
+  it('names a field the file should not have', () => {
+    expect(reasonFor(JSON.stringify({ ...FILE, comment: 'hi' }))).toBe(
+      'idle.json could not be opened: it is damaged (unknown comment).',
+    );
+  });
+
   it('rejects a version that is not a known one', () => {
     expect(reasonFor(JSON.stringify({ ...FILE, version: 0 }))).toMatch(
       /^idle\.json could not be opened: it is damaged \(version: /,

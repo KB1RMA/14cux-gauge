@@ -7,7 +7,11 @@ import {
   CheckIcon,
   DividerHorizontalIcon,
 } from '@radix-ui/react-icons';
-import { useTable, type RowSelectionState } from '@tanstack/react-table';
+import {
+  functionalUpdate,
+  useTable,
+  type RowSelectionState,
+} from '@tanstack/react-table';
 import { Checkbox, VisuallyHidden } from 'radix-ui';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
@@ -116,9 +120,7 @@ export function SessionTable({
     state: { sorting, rowSelection: selection },
     onSortingChange: setSorting,
     onRowSelectionChange: (updater) => {
-      onSelectionChange(
-        typeof updater === 'function' ? updater(selection) : updater,
-      );
+      onSelectionChange(functionalUpdate(updater, selection));
     },
   });
   const allSelected = table.getIsAllRowsSelected();
