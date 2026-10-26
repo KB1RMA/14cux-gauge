@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import userEvent from '@testing-library/user-event';
 import type uPlot from 'uplot';
 import type * as plotOptions from '../charts/plotOptions';
@@ -14,7 +15,7 @@ import { useReplay } from '../replay/useReplay';
 import { installCanvasStandIns } from '../test-support/canvas';
 import { snapshotAt } from '../test-support/snapshots';
 import { TestPlatform } from '../test-support/TestApp';
-import { PreferencesMenu } from './PreferencesMenu';
+import { Preferences } from './Preferences';
 import { TimelineOverview } from './TimelineOverview';
 
 // A canvas paints nothing a test can see, so these tests read the data each
@@ -60,12 +61,14 @@ function Overview() {
   }
 
   return (
-    <TestPlatform platform={browserPlatform()}>
-      <PreferencesProvider>
-        <PreferencesMenu />
-        <TimelineOverview metric={coolant} series={series} replay={replay} />
-      </PreferencesProvider>
-    </TestPlatform>
+    <MemoryRouter>
+      <TestPlatform platform={browserPlatform()}>
+        <PreferencesProvider>
+          <Preferences />
+          <TimelineOverview metric={coolant} series={series} replay={replay} />
+        </PreferencesProvider>
+      </TestPlatform>
+    </MemoryRouter>
   );
 }
 
@@ -101,7 +104,7 @@ describe('TimelineOverview', () => {
     expect(drawn.data.at(-1)?.[0]).toEqual([0, 1]);
 
     await user.click(screen.getByRole('button', { name: 'Preferences' }));
-    await user.click(screen.getByRole('menuitemradio', { name: /^Celsius / }));
+    await user.click(screen.getByRole('radio', { name: 'Celsius (°C)' }));
     await user.keyboard('{Escape}');
 
     await vi.waitFor(() => {

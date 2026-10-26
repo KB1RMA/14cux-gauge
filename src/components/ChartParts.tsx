@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { VisuallyHidden } from 'radix-ui';
+import { Fragment } from 'react';
 import styles from './TimeSeriesChart.module.css';
+
+const NO_LIMITS: readonly string[] = [];
 
 function Stat({
   term,
@@ -36,7 +39,8 @@ function Stat({
 
 /**
  * A graph's values as text: the current one, and (except for on/off and
- * enumerated readings, where they mean little) the lowest and highest.
+ * enumerated readings, where they mean little) the lowest and highest, and
+ * any limits drawn on the graph.
  */
 export function ChartStats({
   now,
@@ -44,12 +48,15 @@ export function ChartStats({
   max,
   step,
   format,
+  limits = NO_LIMITS,
 }: {
   now: number | null | undefined;
   min: number | undefined;
   max: number | undefined;
   step: boolean | undefined;
   format(value: number): string;
+  /** Each limit drawn on the graph, as text, such as "low ≤ 12.0 V". */
+  limits?: readonly string[];
 }) {
   return (
     <dl className={styles['stats']}>
@@ -60,6 +67,19 @@ export function ChartStats({
           <Stat term="Max" value={max} format={format} />
         </>
       )}
+      {limits.length > 0 ? (
+        <div className={styles['limits']}>
+          <dt>Limits</dt>
+          <dd>
+            {limits.map((limit, index) => (
+              <Fragment key={limit}>
+                {index > 0 ? ', ' : null}
+                <span>{limit}</span>
+              </Fragment>
+            ))}
+          </dd>
+        </div>
+      ) : null}
     </dl>
   );
 }

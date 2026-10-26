@@ -59,6 +59,39 @@ function stat(figure: HTMLElement, term: string): string | null {
 }
 
 describe('TimeSeriesChart', () => {
+  it('lists the limits that apply beside the graph, in the chosen units', () => {
+    const history = new SampleHistory(METRIC_KEYS, 100);
+
+    history.push(1000, { coolantTempF: 212 });
+
+    const { unmount } = renderChart('coolantTempF', history);
+    const figure = screen.getByRole('figure', { name: 'Coolant (°F)' });
+
+    expect(stat(figure, 'Limits')).toBe('hot ≥ 221 °F, overheating ≥ 239 °F');
+
+    unmount();
+    localStorage.setItem(
+      'cuxGauge.preferences',
+      JSON.stringify({ temperatureUnit: 'C' }),
+    );
+    renderChart('coolantTempF', history);
+
+    expect(
+      stat(screen.getByRole('figure', { name: 'Coolant (°C)' }), 'Limits'),
+    ).toBe('hot ≥ 105 °C, overheating ≥ 115 °C');
+  });
+
+  it('lists no limits for a reading without any', () => {
+    const history = new SampleHistory(METRIC_KEYS, 100);
+
+    history.push(1000, { throttle: 0.5, gear: Gear.DriveOrReverse });
+    renderChart('throttle', history);
+
+    expect(
+      stat(screen.getByRole('figure', { name: 'Throttle (%)' }), 'Limits'),
+    ).toBeNull();
+  });
+
   it('is a figure named after the metric, with its latest, lowest and highest values', () => {
     const history = new SampleHistory(METRIC_KEYS, 100);
 

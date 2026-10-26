@@ -2,6 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { Gear } from '@kb1rma/libcomm14cux-ts';
 import {
+  describeLimits,
   formatSample,
   injectorDuty,
   METRIC_GROUPS,
@@ -9,10 +10,12 @@ import {
   RPM_LIMIT,
   meterSpan,
   metricsInGroup,
+  readingState,
   readingsFor,
   recordedKeys,
   sampleOf,
   type DisplayUnits,
+  type Metric,
   type MetricKey,
 } from './metrics';
 import type { LiveSnapshot } from './model/snapshot';
@@ -107,32 +110,29 @@ describe('metrics', () => {
     expect(duty({ engineRpm: 750 })).toBeNull();
   });
 
-  it('formats injector duty as a percentage, and says when it is high', () => {
+  it('formats injector duty as a percentage, and says when it reaches its suggested limits', () => {
     const duty = metric('injectorDuty');
     const show = (sample: number) => ({
       text: formatSample(duty, sample, IMPERIAL),
-      tone: duty.tone?.(sample),
-      note: duty.note?.(sample),
+      ...readingState(duty, duty.limits?.suggested, sample),
     });
 
     expect(duty.unit(IMPERIAL)).toBe('%');
-    expect(show(0)).toEqual({ text: '0.0', tone: 'normal', note: undefined });
-    expect(show(0.029375)).toEqual({
-      text: '2.9',
-      tone: 'normal',
-      note: undefined,
-    });
+    expect(show(0)).toEqual({ text: '0.0', tone: 'normal' });
+    expect(show(0.029375)).toEqual({ text: '2.9', tone: 'normal' });
+    expect(show(0.849)).toEqual({ text: '84.9', tone: 'normal' });
+    // A high limit applies at its value.
     expect(show(0.85)).toEqual({
       text: '85.0',
-      tone: 'normal',
-      note: undefined,
+      tone: 'warn',
+      note: 'near limit',
     });
     expect(show(0.851)).toEqual({
       text: '85.1',
       tone: 'warn',
       note: 'near limit',
     });
-    // Rounds to 100.0 for display, but the threshold uses the sample.
+    // Rounds to 100.0 for display, but the limit is compared with the sample.
     expect(show(0.9996)).toEqual({
       text: '100.0',
       tone: 'warn',
@@ -191,6 +191,11 @@ describe('metrics', () => {
     expect(formatSample(metric('airflow'), 0.1, IMPERIAL)).toBe('10.0');
     expect(metric('throttle').toDisplay(0.25, IMPERIAL)).toBe(25);
     expect(formatSample(metric('lambdaShortOdd'), 10, IMPERIAL)).toBe('+10');
+    // Trims are whole counts: a fraction rounds, and never shows as "-0".
+    expect(formatSample(metric('lambdaShortOdd'), 5.5, IMPERIAL)).toBe('+6');
+    expect(formatSample(metric('lambdaLongEven'), -12, IMPERIAL)).toBe('-12');
+    expect(formatSample(metric('lambdaLongEven'), -0.4, IMPERIAL)).toBe('0');
+    expect(formatSample(metric('lambdaShortOdd'), 0, IMPERIAL)).toBe('0');
     expect(formatSample(metric('mainVoltage'), 14.06, IMPERIAL)).toBe('14.1');
     expect(formatSample(metric('gear'), Gear.DriveOrReverse, IMPERIAL)).toBe(
       'D / R',
@@ -246,26 +251,193 @@ describe('metrics', () => {
     expect(metric('engineRpm').tone).toBeUndefined();
   });
 
-  it('says in words when coolant is hot or overheating', () => {
+  it('says in words when coolant reaches its suggested limits', () => {
     const coolant = metric('coolantTempF');
+    const state = (sample: number) =>
+      readingState(coolant, coolant.limits?.suggested, sample);
 
-    expect(coolant.tone?.(220)).toBe('normal');
-    expect(coolant.note?.(220)).toBeUndefined();
+    expect(coolant.limits?.suggested).toEqual({
+      highWarn: 221,
+      highAlert: 239,
+    });
+    expect(state(220.9)).toEqual({ tone: 'normal' });
     // 221 °F is 105 °C.
-    expect(coolant.tone?.(221)).toBe('warn');
-    expect(coolant.note?.(221)).toBe('hot');
-    expect(coolant.tone?.(238)).toBe('warn');
-    expect(coolant.note?.(238)).toBe('hot');
+    expect(state(221)).toEqual({ tone: 'warn', note: 'hot' });
+    expect(state(238.9)).toEqual({ tone: 'warn', note: 'hot' });
     // 239 °F is 115 °C.
-    expect(coolant.tone?.(239)).toBe('alert');
-    expect(coolant.note?.(239)).toBe('overheating');
-    expect(coolant.note?.(300)).toBe('overheating');
+    expect(state(239)).toEqual({ tone: 'alert', note: 'overheating' });
+    expect(state(300)).toEqual({ tone: 'alert', note: 'overheating' });
     // Cold is not flagged: the ECU enriches for it.
-    expect(coolant.tone?.(-13)).toBe('normal');
-    expect(coolant.note?.(-13)).toBeUndefined();
-    // The thresholds change the colour and note, never the reading.
+    expect(state(-13)).toEqual({ tone: 'normal' });
+    // Limits change the colour and note, never the reading.
     expect(formatSample(coolant, 230, IMPERIAL)).toBe('230');
     expect(formatSample(coolant, 230, METRIC)).toBe('110');
+  });
+
+  it('compares the full-precision sample with a limit, not the rounded value', () => {
+    const coolant = metric('coolantTempF');
+    const limits = { highWarn: 221 };
+
+    // Shows as 221 °F and 105 °C, but is below the limit.
+    expect(formatSample(coolant, 220.6, IMPERIAL)).toBe('221');
+    expect(formatSample(coolant, 220.6, METRIC)).toBe('105');
+    expect(readingState(coolant, limits, 220.6)).toEqual({ tone: 'normal' });
+  });
+
+  it('says in words when a reading is at, below or above its limits', () => {
+    const voltage = metric('mainVoltage');
+    const limits = {
+      lowAlert: 11,
+      lowWarn: 12,
+      highWarn: 14.8,
+      highAlert: 15.5,
+    };
+    const state = (sample: number) => readingState(voltage, limits, sample);
+
+    expect(state(10.9)).toEqual({ tone: 'alert', note: 'very low' });
+    expect(state(11)).toEqual({ tone: 'alert', note: 'very low' });
+    expect(state(11.01)).toEqual({ tone: 'warn', note: 'low' });
+    expect(state(12)).toEqual({ tone: 'warn', note: 'low' });
+    expect(state(12.01)).toEqual({ tone: 'normal' });
+    expect(state(14.79)).toEqual({ tone: 'normal' });
+    expect(state(14.8)).toEqual({ tone: 'warn', note: 'high' });
+    expect(state(15.49)).toEqual({ tone: 'warn', note: 'high' });
+    expect(state(15.5)).toEqual({ tone: 'alert', note: 'very high' });
+    expect(state(0)).toEqual({ tone: 'alert', note: 'very low' });
+    expect(state(-1)).toEqual({ tone: 'alert', note: 'very low' });
+  });
+
+  it('flags nothing with no limits, as in replay', () => {
+    expect(readingState(metric('coolantTempF'), undefined, 300)).toEqual({
+      tone: 'normal',
+    });
+    expect(readingState(metric('mainVoltage'), {}, 0)).toEqual({
+      tone: 'normal',
+    });
+    // On/off readings keep their own tone, with no note.
+    expect(readingState(metric('milOn'), undefined, 1)).toEqual({
+      tone: 'warn',
+    });
+  });
+
+  it('offers limits on every continuous reading, and not on states or map positions', () => {
+    expect(
+      METRICS.filter((m) => m.limits !== undefined).map((m) => m.key),
+    ).toEqual([
+      'engineRpm',
+      'targetIdleRpm',
+      'roadSpeedMph',
+      'coolantTempF',
+      'fuelTempF',
+      'throttle',
+      'airflow',
+      'idleBypass',
+      'mainVoltage',
+      'injectorPulseUs',
+      'injectorDuty',
+      'coTrimVoltage',
+      'lambdaShortOdd',
+      'lambdaShortEven',
+      'lambdaLongOdd',
+      'lambdaLongEven',
+    ]);
+  });
+
+  it('suggests limits only where owners report a general guide', () => {
+    expect(
+      Object.fromEntries(
+        METRICS.flatMap((m) =>
+          m.limits && Object.keys(m.limits.suggested).length > 0
+            ? [[m.key, m.limits.suggested]]
+            : [],
+        ),
+      ),
+    ).toEqual({
+      engineRpm: { highWarn: 5000, highAlert: 5500 },
+      coolantTempF: { highWarn: 221, highAlert: 239 },
+      fuelTempF: { highWarn: 158 },
+      mainVoltage: {
+        lowAlert: 11,
+        lowWarn: 12,
+        highWarn: 14.8,
+        highAlert: 15.5,
+      },
+      injectorDuty: { highWarn: 0.85, highAlert: 1 },
+    });
+  });
+
+  it('says where each suggestion comes from, in the user’s units', () => {
+    const basis = (m: Metric, units: DisplayUnits) => m.limits?.basis?.(units);
+
+    expect(basis(metric('coolantTempF'), METRIC)).toBe(
+      'Coolant runs at about 80–95 °C once warm; the thermostat opens at 88 °C. ' +
+        '105 °C is hotter than a healthy cooling system runs, and by 115 °C ' +
+        'coolant is close to boiling under a 15 psi cap.',
+    );
+    expect(basis(metric('coolantTempF'), IMPERIAL)).toBe(
+      'Coolant runs at about 176–203 °F once warm; the thermostat opens at 190 °F. ' +
+        '221 °F is hotter than a healthy cooling system runs, and by 239 °F ' +
+        'coolant is close to boiling under a 15 psi cap.',
+    );
+    expect(basis(metric('fuelTempF'), METRIC)).toBe(
+      'Owners report fuel rail readings of about 25–50 °C while driving. ' +
+        'From about 70 °C fuel can start to vaporise in the rail, which the ' +
+        'ECU’s hot-start enrichment exists to clear.',
+    );
+    const suggesting = METRICS.filter(
+      (m) => m.limits && Object.keys(m.limits.suggested).length > 0,
+    );
+
+    expect(
+      suggesting.filter(
+        (m) => !/^[A-Z].{40,}\.$/.test(m.limits?.basis?.(IMPERIAL) ?? ''),
+      ),
+    ).toEqual([]);
+  });
+
+  it('turns a typed limit back into a sample in library units', () => {
+    const back = (key: MetricKey, display: number, units: DisplayUnits) =>
+      metric(key).limits?.fromDisplay(display, units);
+
+    expect(back('coolantTempF', 105, METRIC)).toBe(221);
+    expect(back('coolantTempF', -40, METRIC)).toBe(-40);
+    expect(back('coolantTempF', 0, METRIC)).toBe(32);
+    expect(back('coolantTempF', 221, IMPERIAL)).toBe(221);
+    expect(back('roadSpeedMph', 100, IMPERIAL)).toBe(100);
+    expect(back('roadSpeedMph', 160.9344, METRIC)).toBe(100);
+    expect(back('throttle', 85, IMPERIAL)).toBe(0.85);
+    expect(back('injectorDuty', 85, IMPERIAL)).toBe(0.85);
+    expect(back('injectorPulseUs', 2.35, IMPERIAL)).toBe(2350);
+    expect(back('mainVoltage', 12, METRIC)).toBe(12);
+    expect(back('lambdaLongOdd', -100, IMPERIAL)).toBe(-100);
+  });
+
+  it('describes limits in the user’s units, lowest first', () => {
+    const voltage = metric('mainVoltage');
+    const coolant = metric('coolantTempF');
+
+    expect(
+      describeLimits(
+        voltage,
+        { highAlert: 15.5, lowWarn: 12, lowAlert: 11, highWarn: 14.8 },
+        IMPERIAL,
+      ),
+    ).toEqual([
+      'very low ≤ 11.0 V',
+      'low ≤ 12.0 V',
+      'high ≥ 14.8 V',
+      'very high ≥ 15.5 V',
+    ]);
+    expect(
+      describeLimits(coolant, { highWarn: 221, highAlert: 239 }, IMPERIAL),
+    ).toEqual(['hot ≥ 221 °F', 'overheating ≥ 239 °F']);
+    expect(
+      describeLimits(coolant, { highWarn: 221, highAlert: 239 }, METRIC),
+    ).toEqual(['hot ≥ 105 °C', 'overheating ≥ 115 °C']);
+    expect(
+      describeLimits(metric('lambdaLongOdd'), { lowWarn: -100 }, METRIC),
+    ).toEqual(['low ≤ -100 counts']);
+    expect(describeLimits(coolant, {}, METRIC)).toEqual([]);
   });
 
   it('explains every reading', () => {
@@ -340,5 +512,48 @@ describe('metrics', () => {
     expect(meterSpan(plain, 100)).toEqual([0, 1]);
     expect(meterSpan(plain, 120)).toEqual([0, 1]);
     expect(meterSpan(plain, -5)).toEqual([0, 0]);
+  });
+});
+
+describe('limits typed in display units', () => {
+  const typed = (key: MetricKey, display: number, units: DisplayUnits) => {
+    const { limits } = metric(key);
+
+    if (!limits) {
+      throw new Error(`${key} takes no limits`);
+    }
+
+    return limits.fromDisplay(display, units);
+  };
+
+  it('converts each back to the library’s units', () => {
+    expect(typed('coolantTempF', 105, METRIC)).toBe(221);
+    expect(typed('coolantTempF', 221, IMPERIAL)).toBe(221);
+    expect(typed('fuelTempF', -40, METRIC)).toBe(-40);
+    expect(typed('roadSpeedMph', 100, METRIC)).toBeCloseTo(62.1371, 4);
+    expect(typed('roadSpeedMph', 62, IMPERIAL)).toBe(62);
+    expect(typed('throttle', 85, IMPERIAL)).toBe(0.85);
+    expect(typed('injectorDuty', 100, IMPERIAL)).toBe(1);
+    expect(typed('injectorPulseUs', 2.5, IMPERIAL)).toBe(2500);
+    expect(typed('mainVoltage', 14.8, METRIC)).toBe(14.8);
+    expect(typed('lambdaShortOdd', -12, IMPERIAL)).toBe(-12);
+  });
+
+  it('reads back as typed for every reading that takes limits, in both unit systems', () => {
+    const withLimits = METRICS.filter((m) => m.limits !== undefined);
+
+    // Every continuous reading.
+    expect(withLimits).toHaveLength(16);
+
+    for (const m of withLimits) {
+      for (const units of [IMPERIAL, METRIC]) {
+        for (const display of [-40, 0, 0.5, 12.3, 105, 5000]) {
+          expect(m.toDisplay(typed(m.key, display, units), units)).toBeCloseTo(
+            display,
+            9,
+          );
+        }
+      }
+    }
   });
 });

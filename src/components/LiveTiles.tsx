@@ -2,12 +2,14 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { useId, useMemo, type ReactNode } from 'react';
 import { useLiveSample } from '../ecu/useLiveData';
+import type { Limits } from '../model/limits';
 import type { LiveSnapshot } from '../model/snapshot';
 import {
   formatSample,
   METRIC_GROUPS,
   METRIC_KEYS,
   metricsInGroup,
+  readingState,
   sampleOf,
   type DialScale,
   type Metric,
@@ -15,6 +17,7 @@ import {
 } from '../metrics';
 import type { PreferencesContextValue } from '../preferences/context';
 import { usePreferences } from '../preferences/usePreferences';
+import { limitsFor } from '../settings/limitSettings';
 import { Dial } from './Dial';
 import { Meter } from './Meter';
 import { MetricInfo } from './MetricInfo';
@@ -62,13 +65,18 @@ function dialScaleFor(
 function MetricTile({
   metric,
   sample,
+  limits,
 }: {
   metric: Metric;
   /** In library units; `null` is an invalid reading, `undefined` no data yet. */
   sample: number | null | undefined;
+  /** The limits to show the reading against; none in replay. */
+  limits?: Limits | undefined;
 }) {
   const units = usePreferences();
   const display = sample == null ? sample : metric.toDisplay(sample, units);
+  const state =
+    sample == null ? undefined : readingState(metric, limits, sample);
   // The same scale object until the metric or a preference changes, so the
   // dial's face is not redrawn with each reading.
   const scale = useMemo(() => dialScaleFor(metric, units), [metric, units]);
@@ -82,8 +90,8 @@ function MetricTile({
           : formatSample(metric, sample, units)
       }
       unit={metric.unit(units)}
-      tone={sample == null ? 'normal' : (metric.tone?.(sample) ?? 'normal')}
-      note={sample == null ? undefined : metric.note?.(sample)}
+      tone={state?.tone ?? 'normal'}
+      note={state?.note}
       info={<MetricInfo metric={metric} />}
       meter={
         metric.meter ? (
@@ -92,16 +100,33 @@ function MetricTile({
       }
       dial={
         scale ? (
-          <Dial metric={metric} scale={scale} units={units} display={display} />
+          <Dial
+            metric={metric}
+            scale={scale}
+            units={units}
+            limits={limits}
+            display={display}
+          />
         ) : undefined
       }
     />
   );
 }
 
-/** A tile that follows its own reading, so it changes only when that does. */
+/**
+ * A tile that follows its own reading, so it changes only when that does,
+ * against the limits that apply now.
+ */
 function PolledTile({ metric }: { metric: Metric }) {
-  return <MetricTile metric={metric} sample={useLiveSample(metric.key)} />;
+  const { ownLimits } = usePreferences();
+
+  return (
+    <MetricTile
+      metric={metric}
+      sample={useLiveSample(metric.key)}
+      limits={limitsFor(metric, ownLimits)}
+    />
+  );
 }
 
 function TileGroups({
@@ -152,7 +177,10 @@ export function LiveTiles({
   );
 }
 
-/** Like `LiveTiles`, showing the readings in `snapshot`, as replay does. */
+/**
+ * Like `LiveTiles`, showing the readings in `snapshot`, as replay does.
+ * Recordings do not keep the limits that applied, so none are shown.
+ */
 export function SnapshotTiles({
   snapshot,
   keys = METRIC_KEYS,

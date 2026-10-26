@@ -48,6 +48,15 @@
   white-space: nowrap;
 }
 
+/* Limits wrap between levels, never inside one. */
+.stats .limits dd {
+  white-space: normal;
+}
+
+.stats .limits span {
+  white-space: nowrap;
+}
+
 /* The first stat (Now) is the headline value. */
 .stats div:first-child dd {
   font-size: 1.25rem;

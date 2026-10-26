@@ -4,12 +4,14 @@
 /**
  * The address of every screen. The router keeps them in the URL's fragment
  * (`#/live/graphs`), which works from any static host and a file:// URL.
- * Preferences and filters are not part of an address.
+ * Preference values and filters are not part of an address; only which
+ * section of the Preferences dialog is open, if it is (see below).
  */
 export type LiveTab = 'overview' | 'graphs' | 'fuelMap';
 export type ReplayTab = 'readings' | 'graphs';
 
 export const LIVE_PATH = '/live';
+export const DASH_PATH = '/dash';
 export const SESSIONS_PATH = '/sessions';
 
 export const LIVE_TAB_PATHS: Record<LiveTab, string> = {
@@ -23,3 +25,18 @@ export function sessionPath(id: string, tab: ReplayTab = 'readings'): string {
 
   return tab === 'graphs' ? `${base}/graphs` : base;
 }
+
+/**
+ * The Preferences dialog opens over whichever view is showing, so it is a
+ * query on that view's address rather than a path of its own:
+ * `#/live/graphs?preferences=limits`.
+ */
+export const PREFERENCES_PARAM = 'preferences';
+
+export const PREFERENCES_SECTIONS = [
+  'general',
+  'appearance',
+  'limits',
+] as const;
+
+export type PreferencesSection = (typeof PREFERENCES_SECTIONS)[number];

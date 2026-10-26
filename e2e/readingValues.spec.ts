@@ -4,6 +4,7 @@
 // ECU memory offsets and raw value encodings; written for 14cux-gauge, 2026.
 import type { Page } from '@playwright/test';
 import {
+  choosePreferences,
   expect,
   expectNoAxeViolations,
   reading,
@@ -55,16 +56,7 @@ async function chooseUnits(
   temperature: 'Celsius' | 'Fahrenheit',
   speed: 'Kilometres per hour' | 'Miles per hour',
 ): Promise<void> {
-  await page.getByRole('button', { name: 'Preferences' }).click();
-
-  const menu = page.getByRole('menu');
-
-  await menu
-    .getByRole('menuitemradio', { name: new RegExp(temperature) })
-    .click();
-  await menu.getByRole('menuitemradio', { name: new RegExp(speed) }).click();
-  await page.keyboard.press('Escape');
-  await expect(menu).toBeHidden();
+  await choosePreferences(page, 'General', temperature, speed);
 }
 
 async function plantEngine(emulatedSerial: EmulatedSerial): Promise<void> {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { App } from './App';
@@ -291,11 +291,15 @@ describe('App on a screen it can control', () => {
   async function chooseKeepScreenOn(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('button', { name: 'Preferences' }));
     await user.click(
-      screen.getByRole('menuitemcheckbox', {
+      screen.getByRole('checkbox', {
         name: 'Keep the screen on while connected',
       }),
     );
     await user.keyboard('{Escape}');
+    // Closing goes back in history, which the router finishes later.
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
   }
 
   it('keeps the screen on while connected, says so, and lets go on disconnect', async () => {
@@ -361,12 +365,12 @@ describe('App on a screen it can control', () => {
 
     await user.click(screen.getByRole('button', { name: 'Preferences' }));
 
-    const item = screen.getByRole('menuitemcheckbox', {
-      name: /Keep the screen on while connected/,
+    const box = screen.getByRole('checkbox', {
+      name: 'Keep the screen on while connected',
     });
 
-    expect(item).toHaveTextContent('Not supported');
-    expect(item).toHaveAttribute('aria-disabled', 'true');
+    expect(box).toBeDisabled();
+    expect(box).toHaveAccessibleDescription('Not supported in this browser.');
   });
 
   it('goes full screen from the dashboard and back', async () => {

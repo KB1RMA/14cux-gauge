@@ -8,6 +8,8 @@ import {
   THEME_PREFERENCES,
   USAGE_COUNTS_PREFERENCES,
 } from './preferences';
+import { dashReadings } from './dashSettings';
+import { ownLimits } from './limitSettings';
 import { ALWAYS_READ } from './readingSettings';
 import { LAYOUT_OPTIONS, WINDOW_OPTIONS } from './graphSettings';
 import type { SettingDefaults } from './settingDefaults';
@@ -51,6 +53,13 @@ export const SETTINGS = {
       // Never turns the MIL off.
       off: pickedFrom(METRIC_KEYS, (key) => !ALWAYS_READ.includes(key)),
     }),
+  /** Which readings the Dash view shows. */
+  dash: () => settingObject({ readings: dashReadings }),
+  /**
+   * The limits the user has set, by reading, chosen in Preferences; each
+   * reading not listed uses its suggested limits.
+   */
+  limits: () => settingObject({ own: ownLimits }),
   /** The time window, layout and hidden graphs, live and in replay. */
   graphs: () =>
     settingObject(
