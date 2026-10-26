@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.13.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.12.0...v0.13.0) (2026-10-26)
+
+
+### Features
+
+* add a Dash view with a few large readings that marks stale values ([#103](https://github.com/KB1RMA/14cux-gauge/issues/103)) ([e22ae1d](https://github.com/KB1RMA/14cux-gauge/commit/e22ae1d97c2fcacecce6511c67ad58baafebfa13))
+* choose analogue dials for engine speed, road speed, coolant and fuel temperature in Preferences ([#31](https://github.com/KB1RMA/14cux-gauge/issues/31)) ([3cf650e](https://github.com/KB1RMA/14cux-gauge/commit/3cf650e2ca27d6dbdcb07de51c45b9384b8769fa))
+* pick units, gauge style and theme from compact toggles in the Preferences menu ([3cf650e](https://github.com/KB1RMA/14cux-gauge/commit/3cf650e2ca27d6dbdcb07de51c45b9384b8769fa))
+* save recorded sessions as a file and open them again, here or on another computer ([#110](https://github.com/KB1RMA/14cux-gauge/issues/110)) ([75f7330](https://github.com/KB1RMA/14cux-gauge/commit/75f7330cb79fa6ab9eb8f2ffaf3a5b1360e2430e))
+* say when coolant is hot (from 105 °C) or overheating (from 115 °C) ([3cf650e](https://github.com/KB1RMA/14cux-gauge/commit/3cf650e2ca27d6dbdcb07de51c45b9384b8769fa))
+* sort the sessions list by any column, and choose several sessions to save together in one file ([75f7330](https://github.com/KB1RMA/14cux-gauge/commit/75f7330cb79fa6ab9eb8f2ffaf3a5b1360e2430e))
+
+
+### Bug Fixes
+
+* keep preferences a newer version of the app saved when an older version changes them ([3cf650e](https://github.com/KB1RMA/14cux-gauge/commit/3cf650e2ca27d6dbdcb07de51c45b9384b8769fa))
+* show the live view promptly after connecting, instead of "Loading…" while readings update ([3cf650e](https://github.com/KB1RMA/14cux-gauge/commit/3cf650e2ca27d6dbdcb07de51c45b9384b8769fa))
+
 ## [0.12.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.11.0...v0.12.0) (2026-10-25)
 
 
