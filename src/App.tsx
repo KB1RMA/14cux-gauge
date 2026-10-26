@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { lazy, useEffect } from 'react';
+import { useEffect } from 'react';
 import { HashRouter, Navigate, NavLink, Route, Routes } from 'react-router';
 import type { AppServices } from './appServices';
 import { goatCounter, type UsageCounter } from './usage/goatCounter';
@@ -11,6 +11,7 @@ import { Footer } from './components/Footer';
 import { PreferencesMenu } from './components/PreferencesMenu';
 import { SaveSessionDialog } from './components/SaveSessionDialog';
 import { StatusBar } from './components/StatusBar';
+import { lazyView } from './components/lazyView';
 import { ViewBoundary } from './components/ViewBoundary';
 import { useEcu } from './ecu/useEcu';
 import { EcuProvider } from './ecu/EcuProvider';
@@ -41,13 +42,11 @@ const VIEWS: readonly { label: string; to: string }[] = [
 const DEFAULT_USAGE_COUNTER = goatCounter();
 
 // The views behind the connect screen are split out of the startup bundle.
-const loadDashboard = () => import('./components/Dashboard');
-const loadSessionsView = () => import('./components/SessionsView');
-const Dashboard = lazy(() =>
-  loadDashboard().then((module) => ({ default: module.Dashboard })),
+const { View: Dashboard, preload: loadDashboard } = lazyView(() =>
+  import('./components/Dashboard').then((module) => module.Dashboard),
 );
-const SessionsView = lazy(() =>
-  loadSessionsView().then((module) => ({ default: module.SessionsView })),
+const { View: SessionsView, preload: loadSessionsView } = lazyView(() =>
+  import('./components/SessionsView').then((module) => module.SessionsView),
 );
 
 /** The live views, or the connect screen until there is an ECU to show. */
