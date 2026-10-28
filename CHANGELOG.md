@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.2](https://github.com/KB1RMA/14cux-gauge/compare/v0.13.1...v0.13.2) (2026-10-28)
+
+
+### Bug Fixes
+
+* keep the ECU connection in step after a failed command ([0545127](https://github.com/KB1RMA/14cux-gauge/commit/0545127e0b292f984bb5786d15fb7fe46e76614d))
+* let you retry disconnecting when closing the serial port fails ([0545127](https://github.com/KB1RMA/14cux-gauge/commit/0545127e0b292f984bb5786d15fb7fe46e76614d))
+
 ## [0.13.1](https://github.com/KB1RMA/14cux-gauge/compare/v0.13.0...v0.13.1) (2026-10-26)
 
 
