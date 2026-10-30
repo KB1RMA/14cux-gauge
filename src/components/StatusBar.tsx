@@ -2,6 +2,8 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { DotFilledIcon, StopIcon } from '@radix-ui/react-icons';
 import { useRef, useState } from 'react';
+import { connectionHelp } from '../ecu/connectionHelp';
+import type { EcuSource } from '../ecu/connect';
 import type { ConnectionState } from '../ecu/connectionState';
 import { useEcu } from '../ecu/useEcu';
 import { useLiveData } from '../ecu/useLiveData';
@@ -11,6 +13,7 @@ import { useScreenWake } from '../screen/useScreenWake';
 import type { ScreenWakeStatus } from '../screen/screenWake';
 import { useRecording } from '../recording/useRecording';
 import { formatDuration, sourceLabel } from '../sessions/format';
+import { useSetting } from '../settings/useSetting';
 import { FailureDialog } from './FailureDialog';
 import styles from './StatusBar.module.css';
 
@@ -80,8 +83,24 @@ function describeConnection(
   }
 }
 
+type SerialSource = Extract<EcuSource, { kind: 'serial' }>;
+
+/** The baud rate `source` did not use, and how to connect at it. */
+function otherBaudOffer(
+  source: SerialSource,
+  connectAt: (source: SerialSource) => void,
+) {
+  return {
+    rate: source.doubleSpeed ? '7812' : '15625',
+    connect: () => {
+      connectAt(source);
+    },
+  };
+}
+
 export function StatusBar() {
-  const { state, disconnect, reconnect, pollingPaused } = useEcu();
+  const { state, connect, disconnect, reconnect, pollingPaused } = useEcu();
+  const [, setDoubleSpeed] = useSetting('doubleSpeed');
   const { snapshot, stats } = useLiveData();
   const { chosen } = useReadings();
   const recording = useRecording();
@@ -100,6 +119,13 @@ export function StatusBar() {
   if (state.status === 'idle') {
     return null;
   }
+
+  const tryOtherBaud = (source: SerialSource) => {
+    const doubleSpeed = !source.doubleSpeed;
+
+    setDoubleSpeed(doubleSpeed);
+    void connect({ ...source, doubleSpeed });
+  };
 
   return (
     <section
@@ -204,6 +230,14 @@ export function StatusBar() {
           open={closedFor !== state}
           message={state.message}
           detail={state.detail}
+          stage={state.stage}
+          otherBaud={
+            state.source.kind === 'serial' &&
+            state.stage !== undefined &&
+            connectionHelp(state.stage).otherBaud
+              ? otherBaudOffer(state.source, tryOtherBaud)
+              : undefined
+          }
           onClose={() => {
             setClosedFor(state);
           }}

@@ -44,6 +44,8 @@ class FakeSerialPort extends EventTarget {
  */
 class AnsweringSerialPort extends FakeSerialPort {
   readonly ecu = new SimulatedTransport();
+  /** Corrupts every echo, as a wrong baud rate would. */
+  garbled = false;
   #toHost: ReadableStreamDefaultController<Uint8Array> | undefined;
 
   constructor() {
@@ -61,6 +63,7 @@ class AnsweringSerialPort extends FakeSerialPort {
     });
     this.writable = new WritableStream<Uint8Array>({
       write: async (chunk) => {
+        this.ecu.corruptNextEcho = this.garbled;
         await this.ecu.write(chunk);
         await this.#deliverReply();
       },
@@ -324,6 +327,95 @@ describe('App with a serial ECU', () => {
     expect((recent as HTMLTextAreaElement).value).toMatch(
       /ERR Polling pass failed \(1 in a row\), retrying: TimeoutError: [^\n]*\n(.*\n)*.*ERR Polling pass failed \(2 in a row\), retrying: TimeoutError: /,
     );
+  });
+
+  it('names what to check when the port opens but nothing comes back', async () => {
+    const port = new AnsweringSerialPort();
+    const user = userEvent.setup();
+
+    port.ecu.silent = true;
+    installSerial(port);
+    render(<TestApp />);
+    await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Connection failed',
+    });
+
+    expect(dialog).toHaveAccessibleDescription(
+      'The serial port opened, but nothing came back from the ECU.',
+    );
+    expect(
+      within(within(dialog).getByRole('list', { name: 'What to check' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      'The ignition is on.',
+      'You chose the port of the interface cable, not another serial port.',
+      'The cable is a 5 V FTDI cable with its Rx line inverted.',
+      'The cable has its 390 Ω resistor between Rx and ground.',
+      'The grounding plug is not fitted.',
+    ]);
+    expect(
+      within(dialog).getByRole('link', { name: /^hardware notes/ }),
+    ).toHaveAttribute('href', 'https://github.com/KB1RMA/14cux-gauge#hardware');
+    expect(
+      within(dialog).getByRole('link', {
+        name: /^cable and latency-timer notes/,
+      }),
+    ).toHaveAttribute(
+      'href',
+      'https://github.com/KB1RMA/comm14cux-ts#hardware',
+    );
+    expect(
+      within(dialog).queryByRole('button', { name: /baud$/ }),
+    ).not.toBeInTheDocument();
+    await expectNoAxeViolations(document.body);
+
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Disconnected: The serial port opened, but nothing came back from the ECU.',
+    );
+  });
+
+  it('offers the other baud rate when replies are unreadable, and remembers it', async () => {
+    const port = new AnsweringSerialPort();
+    const user = userEvent.setup();
+
+    port.garbled = true;
+    installSerial(port);
+    render(<TestApp />);
+    await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Connection failed',
+    });
+
+    expect(dialog).toHaveAccessibleDescription(
+      'Data came back on the serial port, but it was not a valid reply from the ECU.',
+    );
+    expect(
+      within(dialog).getByRole('list', { name: 'What to check' }),
+    ).toHaveTextContent(
+      'The baud rate matches the ECU: 7812 for standard firmware, 15625 for double-speed firmware.',
+    );
+
+    port.garbled = false;
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Try 15625 baud' }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Serial ECU (15625 baud) · Polling',
+      );
+    });
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+
+    expect(
+      await screen.findByRole('checkbox', { name: /Double-speed/ }),
+    ).toBeChecked();
   });
 
   it('stays put when the user dismisses the port picker', async () => {

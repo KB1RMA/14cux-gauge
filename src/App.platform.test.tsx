@@ -28,6 +28,7 @@ function desktopPlatform() {
   const platform: Platform = {
     serial: {
       available: () => true,
+      securePage: () => true,
       requestPort: () => Promise.resolve({ description: 'Test adapter' }),
       grantedPorts: () => Promise.resolve([]),
       open: (_port, { baudRate }) => {

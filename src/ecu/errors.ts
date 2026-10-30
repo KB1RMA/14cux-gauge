@@ -74,6 +74,63 @@ export function errorReason(error: unknown): ErrorReason {
   return 'other';
 }
 
+/**
+ * How far a connection got before it failed, going by what the app saw:
+ *
+ * - `browser`: the browser refused to let the page use the port.
+ * - `port`: the port could not be opened or used.
+ * - `silent`: the port opened, but not one byte came back.
+ * - `garbled`: bytes came back, but never a valid reply.
+ * - `lost`: the ECU had been answering on this connection, then stopped.
+ *
+ * A browser with no Web Serial never gets as far as connecting; the connect
+ * screen says so.
+ */
+export type FailureStage = 'browser' | 'port' | 'silent' | 'garbled' | 'lost';
+
+/** What had happened on a connection by the time it failed. */
+export interface ConnectionProgress {
+  /** Whether its port opened. */
+  opened: boolean;
+  /** Whether it finished a polling pass. */
+  answered: boolean;
+  /** Bytes read from the port. */
+  bytesReceived: number;
+}
+
+/** The errors Web Serial gives for bytes on the wire it could not make out. */
+const LINE_ERRORS: ReadonlySet<string> = new Set([
+  'BreakError',
+  'FramingError',
+  'ParityError',
+]);
+
+/** The stage a connection reached when `error` ended it. */
+export function failureStage(
+  error: unknown,
+  { opened, answered, bytesReceived }: ConnectionProgress,
+): FailureStage {
+  if (!opened) {
+    return errorReason(error) === 'blocked' ? 'browser' : 'port';
+  }
+
+  if (answered) {
+    return 'lost';
+  }
+
+  if (error instanceof TimeoutError) {
+    // A read that times out part way keeps the bytes it had.
+    return bytesReceived + (error.receivedBytes ?? 0) > 0
+      ? 'garbled'
+      : 'silent';
+  }
+
+  return error instanceof ProtocolError ||
+    (error instanceof DOMException && LINE_ERRORS.has(error.name))
+    ? 'garbled'
+    : 'port';
+}
+
 /** Turns any error from the ECU stack or Web Serial into a sentence for the UI. */
 export function describeError(error: unknown): string {
   if (error instanceof TimeoutError) {

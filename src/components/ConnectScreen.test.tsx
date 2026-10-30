@@ -10,10 +10,11 @@ import { TestServices } from '../test-support/TestApp';
 import { ConnectScreen } from './ConnectScreen';
 
 /** Where serial ports can be used, or not; never asked for one here. */
-function platform(serial: boolean) {
+function platform(serial: boolean, secure = true) {
   return browserPlatform({
     serial: {
       available: () => serial,
+      securePage: () => secure,
       requestPort: () => Promise.reject(new Error('Not offered in this test')),
       grantedPorts: () => Promise.resolve([]),
       open: () => {
@@ -23,9 +24,9 @@ function platform(serial: boolean) {
   });
 }
 
-function renderScreen({ serial = true } = {}) {
+function renderScreen({ serial = true, secure = true } = {}) {
   return render(
-    <TestServices platform={platform(serial)}>
+    <TestServices platform={platform(serial, secure)}>
       <ConnectScreen />
     </TestServices>,
   );
@@ -41,6 +42,15 @@ describe('ConnectScreen', () => {
     expect(
       screen.queryByRole('button', { name: 'Connect to ECU' }),
     ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Demo mode' })).toBeEnabled();
+  });
+
+  it('says so when the page is not secure, rather than blame the browser', () => {
+    renderScreen({ serial: false, secure: false });
+
+    expect(screen.getByRole('note')).toHaveTextContent(
+      'This page was not loaded over HTTPS or from localhost, so the browser does not offer serial ports here. Open it from its https:// address. Demo mode still works here.',
+    );
     expect(screen.getByRole('button', { name: 'Demo mode' })).toBeEnabled();
   });
 
@@ -99,6 +109,7 @@ describe('ConnectScreen reconnecting', () => {
       platform: browserPlatform({
         serial: {
           available: () => true,
+          securePage: () => true,
           requestPort: () => {
             requested();
 

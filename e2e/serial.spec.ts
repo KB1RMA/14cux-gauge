@@ -117,6 +117,33 @@ test.describe('Serial ECU over Web Serial', () => {
     expect(await emulatedSerial.opens()).toHaveLength(2);
   });
 
+  test('says what to check when the ECU never answers', async ({
+    page,
+    emulatedSerial,
+  }) => {
+    await page.goto('./');
+    await emulatedSerial.setSilent(true);
+    await page.getByRole('button', { name: 'Connect to ECU' }).click();
+
+    const failure = page.getByRole('dialog', { name: 'Connection failed' });
+
+    await expect(failure).toContainText(
+      'The serial port opened, but nothing came back from the ECU.',
+    );
+    await expect(
+      failure
+        .getByRole('list', { name: 'What to check' })
+        .getByRole('listitem')
+        .filter({ hasText: 'The grounding plug is not fitted.' }),
+    ).toBeVisible();
+    await expectNoAxeViolations(page, { within: '[role="dialog"]' });
+    await failure.getByRole('button', { name: 'Close' }).click();
+
+    await expect(connectionStatus(page)).toHaveText(
+      'Disconnected: The serial port opened, but nothing came back from the ECU.',
+    );
+  });
+
   test('reports an ECU that stops responding', async ({
     page,
     emulatedSerial,
