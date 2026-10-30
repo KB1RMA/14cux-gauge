@@ -355,6 +355,7 @@ describe('App with a serial ECU', () => {
       'The cable is a 5 V FTDI cable with its Rx line inverted.',
       'The cable has its 390 Ω resistor between Rx and ground.',
       'The grounding plug is not fitted.',
+      'The baud rate matches the ECU: 7812 for standard firmware, 15625 for double-speed firmware.',
     ]);
     expect(
       within(dialog).getByRole('link', { name: /^hardware notes/ }),
@@ -368,8 +369,8 @@ describe('App with a serial ECU', () => {
       'https://github.com/KB1RMA/comm14cux-ts#hardware',
     );
     expect(
-      within(dialog).queryByRole('button', { name: /baud$/ }),
-    ).not.toBeInTheDocument();
+      within(dialog).getByRole('button', { name: 'Try 15625 baud' }),
+    ).toBeVisible();
     await expectNoAxeViolations(document.body);
 
     await user.keyboard('{Escape}');
@@ -400,6 +401,7 @@ describe('App with a serial ECU', () => {
     ).toHaveTextContent(
       'The baud rate matches the ECU: 7812 for standard firmware, 15625 for double-speed firmware.',
     );
+    await expectNoAxeViolations(document.body);
 
     port.garbled = false;
     await user.click(
@@ -411,11 +413,45 @@ describe('App with a serial ECU', () => {
         'Serial ECU (15625 baud) · Polling',
       );
     });
+    await screen.findByText('Engine speed');
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
 
     expect(
       await screen.findByRole('checkbox', { name: /Double-speed/ }),
     ).toBeChecked();
+  });
+
+  it('keeps the saved baud rate when the other one gets no answer either', async () => {
+    const port = new AnsweringSerialPort();
+    const user = userEvent.setup();
+
+    port.garbled = true;
+    installSerial(port);
+    render(<TestApp />);
+    await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
+    await user.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Connection failed' }),
+      ).getByRole('button', { name: 'Try 15625 baud' }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('dialog', { name: 'Connection failed' }),
+      ).toBeVisible();
+    });
+    expect(
+      within(
+        screen.getByRole('dialog', { name: 'Connection failed' }),
+      ).getByRole('button', { name: 'Try 7812 baud' }),
+    ).toBeVisible();
+
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(
+      await screen.findByRole('checkbox', { name: /Double-speed/ }),
+    ).not.toBeChecked();
   });
 
   it('stays put when the user dismisses the port picker', async () => {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
+import { Ecu, MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { waitFor } from '@testing-library/react';
 import { onTestFinished } from 'vitest';
 import { LatencyTransport } from '../demo/latencyTransport';
@@ -55,7 +55,6 @@ class SlowToOpen extends SimulatedTransport {
   }
 }
 
-/** Every connection status `session` passes through, in order. */
 /** Corrupts the echo of everything sent to it, as a wrong baud rate would. */
 class CorruptEchoes extends SimulatedTransport {
   override write(data: Uint8Array): Promise<void> {
@@ -65,6 +64,7 @@ class CorruptEchoes extends SimulatedTransport {
   }
 }
 
+/** Every connection status `session` passes through, in order. */
 function statuses(session: EcuSession): string[] {
   const seen: string[] = [session.getSnapshot().connection.status];
 
@@ -145,13 +145,71 @@ describe('EcuSession', () => {
     await waitFor(() => {
       expect(session.getSnapshot().connection).toMatchObject({
         status: 'error',
-        message:
-          'The ECU stopped responding. Check the cable, that the ignition is on, and that the baud rate matches the ECU firmware.',
+        message: 'The ECU was answering, then stopped.',
         reason: 'timeout',
         stage: 'lost',
       });
     });
     expect(session.getSnapshot().link).toBeUndefined();
+  });
+
+  it('names the lost stage when the ECU stops part way through the first pass', async () => {
+    const transport = idling();
+    const write = transport.write.bind(transport);
+    let writes = 0;
+
+    transport.write = (data) => {
+      writes++;
+      transport.silent = writes > 12;
+
+      return write(data);
+    };
+
+    const { session } = sessionOver([transport], 0);
+    const answered: unknown[] = [];
+
+    session.onAnswered((source) => {
+      answered.push(source);
+    });
+    await session.connect({ kind: 'demo' });
+    await waitFor(() => {
+      expect(session.getSnapshot().connection).toMatchObject({
+        status: 'error',
+        message: 'The ECU was answering, then stopped.',
+        stage: 'lost',
+      });
+    });
+    expect(answered).toEqual([{ kind: 'demo' }]);
+  });
+
+  it('says nothing about a serial line for a connection without one', async () => {
+    const transport = idling();
+    const ecu = new Ecu(transport);
+    const session = new EcuSession({
+      pollIntervalMs: { demo: 0 },
+      createConnection: (source) => ({
+        ecu,
+        source,
+        bytesReceived: () => undefined,
+        onLost: () => () => undefined,
+        dispose: () => ecu.disconnect(),
+      }),
+    });
+
+    onTestFinished(session.dispose);
+    transport.silent = true;
+    await session.connect({ kind: 'demo' });
+    await waitFor(() => {
+      expect(session.getSnapshot().connection.status).toBe('error');
+    });
+
+    const { connection } = session.getSnapshot();
+
+    expect(connection).toMatchObject({
+      message:
+        'The ECU stopped responding. Check the cable, that the ignition is on, and that the baud rate matches the ECU firmware.',
+    });
+    expect(connection).not.toHaveProperty('stage');
   });
 
   it('names the silent stage when the ECU never answers, once, however many passes retry', async () => {

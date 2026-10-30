@@ -4,13 +4,13 @@ import { testPlatform } from '../test-support/platform';
 import { ecuConnections } from './connect';
 
 describe('ecuConnections', () => {
-  it('counts no bytes for demo mode, which has no serial line', async () => {
+  it('has no byte count for demo mode, which has no serial line', async () => {
     const connection = ecuConnections(testPlatform().serial)({ kind: 'demo' });
 
     await connection.ecu.connect();
     await connection.ecu.getEngineRPM();
 
-    expect(connection.bytesReceived()).toBe(0);
+    expect(connection.bytesReceived()).toBeUndefined();
     await connection.dispose();
   });
 });

@@ -370,13 +370,17 @@ reads the ROM image the same way, through a `Lease` of its own.
 
 When a connection fails, `EcuSession` works out how far it got from what it
 saw: whether the port opened, whether any bytes came back (`CountingTransport`
-counts them under the `Ecu`), and whether a polling pass finished. That
+counts them under the `Ecu`), and whether the ECU gave a valid reply. That
 `FailureStage` goes in the connection's `error` state with the message, so
 polling retries change nothing on screen and the failure is announced once.
 `connectionHelp` holds the words for each stage, and `FailureDialog` lists what
-to check, with an offer to try the other baud rate when replies were
-unreadable. A browser with no Web Serial never connects, so `ConnectScreen`
+to check, with an offer to try the other baud rate when no valid reply came
+back. `EcuSession.onAnswered` tells `StatusBar` when the ECU first answers, and
+only then is that rate saved. Demo mode has no serial line, so it has no stage.
+A browser with no Web Serial never connects, so `ConnectScreen`
 says why, using the platform's `serial.available()` and `serial.securePage()`.
+If the browser blocks the port picker, `ConnectScreen` lists the same checks as
+the failure dialog, through `ConnectionChecks`.
 
 Preferences is a dialog over whichever view is showing, opened by the gear
 in the app bar. Which section is open is a query on the view's address

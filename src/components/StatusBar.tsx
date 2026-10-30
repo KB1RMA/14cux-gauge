@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { DotFilledIcon, StopIcon } from '@radix-ui/react-icons';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { connectionHelp } from '../ecu/connectionHelp';
 import type { EcuSource } from '../ecu/connect';
 import type { ConnectionState } from '../ecu/connectionState';
@@ -88,18 +88,19 @@ type SerialSource = Extract<EcuSource, { kind: 'serial' }>;
 /** The baud rate `source` did not use, and how to connect at it. */
 function otherBaudOffer(
   source: SerialSource,
-  connectAt: (source: SerialSource) => void,
+  connect: (source: SerialSource) => Promise<void>,
 ) {
   return {
     rate: source.doubleSpeed ? '7812' : '15625',
     connect: () => {
-      connectAt(source);
+      void connect({ ...source, doubleSpeed: !source.doubleSpeed });
     },
   };
 }
 
 export function StatusBar() {
-  const { state, connect, disconnect, reconnect, pollingPaused } = useEcu();
+  const { state, connect, disconnect, reconnect, pollingPaused, onAnswered } =
+    useEcu();
   const [, setDoubleSpeed] = useSetting('doubleSpeed');
   const { snapshot, stats } = useLiveData();
   const { chosen } = useReadings();
@@ -116,16 +117,21 @@ export function StatusBar() {
   );
   const [reopened, setReopened] = useState(false);
 
+  // A baud rate tried from the failure dialog is saved only once the ECU has
+  // answered at it, so a failed try cannot replace the right setting.
+  useEffect(
+    () =>
+      onAnswered((source) => {
+        if (source.kind === 'serial') {
+          setDoubleSpeed(source.doubleSpeed);
+        }
+      }),
+    [onAnswered, setDoubleSpeed],
+  );
+
   if (state.status === 'idle') {
     return null;
   }
-
-  const tryOtherBaud = (source: SerialSource) => {
-    const doubleSpeed = !source.doubleSpeed;
-
-    setDoubleSpeed(doubleSpeed);
-    void connect({ ...source, doubleSpeed });
-  };
 
   return (
     <section
@@ -235,7 +241,7 @@ export function StatusBar() {
             state.source.kind === 'serial' &&
             state.stage !== undefined &&
             connectionHelp(state.stage).otherBaud
-              ? otherBaudOffer(state.source, tryOtherBaud)
+              ? otherBaudOffer(state.source, connect)
               : undefined
           }
           onClose={() => {

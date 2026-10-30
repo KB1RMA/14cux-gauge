@@ -30,8 +30,11 @@ export function recordedSource(source: EcuSource): RecordedSource {
 export interface EcuConnection {
   readonly ecu: Ecu;
   readonly source: EcuSource;
-  /** Bytes read from the ECU's side of the link so far. */
-  bytesReceived(): number;
+  /**
+   * Bytes read from the ECU's side of the link so far, or `undefined` where
+   * there is no serial line to count, as in demo mode.
+   */
+  bytesReceived(): number | undefined;
   /**
    * Calls `listener` if the link is lost outside of the ECU protocol (for
    * example the USB cable is unplugged). Returns an unsubscribe function.
@@ -88,7 +91,7 @@ function createDemoEcu(): EcuConnection {
   return {
     ecu,
     source: { kind: 'demo' },
-    bytesReceived: () => 0,
+    bytesReceived: () => undefined,
     onLost: () => () => undefined,
     async dispose() {
       engine.stop();

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import { SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { browserPlatform } from '../platform/browser';
@@ -52,6 +52,43 @@ describe('ConnectScreen', () => {
       'This page was not loaded over HTTPS or from localhost, so the browser does not offer serial ports here. Open it from its https:// address. Demo mode still works here.',
     );
     expect(screen.getByRole('button', { name: 'Demo mode' })).toBeEnabled();
+  });
+
+  it('lists what to check when the browser blocks the port picker', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TestServices
+        platform={browserPlatform({
+          serial: {
+            available: () => true,
+            securePage: () => true,
+            requestPort: () =>
+              Promise.reject(new DOMException('Blocked', 'SecurityError')),
+            grantedPorts: () => Promise.resolve([]),
+            open: () => {
+              throw new Error('Not offered in this test');
+            },
+          },
+        })}
+      >
+        <ConnectScreen />
+      </TestServices>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Connect to ECU' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The browser blocked access to the serial port.',
+    );
+    expect(
+      within(screen.getByRole('list', { name: 'What to check' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      'The page address starts with https://, or the page is on localhost.',
+      'Serial ports are not blocked for this site in the browser’s site settings.',
+    ]);
+    await expectNoAxeViolations(document.body);
   });
 
   it('has no detectable accessibility violations, with or without Web Serial', async () => {

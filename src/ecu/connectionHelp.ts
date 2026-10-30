@@ -23,6 +23,9 @@ export interface ConnectionHelp {
   otherBaud: boolean;
 }
 
+const BAUD_CHECK =
+  'The baud rate matches the ECU: 7812 for standard firmware, 15625 for double-speed firmware.';
+
 const HELP: Record<FailureStage, ConnectionHelp> = {
   browser: {
     checks: [
@@ -49,15 +52,16 @@ const HELP: Record<FailureStage, ConnectionHelp> = {
       'The cable is a 5 V FTDI cable with its Rx line inverted.',
       'The cable has its 390 Ω resistor between Rx and ground.',
       'The grounding plug is not fitted.',
+      BAUD_CHECK,
     ],
     cableNotes: true,
-    otherBaud: false,
+    otherBaud: true,
   },
   garbled: {
     observed:
       'Data came back on the serial port, but it was not a valid reply from the ECU.',
     checks: [
-      'The baud rate matches the ECU: 7812 for standard firmware, 15625 for double-speed firmware.',
+      BAUD_CHECK,
       'The cable’s Rx line is inverted.',
       'The cable’s connections are sound, as electrical noise can also corrupt replies.',
     ],
@@ -65,6 +69,7 @@ const HELP: Record<FailureStage, ConnectionHelp> = {
     otherBaud: true,
   },
   lost: {
+    observed: 'The ECU was answering, then stopped.',
     checks: [
       'The ignition is still on.',
       'The cable is still plugged in at both ends.',

@@ -18,6 +18,7 @@ export interface EmulatedSerial {
   poke(address: number, bytes: readonly number[]): Promise<void>;
   peek(address: number, length: number): Promise<number[]>;
   setSilent(silent: boolean): Promise<void>;
+  setGarbled(garbled: boolean): Promise<void>;
   unplug(): Promise<void>;
 }
 
@@ -94,6 +95,10 @@ export const test = base.extend<Fixtures>({
         page.evaluate((s) => {
           window.emulatedSerial.setSilent(s);
         }, silent),
+      setGarbled: (garbled) =>
+        page.evaluate((g) => {
+          window.emulatedSerial.setGarbled(g);
+        }, garbled),
       unplug: () =>
         page.evaluate(() => {
           window.emulatedSerial.unplug();

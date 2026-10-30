@@ -31,9 +31,6 @@ describe('failureStage', () => {
         bytesReceived: 1,
       }),
     ).toBe('garbled');
-    expect(
-      failureStage(new TimeoutError('No data', { receivedBytes: 1 }), opened),
-    ).toBe('garbled');
   });
 
   it('calls unreadable bytes garbled', () => {
@@ -58,6 +55,17 @@ describe('failureStage', () => {
 
     expect(failureStage(new TimeoutError('No data'), answered)).toBe('lost');
     expect(failureStage(new ProtocolError('Bad echo'), answered)).toBe('lost');
+    expect(
+      failureStage(new DOMException('Bad', 'FramingError'), answered),
+    ).toBe('lost');
+  });
+
+  it('keeps a port failure a port failure once the ECU has answered', () => {
+    const answered = { ...opened, answered: true, bytesReceived: 500 };
+
+    expect(
+      failureStage(new DOMException('Gone', 'NetworkError'), answered),
+    ).toBe('port');
   });
 });
 

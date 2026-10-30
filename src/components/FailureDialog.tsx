@@ -2,16 +2,11 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { Dialog } from 'radix-ui';
 import { useId } from 'react';
-import {
-  CABLE_NOTES_URL,
-  HARDWARE_NOTES_URL,
-  connectionHelp,
-} from '../ecu/connectionHelp';
 import type { FailureStage } from '../ecu/errors';
 import { formatRecentEntries } from '../diagnostics/report';
 import { useDiagnostics } from '../diagnostics/useDiagnostics';
+import { ConnectionChecks } from './ConnectionChecks';
 import { DownloadLogButton } from './DownloadLogButton';
-import { ExternalLink } from './ExternalLink';
 import dialogStyles from './ConfirmDialog.module.css';
 import styles from './FailureDialog.module.css';
 
@@ -59,36 +54,6 @@ function RecentLog() {
   );
 }
 
-/** What to check for a failure at `stage`, and where to read more. */
-function Checks({ stage }: { stage: FailureStage }) {
-  const { checks, cableNotes } = connectionHelp(stage);
-  const id = useId();
-
-  return (
-    <>
-      <h3 id={id} className={styles['heading']}>
-        What to check
-      </h3>
-      <ul aria-labelledby={id} className={styles['checks']}>
-        {checks.map((check) => (
-          <li key={check}>{check}</li>
-        ))}
-      </ul>
-      {cableNotes ? (
-        <p>
-          See the app&apos;s{' '}
-          <ExternalLink href={HARDWARE_NOTES_URL}>hardware notes</ExternalLink>{' '}
-          and the{' '}
-          <ExternalLink href={CABLE_NOTES_URL}>
-            cable and latency-timer notes
-          </ExternalLink>
-          .
-        </p>
-      ) : null}
-    </>
-  );
-}
-
 /**
  * Shown when a connection fails: what went wrong in plain words, what to
  * check, the raw error, the most recent serial traffic, and the full log to
@@ -127,7 +92,7 @@ export function FailureDialog({
             Connection failed
           </Dialog.Title>
           <Dialog.Description>{message}</Dialog.Description>
-          {stage === undefined ? null : <Checks stage={stage} />}
+          {stage === undefined ? null : <ConnectionChecks stage={stage} />}
           {detail === undefined ? null : (
             <p>
               Error: <code className={styles['detail']}>{detail}</code>

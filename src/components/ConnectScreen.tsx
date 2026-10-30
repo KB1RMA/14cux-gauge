@@ -4,7 +4,11 @@ import { CheckIcon } from '@radix-ui/react-icons';
 import { Checkbox, Label } from 'radix-ui';
 import { useEffect, useId, useRef, useState } from 'react';
 import { CABLE_NOTES_URL } from '../ecu/connectionHelp';
-import { describeError, isPortPickerCancelled } from '../ecu/errors';
+import {
+  describeError,
+  errorReason,
+  isPortPickerCancelled,
+} from '../ecu/errors';
 import { describeRawError } from '../diagnostics/diagnosticLog';
 import { useDiagnostics } from '../diagnostics/useDiagnostics';
 import { useEcu } from '../ecu/useEcu';
@@ -12,6 +16,7 @@ import { useGrantedPorts } from '../ecu/useGrantedPorts';
 import { usePlatform } from '../platform/usePlatform';
 import type { SerialPortHandle } from '../platform/platform';
 import { useSetting } from '../settings/useSetting';
+import { ConnectionChecks } from './ConnectionChecks';
 import { ExternalLink } from './ExternalLink';
 import styles from './ConnectScreen.module.css';
 
@@ -21,7 +26,9 @@ export function ConnectScreen() {
   const { serial } = usePlatform();
   const [doubleSpeed, setDoubleSpeed] = useSetting('doubleSpeed');
   const grantedPorts = useGrantedPorts();
-  const [pickerError, setPickerError] = useState<string | undefined>(undefined);
+  const [pickerError, setPickerError] = useState<
+    { message: string; blocked: boolean } | undefined
+  >(undefined);
   const supported = serial.available();
   const busy = state.status === 'connecting';
   const doubleSpeedId = useId();
@@ -53,7 +60,10 @@ export function ConnectScreen() {
           'error',
           `The port picker failed: ${describeRawError(error)}`,
         );
-        setPickerError(describeError(error));
+        setPickerError({
+          message: describeError(error),
+          blocked: errorReason(error) === 'blocked',
+        });
       }
 
       return;
@@ -148,9 +158,10 @@ export function ConnectScreen() {
         )}
         {pickerError ? (
           <p role="alert" className={styles['error']}>
-            {pickerError}
+            {pickerError.message}
           </p>
         ) : null}
+        {pickerError?.blocked ? <ConnectionChecks stage="browser" /> : null}
       </section>
 
       <section className={styles['card']} aria-labelledby="demo-title">

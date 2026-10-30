@@ -81,7 +81,8 @@ export function errorReason(error: unknown): ErrorReason {
  * - `port`: the port could not be opened or used.
  * - `silent`: the port opened, but not one byte came back.
  * - `garbled`: bytes came back, but never a valid reply.
- * - `lost`: the ECU had been answering on this connection, then stopped.
+ * - `lost`: the ECU had been answering on this connection, then the replies
+ *   stopped or went bad.
  *
  * A browser with no Web Serial never gets as far as connecting; the connect
  * screen says so.
@@ -92,7 +93,7 @@ export type FailureStage = 'browser' | 'port' | 'silent' | 'garbled' | 'lost';
 export interface ConnectionProgress {
   /** Whether its port opened. */
   opened: boolean;
-  /** Whether it finished a polling pass. */
+  /** Whether the ECU gave a valid reply. */
   answered: boolean;
   /** Bytes read from the port. */
   bytesReceived: number;
@@ -114,21 +115,21 @@ export function failureStage(
     return errorReason(error) === 'blocked' ? 'browser' : 'port';
   }
 
+  const lineFault =
+    isTransientLinkError(error) ||
+    (error instanceof DOMException && LINE_ERRORS.has(error.name));
+
+  if (!lineFault) {
+    return 'port';
+  }
+
   if (answered) {
     return 'lost';
   }
 
-  if (error instanceof TimeoutError) {
-    // A read that times out part way keeps the bytes it had.
-    return bytesReceived + (error.receivedBytes ?? 0) > 0
-      ? 'garbled'
-      : 'silent';
-  }
-
-  return error instanceof ProtocolError ||
-    (error instanceof DOMException && LINE_ERRORS.has(error.name))
-    ? 'garbled'
-    : 'port';
+  return error instanceof TimeoutError && bytesReceived === 0
+    ? 'silent'
+    : 'garbled';
 }
 
 /** Turns any error from the ECU stack or Web Serial into a sentence for the UI. */

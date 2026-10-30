@@ -131,7 +131,7 @@ interface Active {
   connection: EcuConnection;
   /** Whether the port has opened. */
   opened: boolean;
-  /** Whether a polling pass has finished on this connection. */
+  /** Whether the ECU has given a valid reply on this connection. */
   answered: boolean;
   poller?: Poller;
   unwatch?: () => void;
@@ -170,6 +170,7 @@ export class EcuSession {
   private readonly snapshotListeners = new Set<
     (snapshot: LiveSnapshot) => void
   >();
+  private readonly answeredListeners = new Set<(source: EcuSource) => void>();
 
   private selection: ReadingSelection = EVERY_READING;
   private active: Active | undefined;
@@ -221,6 +222,20 @@ export class EcuSession {
 
     return () => {
       this.snapshotListeners.delete(listener);
+    };
+  };
+
+  /**
+   * Calls `listener` with the source of each connection, the first time the
+   * ECU gives a valid reply on it, until the returned function is called.
+   */
+  readonly onAnswered = (
+    listener: (source: EcuSource) => void,
+  ): (() => void) => {
+    this.answeredListeners.add(listener);
+
+    return () => {
+      this.answeredListeners.delete(listener);
     };
   };
 
@@ -319,8 +334,18 @@ export class EcuSession {
       intervalMs: this.options.pollIntervalMs?.[source.kind] ?? 0,
       readings: () => this.selection.polled,
       watched: () => this.selection.watched,
-      onSnapshot: (snapshot, stats) => {
+      onReply: () => {
+        if (active.answered) {
+          return;
+        }
+
         active.answered = true;
+
+        for (const listener of this.answeredListeners) {
+          listener(source);
+        }
+      },
+      onSnapshot: (snapshot, stats) => {
         pushSnapshot(this.history, snapshot);
 
         if (this.snapshotListeners.size > 0) {
@@ -530,11 +555,16 @@ export class EcuSession {
     }
 
     const detail = describeRawError(error);
-    const stage = failureStage(error, {
-      opened: active.opened,
-      answered: active.answered,
-      bytesReceived: active.connection.bytesReceived(),
-    });
+    const bytesReceived = active.connection.bytesReceived();
+    // Without a serial line there is no stage to name, or cable to check.
+    const stage =
+      bytesReceived === undefined
+        ? undefined
+        : failureStage(error, {
+            opened: active.opened,
+            answered: active.answered,
+            bytesReceived,
+          });
 
     this.log.record('error', `Connection failed: ${detail}`);
     await this.teardown();
@@ -546,10 +576,11 @@ export class EcuSession {
 
     this.dispatchConnection({
       type: 'failed',
-      message: connectionHelp(stage).observed ?? describeError(error),
+      message:
+        (stage && connectionHelp(stage).observed) ?? describeError(error),
       detail,
       reason: errorReason(error),
-      stage,
+      ...(stage === undefined ? {} : { stage }),
     });
   }
 
