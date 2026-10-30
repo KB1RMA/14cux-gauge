@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
 import type { EcuSource } from './connect';
-import type { ErrorReason } from './errors';
+import type { ErrorReason, FailureStage } from './errors';
 
 /**
  * Connection lifecycle: idle → connecting → connected (polling) → error | idle.
@@ -20,6 +20,8 @@ export type ConnectionState =
       detail?: string;
       /** The kind of error, for anonymous usage counts. */
       reason?: ErrorReason;
+      /** How far the connection got, which decides what to tell the user. */
+      stage?: FailureStage;
     };
 
 export type ConnectionAction =
@@ -30,6 +32,7 @@ export type ConnectionAction =
       message: string;
       detail?: string;
       reason?: ErrorReason;
+      stage?: FailureStage;
     }
   | { type: 'disconnected' };
 
@@ -53,6 +56,7 @@ export function connectionReducer(
             message: action.message,
             ...(action.detail === undefined ? {} : { detail: action.detail }),
             ...(action.reason === undefined ? {} : { reason: action.reason }),
+            ...(action.stage === undefined ? {} : { stage: action.stage }),
           };
     case 'disconnected':
       return { status: 'idle', afterSession: true };

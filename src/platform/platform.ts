@@ -46,6 +46,11 @@ export interface SerialPlatform {
   /** Whether serial ports can be used here at all. */
   available(): boolean;
   /**
+   * Whether the page counts as secure (HTTPS or localhost), which browsers
+   * require before they offer serial ports.
+   */
+  securePage(): boolean;
+  /**
    * Asks the user to choose a port. Rejects with a `NotFoundError`
    * `DOMException` if they dismiss the picker (see `isPortPickerCancelled`).
    */

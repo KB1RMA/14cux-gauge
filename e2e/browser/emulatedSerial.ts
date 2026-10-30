@@ -23,6 +23,8 @@ export interface EmulatedSerialControls {
   peek(address: number, length: number): number[];
   /** Makes the ECU stop (or resume) answering. */
   setSilent(silent: boolean): void;
+  /** Makes the ECU corrupt (or stop corrupting) every echo. */
+  setGarbled(garbled: boolean): void;
   /** Simulates pulling the USB cable out. */
   unplug(): void;
 }
@@ -36,6 +38,7 @@ declare global {
 class EmulatedSerialPort extends EventTarget {
   readonly ecu = new SimulatedTransport();
   readonly opens: SerialOptions[] = [];
+  garbled = false;
   readable: ReadableStream<Uint8Array> | null = null;
   writable: WritableStream<Uint8Array> | null = null;
   #toHost: ReadableStreamDefaultController<Uint8Array> | undefined;
@@ -59,6 +62,7 @@ class EmulatedSerialPort extends EventTarget {
     });
     this.writable = new WritableStream<Uint8Array>({
       write: async (chunk) => {
+        this.ecu.corruptNextEcho = this.garbled;
         await this.ecu.write(chunk);
         await this.#deliverReply();
       },
@@ -112,6 +116,9 @@ const controls: EmulatedSerialControls = {
   },
   setSilent(silent) {
     port.ecu.silent = silent;
+  },
+  setGarbled(garbled) {
+    port.garbled = garbled;
   },
   unplug() {
     port.unplug();

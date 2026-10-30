@@ -12,7 +12,8 @@ import { METRIC_KEYS, type MetricKey } from '../metrics';
 import type { LiveSnapshot, ReadingKey } from '../model/snapshot';
 import type { EcuConnection, EcuSource } from './connect';
 import { connectionReducer, type ConnectionState } from './connectionState';
-import { describeError, errorReason } from './errors';
+import { connectionHelp } from './connectionHelp';
+import { describeError, errorReason, failureStage } from './errors';
 import type { EcuRead } from './reads';
 import {
   ALL_READINGS,
@@ -128,6 +129,10 @@ function createDefaultLog(): DiagnosticLog {
 interface Active {
   link: EcuLink;
   connection: EcuConnection;
+  /** Whether the port has opened. */
+  opened: boolean;
+  /** Whether the ECU has given a valid reply on this connection. */
+  answered: boolean;
   poller?: Poller;
   unwatch?: () => void;
   /** Reads run by `readNow` that have not finished. */
@@ -165,6 +170,7 @@ export class EcuSession {
   private readonly snapshotListeners = new Set<
     (snapshot: LiveSnapshot) => void
   >();
+  private readonly answeredListeners = new Set<(source: EcuSource) => void>();
 
   private selection: ReadingSelection = EVERY_READING;
   private active: Active | undefined;
@@ -216,6 +222,20 @@ export class EcuSession {
 
     return () => {
       this.snapshotListeners.delete(listener);
+    };
+  };
+
+  /**
+   * Calls `listener` with the source of each connection, the first time the
+   * ECU gives a valid reply on it, until the returned function is called.
+   */
+  readonly onAnswered = (
+    listener: (source: EcuSource) => void,
+  ): (() => void) => {
+    this.answeredListeners.add(listener);
+
+    return () => {
+      this.answeredListeners.delete(listener);
     };
   };
 
@@ -282,6 +302,8 @@ export class EcuSession {
     const active: Active = {
       link: { id: ++this.links },
       connection,
+      opened: false,
+      answered: false,
       reads: new Set(),
     };
 
@@ -290,7 +312,7 @@ export class EcuSession {
     try {
       await connection.ecu.connect();
     } catch (error) {
-      await this.fail(myGeneration, error);
+      await this.fail(myGeneration, active, error);
 
       return;
     }
@@ -299,10 +321,12 @@ export class EcuSession {
       return;
     }
 
+    active.opened = true;
     active.unwatch = connection.onLost(() => {
       this.log.record('event', 'The browser reported the port disconnected');
       void this.fail(
         myGeneration,
+        active,
         new DOMException('The serial port was disconnected.', 'NetworkError'),
       );
     });
@@ -310,6 +334,17 @@ export class EcuSession {
       intervalMs: this.options.pollIntervalMs?.[source.kind] ?? 0,
       readings: () => this.selection.polled,
       watched: () => this.selection.watched,
+      onReply: () => {
+        if (active.answered) {
+          return;
+        }
+
+        active.answered = true;
+
+        for (const listener of this.answeredListeners) {
+          listener(source);
+        }
+      },
       onSnapshot: (snapshot, stats) => {
         pushSnapshot(this.history, snapshot);
 
@@ -324,7 +359,7 @@ export class EcuSession {
         this.setLive({ snapshot, stats });
       },
       onError: (error) => {
-        void this.fail(myGeneration, error);
+        void this.fail(myGeneration, active, error);
       },
       onRetry: (error, consecutiveErrors) => {
         this.log.record(
@@ -510,12 +545,26 @@ export class EcuSession {
     await this.disposed;
   }
 
-  private async fail(forGeneration: number, error: unknown): Promise<void> {
+  private async fail(
+    forGeneration: number,
+    active: Active,
+    error: unknown,
+  ): Promise<void> {
     if (forGeneration !== this.generation) {
       return;
     }
 
     const detail = describeRawError(error);
+    const bytesReceived = active.connection.bytesReceived();
+    // Without a serial line there is no stage to name, or cable to check.
+    const stage =
+      bytesReceived === undefined
+        ? undefined
+        : failureStage(error, {
+            opened: active.opened,
+            answered: active.answered,
+            bytesReceived,
+          });
 
     this.log.record('error', `Connection failed: ${detail}`);
     await this.teardown();
@@ -527,9 +576,11 @@ export class EcuSession {
 
     this.dispatchConnection({
       type: 'failed',
-      message: describeError(error),
+      message:
+        (stage && connectionHelp(stage).observed) ?? describeError(error),
       detail,
       reason: errorReason(error),
+      ...(stage === undefined ? {} : { stage }),
     });
   }
 

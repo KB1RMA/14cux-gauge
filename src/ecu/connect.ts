@@ -4,6 +4,7 @@ import { BAUD, BAUD_DOUBLE_SPEED, Ecu } from '@kb1rma/libcomm14cux-ts';
 import { createDemoEngine } from '../demo/demoEngine';
 import type { RecordedSource } from '../model/source';
 import type { DiagnosticLog } from '../diagnostics/diagnosticLog';
+import { CountingTransport } from './countingTransport';
 import { TracingTransport } from '../diagnostics/tracingTransport';
 import type { SerialPlatform, SerialPortHandle } from '../platform/platform';
 
@@ -29,6 +30,11 @@ export function recordedSource(source: EcuSource): RecordedSource {
 export interface EcuConnection {
   readonly ecu: Ecu;
   readonly source: EcuSource;
+  /**
+   * Bytes read from the ECU's side of the link so far, or `undefined` where
+   * there is no serial line to count, as in demo mode.
+   */
+  bytesReceived(): number | undefined;
   /**
    * Calls `listener` if the link is lost outside of the ECU protocol (for
    * example the USB cable is unplugged). Returns an unsubscribe function.
@@ -58,9 +64,8 @@ function createSerialEcu(
 ): EcuConnection {
   const baudRate = source.doubleSpeed ? BAUD_DOUBLE_SPEED : BAUD;
   const link = serial.open(source.port, { baudRate });
-  const ecu = new Ecu(
-    log ? new TracingTransport(link.transport, log) : link.transport,
-  );
+  const counted = new CountingTransport(link.transport);
+  const ecu = new Ecu(log ? new TracingTransport(counted, log) : counted);
 
   log?.record(
     'event',
@@ -70,6 +75,7 @@ function createSerialEcu(
   return {
     ecu,
     source,
+    bytesReceived: () => counted.received,
     onLost: (listener) => link.onLost(listener),
     async dispose() {
       // The port may already be gone (unplugged); there is nothing to recover.
@@ -85,6 +91,7 @@ function createDemoEcu(): EcuConnection {
   return {
     ecu,
     source: { kind: 'demo' },
+    bytesReceived: () => undefined,
     onLost: () => () => undefined,
     async dispose() {
       engine.stop();

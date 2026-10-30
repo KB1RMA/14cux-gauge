@@ -37,6 +37,7 @@ export function testPlatform(overrides: Partial<Platform> = {}): Platform {
   return {
     serial: {
       available: () => true,
+      securePage: () => true,
       requestPort: () => Promise.resolve({ description: 'Test adapter' }),
       grantedPorts: () => Promise.resolve([]),
       open: () => ({

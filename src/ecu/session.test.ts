@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 14cux-gauge contributors
-import { MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
+import { Ecu, MemoryOffset, SimulatedTransport } from '@kb1rma/libcomm14cux-ts';
 import { waitFor } from '@testing-library/react';
 import { onTestFinished } from 'vitest';
 import { LatencyTransport } from '../demo/latencyTransport';
@@ -52,6 +52,15 @@ class SlowToOpen extends SimulatedTransport {
 
   finish(error?: Error): void {
     this.settle?.(error);
+  }
+}
+
+/** Corrupts the echo of everything sent to it, as a wrong baud rate would. */
+class CorruptEchoes extends SimulatedTransport {
+  override write(data: Uint8Array): Promise<void> {
+    this.corruptNextEcho = true;
+
+    return super.write(data);
   }
 }
 
@@ -130,17 +139,151 @@ describe('EcuSession', () => {
     const transport = idling();
     const { session } = sessionOver([transport], 0);
 
+    await session.connect({ kind: 'demo' });
+    await firstSnapshot(session);
+    transport.silent = true;
+    await waitFor(() => {
+      expect(session.getSnapshot().connection).toMatchObject({
+        status: 'error',
+        message: 'The ECU was answering, then stopped.',
+        reason: 'timeout',
+        stage: 'lost',
+      });
+    });
+    expect(session.getSnapshot().link).toBeUndefined();
+  });
+
+  it('names the lost stage when the ECU stops part way through the first pass', async () => {
+    const transport = idling();
+    const write = transport.write.bind(transport);
+    let writes = 0;
+
+    transport.write = (data) => {
+      writes++;
+      transport.silent = writes > 12;
+
+      return write(data);
+    };
+
+    const { session } = sessionOver([transport], 0);
+    const answered: unknown[] = [];
+
+    session.onAnswered((source) => {
+      answered.push(source);
+    });
+    await session.connect({ kind: 'demo' });
+    await waitFor(() => {
+      expect(session.getSnapshot().connection).toMatchObject({
+        status: 'error',
+        message: 'The ECU was answering, then stopped.',
+        stage: 'lost',
+      });
+    });
+    expect(answered).toEqual([{ kind: 'demo' }]);
+  });
+
+  it('says nothing about a serial line for a connection without one', async () => {
+    const transport = idling();
+    const ecu = new Ecu(transport);
+    const session = new EcuSession({
+      pollIntervalMs: { demo: 0 },
+      createConnection: (source) => ({
+        ecu,
+        source,
+        bytesReceived: () => undefined,
+        onLost: () => () => undefined,
+        dispose: () => ecu.disconnect(),
+      }),
+    });
+
+    onTestFinished(session.dispose);
+    transport.silent = true;
+    await session.connect({ kind: 'demo' });
+    await waitFor(() => {
+      expect(session.getSnapshot().connection.status).toBe('error');
+    });
+
+    const { connection } = session.getSnapshot();
+
+    expect(connection).toMatchObject({
+      message:
+        'The ECU stopped responding. Check the cable, that the ignition is on, and that the baud rate matches the ECU firmware.',
+    });
+    expect(connection).not.toHaveProperty('stage');
+  });
+
+  it('names the silent stage when the ECU never answers, once, however many passes retry', async () => {
+    const transport = idling();
+    const { session } = sessionOver([transport], 0);
+    const failures = new Set<unknown>();
+
+    session.subscribe(() => {
+      const { connection } = session.getSnapshot();
+
+      if (connection.status === 'error') {
+        failures.add(connection);
+      }
+    });
     transport.silent = true;
     await session.connect({ kind: 'demo' });
     await waitFor(() => {
       expect(session.getSnapshot().connection).toMatchObject({
         status: 'error',
-        message:
-          'The ECU stopped responding. Check the cable, that the ignition is on, and that the baud rate matches the ECU firmware.',
+        message: 'The serial port opened, but nothing came back from the ECU.',
         reason: 'timeout',
+        stage: 'silent',
       });
     });
-    expect(session.getSnapshot().link).toBeUndefined();
+    expect(failures.size).toBe(1);
+  });
+
+  it('names the garbled stage when only unreadable replies come back', async () => {
+    const transport = new CorruptEchoes();
+
+    const { session } = sessionOver([transport], 0);
+
+    await session.connect({ kind: 'demo' });
+    await waitFor(() => {
+      expect(session.getSnapshot().connection).toMatchObject({
+        status: 'error',
+        message:
+          'Data came back on the serial port, but it was not a valid reply from the ECU.',
+        reason: 'protocol',
+        stage: 'garbled',
+      });
+    });
+  });
+
+  it('names the port stage when writes to an open port fail', async () => {
+    // `failWrites` rejects with a plain error, so this reaches the stage but
+    // not a real cause: a real port fails with a DOMException, as the app
+    // tests' port that will not open does.
+    const transport = idling();
+    const { session } = sessionOver([transport], 0);
+
+    transport.failWrites = true;
+    await session.connect({ kind: 'demo' });
+    await waitFor(() => {
+      expect(session.getSnapshot().connection).toMatchObject({
+        status: 'error',
+        stage: 'port',
+      });
+    });
+  });
+
+  it('names the port stage when the port will not open', async () => {
+    const transport = new SlowToOpen();
+    const { session } = sessionOver([transport]);
+    const connecting = session.connect({ kind: 'demo' });
+
+    transport.finish(new DOMException('Busy', 'InvalidStateError'));
+    await connecting;
+
+    expect(session.getSnapshot().connection).toMatchObject({
+      status: 'error',
+      message: 'The serial port is already open, perhaps in another tab.',
+      stage: 'port',
+    });
   });
 
   it('keeps only the last of two connects made together', async () => {
@@ -224,6 +367,7 @@ describe('EcuSession', () => {
         return {
           ecu,
           source,
+          bytesReceived: () => 0,
           onLost: () => () => undefined,
           dispose: () => Promise.reject(new Error('The port would not close')),
         };
