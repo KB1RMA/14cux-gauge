@@ -1,0 +1,40 @@
+# Dependabot opens version-update pull requests. Pull requests are
+# squash-merged, so each title becomes the commit message on `main`, which
+# release-please reads (see AGENTS.md, "Pull requests and the changelog").
+#
+# - Runtime dependencies are bundled into the shipped app, so an update changes
+#   what users run. They use `fix(deps)`, which makes release-please open a
+#   patch release and list the update under "Bug Fixes", so merging it deploys.
+# - Development tools and GitHub Actions never reach users, so they use
+#   `chore`, which release-please leaves out of the changelog and does not
+#   release.
+#
+# Security updates follow the same prefixes, so a patched runtime dependency
+# ships on the next release.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'fix(deps)'
+      prefix-development: 'chore(deps-dev)'
+    groups:
+      # One pull request per kind of dependency keeps the changelog short.
+      runtime:
+        dependency-type: production
+        update-types: [minor, patch]
+      development:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'ci(deps)'
+    groups:
+      actions:
+        patterns: ['*']
