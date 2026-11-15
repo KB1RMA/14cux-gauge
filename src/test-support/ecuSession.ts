@@ -2,6 +2,7 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { Ecu, type Transport } from '@kb1rma/libcomm14cux-ts';
 import { onTestFinished } from 'vitest';
+import { CountingTransport } from '../ecu/countingTransport';
 import { EcuSession, type EcuSessionOptions } from '../ecu/session';
 
 /**
@@ -22,21 +23,30 @@ export function sessionOver(
   pollIntervalMs = ONE_PASS_MS,
   options: Omit<EcuSessionOptions, 'createConnection' | 'pollIntervalMs'> = {},
 ): { session: EcuSession; ecus: Ecu[] } {
-  const ecus = transports.map((transport) => new Ecu(transport));
-  const unused = [...ecus];
+  const counted = transports.map(
+    (transport) => new CountingTransport(transport),
+  );
+  const ecus = counted.map((transport) => new Ecu(transport));
+  const unused = counted.map((transport, index) => ({
+    transport,
+    ecu: ecus[index] as Ecu,
+  }));
   const session = new EcuSession({
     ...options,
     pollIntervalMs: { demo: pollIntervalMs },
     createConnection: (source) => {
-      const ecu = unused.shift();
+      const next = unused.shift();
 
-      if (!ecu) {
+      if (!next) {
         throw new Error('No transport left for another connection');
       }
+
+      const { ecu, transport } = next;
 
       return {
         ecu,
         source,
+        bytesReceived: () => transport.received,
         onLost: () => () => undefined,
         dispose: () => ecu.disconnect().catch(() => undefined),
       };

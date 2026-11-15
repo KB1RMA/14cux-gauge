@@ -22,6 +22,7 @@ export function useEcu(): EcuContextValue {
       disconnect: session.disconnect,
       reconnect: session.reconnect,
       onSnapshot: session.onSnapshot,
+      onAnswered: session.onAnswered,
     }),
     [connection, link, holder, pollingPaused, session],
   );

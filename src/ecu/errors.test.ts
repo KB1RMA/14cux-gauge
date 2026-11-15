@@ -7,7 +7,67 @@ import {
   ReadCancelledError,
   TimeoutError,
 } from '@kb1rma/libcomm14cux-ts';
-import { errorReason } from './errors';
+import { errorReason, failureStage } from './errors';
+
+describe('failureStage', () => {
+  const opened = { opened: true, answered: false, bytesReceived: 0 };
+
+  it('blames the browser only when it refused the port', () => {
+    const closed = { ...opened, opened: false };
+
+    expect(failureStage(new DOMException('No', 'SecurityError'), closed)).toBe(
+      'browser',
+    );
+    expect(failureStage(new DOMException('No', 'NetworkError'), closed)).toBe(
+      'port',
+    );
+  });
+
+  it('calls a timeout silent only if not one byte arrived', () => {
+    expect(failureStage(new TimeoutError('No data'), opened)).toBe('silent');
+    expect(
+      failureStage(new TimeoutError('No data'), {
+        ...opened,
+        bytesReceived: 1,
+      }),
+    ).toBe('garbled');
+  });
+
+  it('calls unreadable bytes garbled', () => {
+    expect(failureStage(new ProtocolError('Bad echo'), opened)).toBe('garbled');
+    expect(failureStage(new DOMException('Bad', 'FramingError'), opened)).toBe(
+      'garbled',
+    );
+    expect(failureStage(new DOMException('Bad', 'BreakError'), opened)).toBe(
+      'garbled',
+    );
+  });
+
+  it('calls any other error on an open port a port failure', () => {
+    expect(failureStage(new DOMException('Gone', 'NetworkError'), opened)).toBe(
+      'port',
+    );
+    expect(failureStage(new NotConnectedError('Closed'), opened)).toBe('port');
+  });
+
+  it('never blames the wiring once the ECU has answered', () => {
+    const answered = { ...opened, answered: true, bytesReceived: 500 };
+
+    expect(failureStage(new TimeoutError('No data'), answered)).toBe('lost');
+    expect(failureStage(new ProtocolError('Bad echo'), answered)).toBe('lost');
+    expect(
+      failureStage(new DOMException('Bad', 'FramingError'), answered),
+    ).toBe('lost');
+  });
+
+  it('keeps a port failure a port failure once the ECU has answered', () => {
+    const answered = { ...opened, answered: true, bytesReceived: 500 };
+
+    expect(
+      failureStage(new DOMException('Gone', 'NetworkError'), answered),
+    ).toBe('port');
+  });
+});
 
 describe('errorReason', () => {
   it('names each ECU error', () => {

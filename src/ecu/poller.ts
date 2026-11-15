@@ -113,6 +113,8 @@ export interface PollerOptions {
   /** Consecutive failed passes (timeouts or protocol errors) before giving up. */
   maxConsecutiveErrors?: number;
   onSnapshot(snapshot: LiveSnapshot, stats: PollerStats): void;
+  /** Called after each read the ECU replied to, even if the value was out of range. */
+  onReply?(): void;
   /**
    * Called once if polling stops by itself, with the error that stopped it.
    * Not called after {@link Poller.stop}.
@@ -177,9 +179,16 @@ export function startPoller(ecu: Ecu, options: PollerOptions): Poller {
     }
 
     try {
-      return await get();
+      const value = await get();
+
+      options.onReply?.();
+
+      return value;
     } catch (error) {
       if (error instanceof InvalidReadingError) {
+        // The ECU did reply; only the value was out of range.
+        options.onReply?.();
+
         return null;
       }
 

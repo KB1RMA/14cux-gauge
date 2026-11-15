@@ -93,6 +93,7 @@ class WebSerialPortHandle implements SerialPortHandle {
 export const webSerial: SerialPlatform = {
   // Asked each time: the page cannot gain Web Serial later, but tests do.
   available: () => 'serial' in navigator,
+  securePage: () => window.isSecureContext !== false,
   requestPort: async () =>
     new WebSerialPortHandle(await navigator.serial.requestPort()),
   grantedPorts: async () =>

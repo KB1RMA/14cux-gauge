@@ -3,7 +3,12 @@
 import { CheckIcon } from '@radix-ui/react-icons';
 import { Checkbox, Label } from 'radix-ui';
 import { useEffect, useId, useRef, useState } from 'react';
-import { describeError, isPortPickerCancelled } from '../ecu/errors';
+import { CABLE_NOTES_URL } from '../ecu/connectionHelp';
+import {
+  describeError,
+  errorReason,
+  isPortPickerCancelled,
+} from '../ecu/errors';
 import { describeRawError } from '../diagnostics/diagnosticLog';
 import { useDiagnostics } from '../diagnostics/useDiagnostics';
 import { useEcu } from '../ecu/useEcu';
@@ -11,10 +16,9 @@ import { useGrantedPorts } from '../ecu/useGrantedPorts';
 import { usePlatform } from '../platform/usePlatform';
 import type { SerialPortHandle } from '../platform/platform';
 import { useSetting } from '../settings/useSetting';
+import { ConnectionChecks } from './ConnectionChecks';
 import { ExternalLink } from './ExternalLink';
 import styles from './ConnectScreen.module.css';
-
-const LIBRARY_HARDWARE_URL = 'https://github.com/KB1RMA/comm14cux-ts#hardware';
 
 export function ConnectScreen() {
   const { state, connect } = useEcu();
@@ -22,7 +26,9 @@ export function ConnectScreen() {
   const { serial } = usePlatform();
   const [doubleSpeed, setDoubleSpeed] = useSetting('doubleSpeed');
   const grantedPorts = useGrantedPorts();
-  const [pickerError, setPickerError] = useState<string | undefined>(undefined);
+  const [pickerError, setPickerError] = useState<
+    { message: string; blocked: boolean } | undefined
+  >(undefined);
   const supported = serial.available();
   const busy = state.status === 'connecting';
   const doubleSpeedId = useId();
@@ -54,7 +60,10 @@ export function ConnectScreen() {
           'error',
           `The port picker failed: ${describeRawError(error)}`,
         );
-        setPickerError(describeError(error));
+        setPickerError({
+          message: describeError(error),
+          blocked: errorReason(error) === 'blocked',
+        });
       }
 
       return;
@@ -80,9 +89,7 @@ export function ConnectScreen() {
             <p>
               Plug in the interface cable, switch the ignition on, then choose
               the cable&apos;s serial port. See the{' '}
-              <ExternalLink href={LIBRARY_HARDWARE_URL}>
-                hardware notes
-              </ExternalLink>{' '}
+              <ExternalLink href={CABLE_NOTES_URL}>hardware notes</ExternalLink>{' '}
               for the cable you need.
             </p>
             <div className={styles['check']}>
@@ -136,6 +143,12 @@ export function ConnectScreen() {
               Connect to ECU
             </button>
           </>
+        ) : !serial.securePage() ? (
+          <p role="note" className={styles['unsupported']}>
+            This page was not loaded over HTTPS or from localhost, so the
+            browser does not offer serial ports here. Open it from its https://
+            address. Demo mode still works here.
+          </p>
         ) : (
           <p role="note" className={styles['unsupported']}>
             This browser can&apos;t talk to serial ports. Web Serial needs
@@ -145,9 +158,10 @@ export function ConnectScreen() {
         )}
         {pickerError ? (
           <p role="alert" className={styles['error']}>
-            {pickerError}
+            {pickerError.message}
           </p>
         ) : null}
+        {pickerError?.blocked ? <ConnectionChecks stage="browser" /> : null}
       </section>
 
       <section className={styles['card']} aria-labelledby="demo-title">

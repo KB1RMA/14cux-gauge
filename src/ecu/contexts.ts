@@ -27,6 +27,11 @@ export interface EcuContextValue {
    * readings, not those a view asked for.
    */
   onSnapshot(listener: (snapshot: LiveSnapshot) => void): () => void;
+  /**
+   * Calls `listener` with the source of each connection, the first time the
+   * ECU gives a valid reply on it, until the returned function is called.
+   */
+  onAnswered(listener: (source: EcuSource) => void): () => void;
 }
 
 /** The controller for the ECU link; see `EcuSession`. */

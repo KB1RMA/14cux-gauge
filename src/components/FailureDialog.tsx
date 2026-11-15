@@ -2,8 +2,10 @@
 // Copyright (C) 2026 14cux-gauge contributors
 import { Dialog } from 'radix-ui';
 import { useId } from 'react';
+import type { FailureStage } from '../ecu/errors';
 import { formatRecentEntries } from '../diagnostics/report';
 import { useDiagnostics } from '../diagnostics/useDiagnostics';
+import { ConnectionChecks } from './ConnectionChecks';
 import { DownloadLogButton } from './DownloadLogButton';
 import dialogStyles from './ConfirmDialog.module.css';
 import styles from './FailureDialog.module.css';
@@ -17,6 +19,10 @@ export interface FailureDialogProps {
   message: string;
   /** The raw error name and message, if known. */
   detail: string | undefined;
+  /** How far the connection got, if known. */
+  stage: FailureStage | undefined;
+  /** Connects at this baud rate, if another is worth offering. */
+  otherBaud?: { rate: string; connect(): void } | undefined;
   onClose(): void;
   /** Where focus goes when the dialog closes. */
   onCloseAutoFocus(): void;
@@ -49,13 +55,16 @@ function RecentLog() {
 }
 
 /**
- * Shown when a connection fails: what went wrong in plain words, the raw
- * error, the most recent serial traffic, and the full log to download.
+ * Shown when a connection fails: what went wrong in plain words, what to
+ * check, the raw error, the most recent serial traffic, and the full log to
+ * download.
  */
 export function FailureDialog({
   open,
   message,
   detail,
+  stage,
+  otherBaud,
   onClose,
   onCloseAutoFocus,
 }: FailureDialogProps) {
@@ -83,6 +92,7 @@ export function FailureDialog({
             Connection failed
           </Dialog.Title>
           <Dialog.Description>{message}</Dialog.Description>
+          {stage === undefined ? null : <ConnectionChecks stage={stage} />}
           {detail === undefined ? null : (
             <p>
               Error: <code className={styles['detail']}>{detail}</code>
@@ -95,6 +105,11 @@ export function FailureDialog({
           </p>
           <div className={dialogStyles['actions']}>
             <Dialog.Close type="button">Close</Dialog.Close>
+            {otherBaud ? (
+              <Dialog.Close type="button" onClick={otherBaud.connect}>
+                Try {otherBaud.rate} baud
+              </Dialog.Close>
+            ) : null}
             <DownloadLogButton primary />
           </div>
         </Dialog.Content>

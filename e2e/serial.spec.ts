@@ -117,6 +117,59 @@ test.describe('Serial ECU over Web Serial', () => {
     expect(await emulatedSerial.opens()).toHaveLength(2);
   });
 
+  test('says what to check when the ECU never answers', async ({
+    page,
+    emulatedSerial,
+  }) => {
+    await page.goto('./');
+    await emulatedSerial.setSilent(true);
+    await page.getByRole('button', { name: 'Connect to ECU' }).click();
+
+    const failure = page.getByRole('dialog', { name: 'Connection failed' });
+
+    await expect(failure).toContainText(
+      'The serial port opened, but nothing came back from the ECU.',
+    );
+    await expect(
+      failure
+        .getByRole('list', { name: 'What to check' })
+        .getByRole('listitem')
+        .filter({ hasText: 'The grounding plug is not fitted.' }),
+    ).toBeVisible();
+    await expectNoAxeViolations(page, { within: '[role="dialog"]' });
+    await failure.getByRole('button', { name: 'Close' }).click();
+
+    await expect(connectionStatus(page)).toHaveText(
+      'Disconnected: The serial port opened, but nothing came back from the ECU.',
+    );
+  });
+
+  test('offers the other baud rate when replies are unreadable', async ({
+    page,
+    emulatedSerial,
+  }) => {
+    await page.goto('./');
+    await emulatedSerial.setGarbled(true);
+    await page.getByRole('button', { name: 'Connect to ECU' }).click();
+
+    const failure = page.getByRole('dialog', { name: 'Connection failed' });
+
+    await expect(failure).toContainText(
+      'Data came back on the serial port, but it was not a valid reply from the ECU.',
+    );
+    await expectNoAxeViolations(page, { within: '[role="dialog"]' });
+
+    await emulatedSerial.setGarbled(false);
+    await failure.getByRole('button', { name: 'Try 15625 baud' }).click();
+
+    await expect(connectionStatus(page)).toHaveText(
+      'Serial ECU (15625 baud) · Polling',
+    );
+    await expect
+      .poll(async () => (await emulatedSerial.opens()).at(-1)?.baudRate)
+      .toBe(15625);
+  });
+
   test('reports an ECU that stops responding', async ({
     page,
     emulatedSerial,
@@ -132,14 +185,12 @@ test.describe('Serial ECU over Web Serial', () => {
 
     const failure = page.getByRole('dialog', { name: 'Connection failed' });
 
-    await expect(failure).toContainText(
-      'The ECU stopped responding. Check the cable, that the ignition is on, and that the baud rate matches the ECU firmware.',
-    );
+    await expect(failure).toContainText('The ECU was answering, then stopped.');
     await expect(failure).toContainText('Error: TimeoutError: ');
     await failure.getByRole('button', { name: 'Close' }).click();
 
     await expect(connectionStatus(page)).toHaveText(
-      'Disconnected: The ECU stopped responding. Check the cable, that the ignition is on, and that the baud rate matches the ECU firmware.',
+      'Disconnected: The ECU was answering, then stopped.',
     );
     await expect(page.getByRole('button', { name: 'Reconnect' })).toBeFocused();
     // The last readings are not left on screen looking live.
