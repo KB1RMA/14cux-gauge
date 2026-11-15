@@ -182,6 +182,42 @@ describe('EcuSession', () => {
     expect(answered).toEqual([{ kind: 'demo' }]);
   });
 
+  it('counts an out-of-range reply as the ECU answering, so a later silence is lost', async () => {
+    // Zeroed main-voltage factors make that one reading out of range; the
+    // ECU still replied to it.
+    const transport = idling();
+    const write = transport.write.bind(transport);
+    let writes = 0;
+
+    transport.write = (data) => {
+      writes++;
+      transport.silent = writes > 12;
+
+      return write(data);
+    };
+
+    const { session } = sessionOver([transport], 0);
+    const answered: unknown[] = [];
+
+    session.select({
+      polled: new Set(['mainVoltage']),
+      chosen: new Set(['mainVoltage']),
+      watched: new Set(['mainVoltage']),
+    });
+    session.onAnswered((source) => {
+      answered.push(source);
+    });
+    await session.connect({ kind: 'demo' });
+    await waitFor(() => {
+      expect(session.getSnapshot().connection).toMatchObject({
+        status: 'error',
+        message: 'The ECU was answering, then stopped.',
+        stage: 'lost',
+      });
+    });
+    expect(answered).toEqual([{ kind: 'demo' }]);
+  });
+
   it('says nothing about a serial line for a connection without one', async () => {
     const transport = idling();
     const ecu = new Ecu(transport);
