@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.1](https://github.com/KB1RMA/14cux-gauge/compare/v0.14.0...v0.14.1) (2026-11-15)
+
+
+### Bug Fixes
+
+* update zod to a patched version that cannot exhaust memory on oversized input ([f6d41df](https://github.com/KB1RMA/14cux-gauge/commit/f6d41dff77b17b1425b2977dee5ce9e0f9df069c))
+
 ## [0.14.0](https://github.com/KB1RMA/14cux-gauge/compare/v0.13.1...v0.14.0) (2026-11-15)
 
 
